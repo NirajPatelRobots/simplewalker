@@ -3,8 +3,6 @@
 Created March 2021
 TODO:
     tests
-    same angles through right and left leg don't give symmetric results
-    deal with Jacobian singularity
     I'm sure MotionController_data isn't very pythonic but I refuse to read a style guide
 
 @author: Niraj
@@ -21,9 +19,9 @@ class MotionController:
     """A motion control calculator.
     use MC.set_plan() to set a new plan
     use MC.calc_controller() to calculate motor commands from angle sensors.
-    MC.dt is the time between calc_controller or set_leg_angles() calls
+    MC.dt is the time between calc_controller or set_leg_angles calls
     The first time you receive angle data, or any other time you have angle data
-        but don't run the controller, use MC.set_leg_angles()"""
+        but don't run calc_controller, use MC.set_leg_angles() instead to keep timing."""
     def __init__(self, dt = 1/20):
         """ constructor.
         dt is the time between calc_controller calls"""
@@ -137,8 +135,7 @@ class MotionController:
             estimated difference between current and desired motor angular velocity
         """
         pos, fk_Jac = kin.forward_kinematics(angle, body_inclination, return_Jacobian=True)
-        #TODO: deal with singularity
-        ik_Jac = np.linalg.inv(fk_Jac)
+        ik_Jac = kin.ik_Jacobian(fk_Jac, angle)
         ik_Jac_dot = (ik_Jac - self._ik_Jac) / self.dt
         self._ik_Jac = ik_Jac
         
@@ -191,7 +188,7 @@ class MotionController_data:
     def __init__(self):
         self.right_leg_conn = 0.03*kin.RIGHT_DIR
         self.left_leg_conn = -0.03*kin.RIGHT_DIR
-        self.body_weight = .2 * 9.81 # [N]
+        self.body_weight = .5 * 9.81 # [N]
         self.right_default_pos = -0.30*kin.UP_DIR + 0.05*kin.RIGHT_DIR
         self.left_default_pos = -0.30*kin.UP_DIR - 0.05*kin.RIGHT_DIR
         self.kp_1 = 5.0 #proportional gain on motor 1
@@ -219,34 +216,61 @@ def test():
     MC = MotionController()
     kin.forward_kinematics(np.zeros(3), 0.0, return_Jacobian=True) #compile
     MC.set_leg_angles(np.zeros(3), np.zeros(3))
-    numTries = 5000
+    numTries = 1000
     angles = np.array([[np.pi/2], [np.pi/2], [-np.pi]]) * np.random.random((3,numTries))
     inclination = np.random.random((numTries)) * np.pi/2
     
     rightCommands = np.empty((3,numTries))
     leftCommands = np.empty((3,numTries))
     
+    angles[:,0] = np.array([ 0.3631415 ,  1.44248313, -0.07108321])
+    
     #test calc_controller speed
     startTime = process_time()
     for i in range(numTries):
-        rightCommands[:,i], leftCommands[:,i] = MC.calc_controller(angles[:,i], -kin.RIGHT_DIR * angles[:,i], inclination[i])
+        rightCommands[:,i], leftCommands[:,i] = MC.calc_controller(angles[:,i], kin.LEFTSCALE * angles[:,i], inclination[i])
     calc_time = process_time() - startTime
     print("calc_controller takes", round(calc_time * 1e6 / numTries), "us")
     
-    if not np.all(np.isclose(rightCommands, leftCommands)):
+    #test identical left and right results
+    if np.all(np.isclose(rightCommands, kin.LEFTSCALE_L * leftCommands)):
+        print("Right and left commands were symmetrical")
+    else:
         print("FAIL: Right and left commands were not symmetrical")
-    asymmetries = 0
-    for i in range(numTries):
-        if not np.all(np.isclose(rightCommands[:,i], leftCommands[:,i])):
-            # print(rightCommands[:,i], leftCommands[:,i])
-            asymmetries += 1
-    print(asymmetries, "out of", numTries)
     
     #test leg angle error using inverse_kinematics
     angles_ref = angles + (np.random.random((3,numTries)) - 0.5) * 0.1
     
+    # test calc theta0, calc theta1, calc theta2
+    # move using each result, check you got closer to goal
+    resultAngles = np.empty((3, numTries))
+    resultAngles[0,:] = rightCommands[0,:]
+    resultAngles[1:,:] = angles[1:,:] + 0.01 * rightCommands[1:,:]
+    t0fails = 0
+    t1fails = 0
+    t2fails = 0
+    for i in range(numTries):
+        t0angles = np.array([rightCommands[0,i], angles[1,i], angles[2,i]])
+        t1angles = np.array([angles[0,i], angles[1,i] + 0.01 * rightCommands[1,i], angles[2,i]])
+        t2angles = np.array([angles[0,i], angles[1,i], angles[2,i] + 0.01 * rightCommands[2,i]])
+        
+        startDist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(angles[:,i], inclination[i]))**2)
+        t0Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t0angles, inclination[i]))**2)
+        t1Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t1angles, inclination[i]))**2)
+        t2Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t2angles, inclination[i]))**2)
+        if t0Dist > startDist:
+            t0fails += 1
+        if t1Dist > startDist:
+            t1fails += 1
+        if t2Dist > startDist:
+            t2fails += 1
+    if t0fails > 0:
+        print("FAIL: Angle command 0 failed to improve tracking error", t0fails, "/", numTries, "times")
+    if t1fails > 0:
+        print("FAIL: Angle command 1 failed to improve tracking error", t1fails, "/", numTries, "times")
+    if t2fails > 0:
+        print("FAIL: Angle command 2 failed to improve tracking error", t2fails, "/", numTries, "times")
     
-    #test calc theta0, calc theta1, calc theta2
     
     # test parameters saving
     params = MotionController_data()

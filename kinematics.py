@@ -18,13 +18,14 @@ THIGH_LENGTH = 0.2 # [m]
 RIGHT = 0
 FORWARD = 1
 UP = 2
-HORIZONTAL = (FORWARD, RIGHT)
+HORIZONTAL = (RIGHT, FORWARD)
 RIGHT_DIR = np.array([1,0,0])
 FORWARD_DIR = np.array([0,1,0])
 UP_DIR = np.array([0,0,1])
 
 LEFTSCALE = np.ones(3)
-LEFTSCALE[RIGHT] *= -1 #multiply by this to change right to left
+LEFTSCALE[RIGHT] *= -1 # multiply vectors by LEFTSCALE to change right to left
+LEFTSCALE_L = LEFTSCALE.reshape((3,1)) # LEFTSCALE but for matrices instead of vectors
 
 def forward_kinematics(theta, body_inclination, return_Jacobian=False):
     """given motor angles, find the expected position of the foot.
@@ -65,6 +66,24 @@ def fk_Jacobian(theta, body_inclination):
     phi2 = phi1 + theta[2]
     phi = np.array([theta[0], phi1, phi2])
     return _fk_Jac_physTrig(np.sin(phi), np.cos(phi))
+
+def ik_Jacobian(fk_Jac, angle):
+    """find the inverse of the fk Jacobian. Deals with singularity.
+    fk_Jac is the forward jacobian, angle is the associated leg angles"""
+    max_width = 0.2 # the width in radians of the singularity handling
+    width = np.abs(angle[2])
+    if width > max_width:
+        ik_Jac = np.linalg.inv(fk_Jac)
+        return ik_Jac
+    else: #if we're close to the singularity
+        backup = np.empty((3,3))
+        backup[0:2,:] = np.linalg.pinv(fk_Jac[:,0:2])
+        backup[2,:] = 2 * backup[1,:]
+        if width > 0.02:
+            ik_Jac = np.linalg.inv(fk_Jac)
+            return (width / max_width) * ik_Jac + (1 - width / max_width) * backup
+        else: # too close to singularity for any inverse
+            return backup
 
 def fk_Jacobian_dot(theta, omega):
     """given leg angles and angular velocity, find the time derivative of the Jacobian returned by fk_Jacobian.
@@ -125,6 +144,7 @@ def _fk_Jac_physTrig(sines, cosines):
 
 def test():
     import time
+    import matplotlib.pyplot as plt
     rng = np.random.default_rng()
     numTries = 5000
     # thetas is [theta0 theta1 theta2 alpha] for each try
@@ -132,6 +152,7 @@ def test():
     fk_results = np.empty((3,numTries))
     Jac_results = np.empty((3,3,numTries))
     fk_Jac_results = np.empty((3,3,numTries))
+    ik_Jac_results = np.empty((3,3,numTries))
     ik_thetas = thetas[:3,:] + rng.uniform(low=-0.1, high=0.1, size=(3,numTries))
     ik_results = np.empty((3,numTries))
     ik_fails = np.zeros((numTries), dtype = int)
@@ -139,6 +160,7 @@ def test():
     forward_kinematics(np.zeros(3), 0.0)
     fk_Jacobian(np.zeros(3), 0.0) #compile
     
+    # Run everything and test timings
     startTime = time.perf_counter()
     for i in range(numTries):
         fk_results[:,i] = forward_kinematics(thetas[:3,i], thetas[3,i])
@@ -157,8 +179,29 @@ def test():
     fk_Jac_time = time.perf_counter() - startTime
     print("forward_kinematics with Jacobian takes", round(fk_Jac_time * 1e6 / numTries, 3), "us")
     
+    startTime = time.perf_counter()
+    for i in range(numTries):
+        ik_Jac_results[:,:,i] = ik_Jacobian(fk_Jac_results[:,:,i], thetas[:3,i])
+    ik_Jac_time = time.perf_counter() - startTime
+    print("inverse Jacobian takes", round(ik_Jac_time * 1e6 / numTries, 3), "us")
+    
+    # Test same results for forward_kinematics and fk_Jacobian
     if not np.all(np.isclose(Jac_results, fk_Jac_results)):
         print("FAIL: forward_kinematics and fk_Jacobian yielded different values")
+        
+    # test ik_Jacobian and fk_Jacobian match
+    eig = np.empty((3, numTries), dtype=np.complex64)
+    for i in range(numTries):
+        evals, _ = np.linalg.eig(ik_Jac_results[:,:,i] @ fk_Jac_results[:,:,i])
+        eig[:,i] = evals
+    print("ik_Jacobian and fk_Jacobian comparison, should be 1.0:", np.max(eig), np.min(eig))
+    fig = plt.figure(1)
+    fig.clf()
+    plt.plot(thetas[2,:], eig[0,:], '.', thetas[2,:], eig[1,:], '.', thetas[2,:], eig[2,:], '.')
+    plt.grid(True)
+    plt.xlabel("Knee Angle [rad]")
+    plt.ylabel("Eigenvalues (should be 1.0)")
+    plt.title("ik_Jacobian and fk_Jacobian comparison")
     
     startTime = time.perf_counter()
     for i in range(numTries):
@@ -180,6 +223,7 @@ def test():
             print("\t", forward_kinematics(ik_results[:,i], thetas[3,i]), " ||| ", fk_results[:,i])
             failnum += 1
     print(failnum, "inverse_kinematics incorrect results")
+    
     
         
     
