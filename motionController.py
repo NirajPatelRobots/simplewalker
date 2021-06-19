@@ -4,6 +4,7 @@ Created March 2021
 TODO:
     tests
     I'm sure MotionController_data isn't very pythonic but I refuse to read a style guide
+    tests have a wide range s.t. we expect some tracking error fails
 
 @author: Niraj
 """
@@ -36,7 +37,7 @@ class MotionController:
         self.params = MotionController_data.load("settings/MotionController.dat")
         if self.params is None:
             self.params = MotionController_data()
-        self.plan.createPlan(np.zeros(3), self.params.right_default_pos, self.params.left_default_pos, np.zeros(3))
+        self.plan.createPlan(self.params.body_default_pos, self.params.right_default_pos, self.params.left_default_pos, np.zeros(3))
         
     def calc_controller(self, rightAngles, leftAngles, body_inclination):
         """calculate the control signals to set the motor to.
@@ -105,9 +106,11 @@ class MotionController:
         plan is the MotionPlanner, which is advanced to the next point.
         returns targets as (3x1) arrays in robot coordinates
         where positions are from the leg connections to the feet and velocities are derivatives of those.
-        returns (right_pos_ref, left_pos_ref, right_vel_ref, left_vel_ref)."""
-        right_leg_pos = (plan.rightPos[:,0] - (plan.pos[:,0] + self.params.right_leg_conn)).reshape(3,1)
-        left_leg_pos = (plan.leftPos[:,0] - (plan.pos[:,0] + self.params.left_leg_conn)).reshape(3,1)
+        # returns (right_pos_ref, left_pos_ref, right_vel_ref, left_vel_ref)."""
+        # right_leg_pos = (plan.rightPos[:,0] - (plan.pos[:,0] + self.params.right_leg_conn)).reshape(3,1)
+        # left_leg_pos = (plan.leftPos[:,0] - (plan.pos[:,0] + self.params.left_leg_conn)).reshape(3,1)
+        right_leg_pos = plan.rightPos[:,0].reshape(3,1)
+        left_leg_pos = plan.leftPos[:,0].reshape(3,1)
         right_leg_vel = (plan.rightVel[:,0] - plan.vel[:,0]).reshape(3,1)
         left_leg_vel = (plan.leftVel[:,0] - plan.vel[:,0]).reshape(3,1)
         plan.advance()
@@ -141,6 +144,7 @@ class MotionController:
         
         angle_error = ik_Jac @ (pos_ref - pos.reshape(3,1))
         angVel_error = ik_Jac_dot @ (pos_ref - pos.reshape(3,1)) + ik_Jac @ (vel_ref - angVel.reshape(3,1)) #chain rule
+        np.clip(angle_error, -np.pi, np.pi, out=angle_error)
         
         return (angle_error, angVel_error)
         
@@ -190,7 +194,8 @@ class MotionController_data:
         self.left_leg_conn = -0.03*kin.RIGHT_DIR
         self.body_weight = .5 * 9.81 # [N]
         self.right_default_pos = -0.30*kin.UP_DIR + 0.05*kin.RIGHT_DIR
-        self.left_default_pos = -0.30*kin.UP_DIR - 0.05*kin.RIGHT_DIR
+        self.left_default_pos =  -0.30*kin.UP_DIR - 0.05*kin.RIGHT_DIR
+        self.body_default_pos =   0.30*kin.UP_DIR
         self.kp_1 = 5.0 #proportional gain on motor 1
         self.kp_2 = 5.0
         self.kv_1 = 0.0 #velocity gain on motor 1
@@ -213,17 +218,19 @@ class MotionController_data:
         
 def test():
     from time import process_time
+    import matplotlib.pyplot as plt
     MC = MotionController()
     kin.forward_kinematics(np.zeros(3), 0.0, return_Jacobian=True) #compile
     MC.set_leg_angles(np.zeros(3), np.zeros(3))
+    MC.params.kv_1 = 0.0 # don't test dynamics so we can use random inputs and not rotate right_default_pos
+    MC.params.kv_2 = 0.0
     numTries = 1000
-    angles = np.array([[np.pi/2], [np.pi/2], [-np.pi]]) * np.random.random((3,numTries))
-    inclination = np.random.random((numTries)) * np.pi/2
+    angles = np.array([[np.pi/2], [-3/8*np.pi], [3/8*np.pi]]) * np.random.random((3,numTries))
+    angles += np.array([[0.0], [0.0], [np.pi/4]])
+    inclination = (np.random.random((numTries))-0.5) * 0.0 #np.pi/4
     
     rightCommands = np.empty((3,numTries))
     leftCommands = np.empty((3,numTries))
-    
-    angles[:,0] = np.array([ 0.3631415 ,  1.44248313, -0.07108321])
     
     #test calc_controller speed
     startTime = process_time()
@@ -237,9 +244,30 @@ def test():
         print("Right and left commands were symmetrical")
     else:
         print("FAIL: Right and left commands were not symmetrical")
+        
+    default_angles = kin.inverse_kinematics(MC.params.right_default_pos, 0.0, theta_est = [0.0, -1.0, 1.0])
+    print("Default angles", default_angles, "(rad)", default_angles * 180 / np.pi, "(deg)")
     
     #test leg angle error using inverse_kinematics
-    angles_ref = angles + (np.random.random((3,numTries)) - 0.5) * 0.1
+    #angles_ref = angles + (np.random.random((3,numTries)) - 0.5) * 0.1
+    pred_err = np.empty((3, numTries))
+    err = np.empty((3, numTries))
+    for i in range(numTries):
+        pred_err[:, i:i+1], _ = MC._leg_angle_error(angles[:,i], np.zeros((3,1)), MC.params.right_default_pos.reshape(3,1), np.zeros((3,1)), inclination[i])
+        err[:, i] = default_angles - angles[:,i]
+    
+    fig = plt.figure(1)
+    fig.clf()
+    plt.subplot(2, 1, 1)
+    plt.plot(angles[1,:], pred_err[1,:], 'r.', angles[1,:], err[1,:], 'b.')
+    plt.grid(True)
+    plt.xlabel("Angle 1 [rad]")
+    plt.ylabel("Angle 1 error [rad]")
+    plt.subplot(2, 1, 2)
+    plt.plot(angles[2,:], pred_err[2,:], 'r.', angles[2,:], err[2,:], 'b.')
+    plt.grid(True)
+    plt.xlabel("Angle 2 [rad]")
+    plt.ylabel("Angle 2 error [rad]")
     
     # test calc theta0, calc theta1, calc theta2
     # move using each result, check you got closer to goal
@@ -249,6 +277,9 @@ def test():
     t0fails = 0
     t1fails = 0
     t2fails = 0
+    t0Angfails = 0
+    t1Angfails = 0
+    t2Angfails = 0
     for i in range(numTries):
         t0angles = np.array([rightCommands[0,i], angles[1,i], angles[2,i]])
         t1angles = np.array([angles[0,i], angles[1,i] + 0.01 * rightCommands[1,i], angles[2,i]])
@@ -258,18 +289,29 @@ def test():
         t0Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t0angles, inclination[i]))**2)
         t1Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t1angles, inclination[i]))**2)
         t2Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t2angles, inclination[i]))**2)
+        
+        startSpin = np.sum((default_angles - angles[:,i])**2)
+        t0Spin = np.sum((default_angles - t0angles)**2)
+        t1Spin = np.sum((default_angles - t1angles)**2)
+        t2Spin = np.sum((default_angles - t2angles)**2)
         if t0Dist > startDist:
             t0fails += 1
         if t1Dist > startDist:
             t1fails += 1
         if t2Dist > startDist:
             t2fails += 1
+        if t0Spin > startSpin:
+            t0Angfails += 1
+        if t1Spin > startSpin:
+            t1Angfails += 1
+        if t2Spin > startSpin:
+            t2Angfails += 1
     if t0fails > 0:
-        print("FAIL: Angle command 0 failed to improve tracking error", t0fails, "/", numTries, "times")
+        print("FAIL: Angle command 0 failed to improve tracking error", t0fails, "(", t0Angfails, ")/", numTries, "times")
     if t1fails > 0:
-        print("FAIL: Angle command 1 failed to improve tracking error", t1fails, "/", numTries, "times")
+        print("FAIL: Angle command 1 failed to improve tracking error", t1fails, "(", t1Angfails, ")/", numTries, "times")
     if t2fails > 0:
-        print("FAIL: Angle command 2 failed to improve tracking error", t2fails, "/", numTries, "times")
+        print("FAIL: Angle command 2 failed to improve tracking error", t2fails, "(", t2Angfails, ")/", numTries, "times")
     
     
     # test parameters saving

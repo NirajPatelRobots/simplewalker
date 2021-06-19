@@ -3,6 +3,7 @@
 Library for kinematic calculations for walking robot
 TODO:
     fk_Jacobian_dot? complicated, so numerically calculated by motionController instead.
+    ik_Jacobian encourages backwards legs. Should fk_Jacobian instead?
 
 Created Mar 2021
 @author: Niraj
@@ -79,6 +80,8 @@ def ik_Jacobian(fk_Jac, angle):
         backup = np.empty((3,3))
         backup[0:2,:] = np.linalg.pinv(fk_Jac[:,0:2])
         backup[2,:] = 2 * backup[1,:]
+        #encourage backwards knee
+        backup[1:, (FORWARD, UP)] += 0.005 * np.array([[-1, 1], [-1, 1]], dtype=float)
         if width > 0.02:
             ik_Jac = np.linalg.inv(fk_Jac)
             return (width / max_width) * ik_Jac + (1 - width / max_width) * backup
@@ -97,14 +100,14 @@ def fk_Jacobian_dot(theta, omega):
 def inverse_kinematics(p_leg, body_inclination, theta_est = None, ignore_failure = False):
     """given the position of the leg, find the desired motor angles.
     Calls a solver, so slower than forward_kinematics.
-    p_leg is relative leg position array of [forward, out, up]
+    p_leg is target relative leg position array of [forward, out, up]
     theta_est is initial guess. default is [0, 0, 0]
     if the solver fails and ignore_failure is False, the function will return None
     
     returns array [theta0, theta1, theta2]"""
     def f(theta, body_inclination, p_desired):
-        p_leg, Jac = forward_kinematics(theta, body_inclination, return_Jacobian=True)
-        disp = p_leg - p_desired
+        p, Jac = forward_kinematics(theta, body_inclination, return_Jacobian=True)
+        disp = p - p_desired
         return np.sum(disp**2), disp @ Jac
     if theta_est is None:
         theta_est = np.zeros(3)

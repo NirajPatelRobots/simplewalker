@@ -2,6 +2,7 @@
 """
 Motion planning for walking robot
 TODO:
+    allow for not always on_ground
     plans where to step next
 
 Created Mar 2021
@@ -15,7 +16,7 @@ class MotionPlanner:
     Use MotionPlanner.createPlan to create a plan.
     Once a plan is created, MotionPlanner.pos is the 3xnumSteps array of positions,
     MotionPlanner.vel is the 3xnumSteps array of velocities.
-    same with MP.rightPos, rightVel, leftPos, and leftVel
+    same with MP.rightPos, rightVel, leftPos, and leftVel for the leg positions.
     MotionPlanner.numSteps is the number of points in the plan.
     MotionPlanner.planTime is the length of the plan in seconds."""
     _pos : np.ndarray
@@ -51,7 +52,7 @@ class MotionPlanner:
 
     def createPlan(self, curr_pos, right_leg_pos, left_leg_pos, curr_vel):
         """ creates a plan based on current position and velocity.
-        curr_pos, curr_vel, right_leg_pos and left_leg_pos are 3-arrays of floats.
+        curr_pos, curr_vel, right_leg_pos and left_leg_pos are 3-arrays of floats for leg position
         The first elements of those arrays are the current position and velocity."""
         pos, vel, h_steps, h_time = self._horizontal_body_plan(curr_pos, curr_vel)
         height, vvel, v_steps, v_time = self._vertical_body_plan(curr_pos[UP])
@@ -152,7 +153,7 @@ class MotionPlanner:
         if on_ground:
             planPos = leg_pos.reshape((3,1)) - body_pos_rel
             planVel = -body_vel
-            planPos[UP,:] = 0.0
+            planPos[UP,:] = -body_pos[UP,:]
         return planPos, planVel
         
     @property
@@ -227,7 +228,7 @@ def test():
             print("FAIL: plan time", planner.planTime, "doesn't match numSteps", planner.numSteps, planner.numSteps*planner.dt)
         
         # check one leg is still on ground
-        right_on_ground = np.logical_and(np.abs(planner.rightPos[UP,1:]) < 1e-15, 
+        right_on_ground = np.logical_and(np.abs(planner.pos[UP,1:] + planner.rightPos[UP,1:]) < 1e-15, 
                                          np.sum(np.abs(np.diff(planner.rightPos[HORIZONTAL,:]) + np.diff(planner.pos[HORIZONTAL,:])),axis=0) < 1e-13)
         left_on_ground = np.logical_and(np.abs(planner.leftPos[UP,1:]) < 1e-15, 
                                          np.sum(np.abs(np.diff(planner.leftPos[HORIZONTAL,:]) + np.diff(planner.pos[HORIZONTAL,:])),axis=0) < 1e-13)
