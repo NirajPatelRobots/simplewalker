@@ -217,14 +217,14 @@ class MotionController_data:
         
         
 def test():
+    numTries = 1000
+    makePlot = True
     from time import process_time
-    import matplotlib.pyplot as plt
     MC = MotionController()
     kin.forward_kinematics(np.zeros(3), 0.0, return_Jacobian=True) #compile
     MC.set_leg_angles(np.zeros(3), np.zeros(3))
     MC.params.kv_1 = 0.0 # don't test dynamics so we can use random inputs and not rotate right_default_pos
     MC.params.kv_2 = 0.0
-    numTries = 1000
     angles = np.array([[np.pi/2], [-3/8*np.pi], [3/8*np.pi]]) * np.random.random((3,numTries))
     angles += np.array([[0.0], [0.0], [np.pi/4]])
     inclination = (np.random.random((numTries))-0.5) * 0.0 #np.pi/4
@@ -256,18 +256,24 @@ def test():
         pred_err[:, i:i+1], _ = MC._leg_angle_error(angles[:,i], np.zeros((3,1)), MC.params.right_default_pos.reshape(3,1), np.zeros((3,1)), inclination[i])
         err[:, i] = default_angles - angles[:,i]
     
-    fig = plt.figure(1)
-    fig.clf()
-    plt.subplot(2, 1, 1)
-    plt.plot(angles[1,:], pred_err[1,:], 'r.', angles[1,:], err[1,:], 'b.')
-    plt.grid(True)
-    plt.xlabel("Angle 1 [rad]")
-    plt.ylabel("Angle 1 error [rad]")
-    plt.subplot(2, 1, 2)
-    plt.plot(angles[2,:], pred_err[2,:], 'r.', angles[2,:], err[2,:], 'b.')
-    plt.grid(True)
-    plt.xlabel("Angle 2 [rad]")
-    plt.ylabel("Angle 2 error [rad]")
+    if makePlot:
+        try:
+            import matplotlib.pyplot as plt
+        except:
+            pass
+        else:
+            fig = plt.figure(1)
+            fig.clf()
+            plt.subplot(2, 1, 1)
+            plt.plot(angles[1,:], pred_err[1,:], 'r.', angles[1,:], err[1,:], 'b.')
+            plt.grid(True)
+            plt.xlabel("Angle 1 [rad]")
+            plt.ylabel("Angle 1 error [rad]")
+            plt.subplot(2, 1, 2)
+            plt.plot(angles[2,:], pred_err[2,:], 'r.', angles[2,:], err[2,:], 'b.')
+            plt.grid(True)
+            plt.xlabel("Angle 2 [rad]")
+            plt.ylabel("Angle 2 error [rad]")
     
     # test calc theta0, calc theta1, calc theta2
     # move using each result, check you got closer to goal

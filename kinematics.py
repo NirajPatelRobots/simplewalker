@@ -3,14 +3,21 @@
 Library for kinematic calculations for walking robot
 TODO:
     fk_Jacobian_dot? complicated, so numerically calculated by motionController instead.
+    ik_Jacobian #BUG
     ik_Jacobian encourages backwards legs. Should fk_Jacobian instead?
+    decide where inclination should be
 
 Created Mar 2021
 @author: Niraj
 """
 import numpy as np
-from scipy.optimize import minimize
-from numba import njit
+try:
+    from scipy.optimize import minimize
+except:
+    optimizer_installed = False
+else:
+    optimizer_installed = True
+#from numba import njit
 
 SHIN_LENGTH = 0.2 # [m]
 THIGH_LENGTH = 0.2 # [m]
@@ -70,7 +77,9 @@ def fk_Jacobian(theta, body_inclination):
 
 def ik_Jacobian(fk_Jac, angle):
     """find the inverse of the fk Jacobian. Deals with singularity.
+    Near theta2=0, Jacobian gets an added term that moves leg forward
     fk_Jac is the forward jacobian, angle is the associated leg angles"""
+    #BUG not always inverse
     max_width = 0.2 # the width in radians of the singularity handling
     width = np.abs(angle[2])
     if width > max_width:
@@ -112,7 +121,8 @@ def inverse_kinematics(p_leg, body_inclination, theta_est = None, ignore_failure
     if theta_est is None:
         theta_est = np.zeros(3)
     
-    #ret = root(f, theta_est, args=(body_inclination, p_leg), jac=True)
+    if optimizer_installed == False:
+        return None
     ret = minimize(f, theta_est, args=(body_inclination, p_leg), jac=True, tol=1e-6)
     #angles = (ret.x + np.pi) % (2 * np.pi) - np.pi # wrap -pi to pi
     if ret.success or ignore_failure:
@@ -122,7 +132,7 @@ def inverse_kinematics(p_leg, body_inclination, theta_est = None, ignore_failure
     
 
 """ --------------------- internal use functions ------------------ """
-@njit
+#@njit
 def _fk_Jac_physTrig(sines, cosines):
     """given ratios of physical coordinates, find d(p_leg)/d(motor_angle)
     theta0 is the motor angle outwards
@@ -147,16 +157,15 @@ def _fk_Jac_physTrig(sines, cosines):
 
 def test():
     import time
-    import matplotlib.pyplot as plt
-    rng = np.random.default_rng()
-    numTries = 5000
+    numTries = 1000
+    makePlot = True
     # thetas is [theta0 theta1 theta2 alpha] for each try
-    thetas = rng.uniform(low=-np.pi/2, high=np.pi/2, size=(4,numTries))
+    thetas = np.random.uniform(low=-np.pi/2, high=np.pi/2, size=(4,numTries))
     fk_results = np.empty((3,numTries))
     Jac_results = np.empty((3,3,numTries))
     fk_Jac_results = np.empty((3,3,numTries))
     ik_Jac_results = np.empty((3,3,numTries))
-    ik_thetas = thetas[:3,:] + rng.uniform(low=-0.1, high=0.1, size=(3,numTries))
+    ik_thetas = thetas[:3,:] + np.random.uniform(low=-0.1, high=0.1, size=(3,numTries))
     ik_results = np.empty((3,numTries))
     ik_fails = np.zeros((numTries), dtype = int)
     
@@ -198,13 +207,19 @@ def test():
         evals, _ = np.linalg.eig(ik_Jac_results[:,:,i] @ fk_Jac_results[:,:,i])
         eig[:,i] = evals
     print("ik_Jacobian and fk_Jacobian comparison, should be 1.0:", np.max(eig), np.min(eig))
-    fig = plt.figure(1)
-    fig.clf()
-    plt.plot(thetas[2,:], eig[0,:], '.', thetas[2,:], eig[1,:], '.', thetas[2,:], eig[2,:], '.')
-    plt.grid(True)
-    plt.xlabel("Knee Angle [rad]")
-    plt.ylabel("Eigenvalues (should be 1.0)")
-    plt.title("ik_Jacobian and fk_Jacobian comparison")
+    if makePlot:
+        try:
+            import matplotlib.pyplot as plt
+        except:
+            pass
+        else:
+            fig = plt.figure(1)
+            fig.clf()
+            plt.plot(thetas[2,:], eig[0,:], '.', thetas[2,:], eig[1,:], '.', thetas[2,:], eig[2,:], '.')
+            plt.grid(True)
+            plt.xlabel("Knee Angle [rad]")
+            plt.ylabel("Eigenvalues (should be 1.0)")
+            plt.title("ik_Jacobian and fk_Jacobian comparison")
     
     startTime = time.perf_counter()
     for i in range(numTries):
@@ -217,7 +232,6 @@ def test():
     print("inverse_kinematics takes", round(ik_time * 1e6 / numTries, 3), "us with close estimate")
     print(np.sum(ik_fails), "/", numTries, "inverse_kinematics optimizer failures")
     
-    #BUG: there are two ik values, inverse_kinematics could pick the wrong one
     failnum = 0
     for i in range(numTries):
         if not (np.all(np.isclose(forward_kinematics(ik_results[:,i], thetas[3,i]), fk_results[:,i], atol=0.001)) or ik_fails[i]):

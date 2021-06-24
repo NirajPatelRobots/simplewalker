@@ -185,18 +185,19 @@ class MotionPlanner:
 
 
 def test():
+    numTries = 1000
+    makePlot = True
     import time
-    import matplotlib.pyplot as plt
     import kinematics
     planner = MotionPlanner()
-    rng = np.random.default_rng()
-    numTries = 1000
     testPos = np.zeros((3,numTries))
-    testPos[UP,:] = planner._hstar + 0.05 * rng.random((1,numTries))
-    testVel = rng.standard_normal((3,numTries)) * 0.03
+    testPos[UP,:] = planner._hstar + 0.05 * np.random.random((1,numTries))
+    testVel = np.random.standard_normal((3,numTries)) * 0.03
     legPos = np.zeros(3)
     legPos[kinematics.RIGHT] = 0.03
     allNumSteps = np.empty(numTries)
+    
+    #test timing
     startTime = time.perf_counter()
     for i in range(numTries):
         planner.createPlan(testPos[:,i], legPos, LEFTSCALE*legPos, testVel[:,i])
@@ -251,9 +252,9 @@ def test():
                 print("Didn't advance correctly")
                 
         
-        # last, check that replanning doesn't change plans
+        # last, check that replanning starting at predicted step k+i doesn't change plans for k+j >= k+i
         if planner.numSteps > 3:
-            checkIndex = rng.integers(1, planner.numSteps-2)
+            checkIndex = np.random.randint(1, planner.numSteps-2)
             plannedPos = planner.pos[:,checkIndex+1]
             plannedVel = planner.vel[:,checkIndex+1]
             planner.createPlan(planner.pos[:,checkIndex], legPos, LEFTSCALE*legPos, planner.vel[:,checkIndex])
@@ -261,10 +262,16 @@ def test():
                 and np.all(np.isclose(plannedVel, planner.vel[:,1]))):
                 print("FAIL: replanning velocity", testVel[:,i], "changed", checkIndex, planner.pos[:,0], planner.vel[:,0],
                       "from\n", plannedPos, "to", planner.pos[:,1], plannedVel, "to", planner.vel[:,1])
-    fig = plt.figure(1)
-    fig.clf()
-    plt.hist(allNumSteps)
-    plt.show()
+    if makePlot:
+        try:
+            import matplotlib.pyplot as plt
+        except:
+            pass
+        else:
+            fig = plt.figure(1)
+            fig.clf()
+            plt.hist(allNumSteps)
+            plt.show()
 
 if __name__ == "__main__":
     test()
