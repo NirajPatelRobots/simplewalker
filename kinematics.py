@@ -3,9 +3,8 @@
 Library for kinematic calculations for walking robot
 TODO:
     fk_Jacobian_dot? complicated, so numerically calculated by motionController instead.
-    ik_Jacobian #BUG
     ik_Jacobian encourages backwards legs. Should fk_Jacobian instead?
-    decide where inclination should be
+    decide exactly where inclination should be
 
 Created Mar 2021
 @author: Niraj
@@ -20,7 +19,7 @@ else:
 #from numba import njit
 
 SHIN_LENGTH = 0.2 # [m]
-THIGH_LENGTH = 0.2 # [m]
+THIGH_LENGTH = 0.2 # [m] (if you make them different, fix _fk_Jac_physTrig to do that)
 
 # array indexes
 RIGHT = 0
@@ -152,7 +151,7 @@ def _fk_Jac_physTrig(sines, cosines):
     Jac[UP,0] = (cosines[1] + cosines[2]) * sines[0]
     Jac[UP,1] = (sines[1] + sines[2]) * cosines[0]
     Jac[UP,2] = sines[2] * cosines[0]
-    return Jac
+    return SHIN_LENGTH * Jac
     
 
 def test():
@@ -219,8 +218,22 @@ def test():
             plt.grid(True)
             plt.xlabel("Knee Angle [rad]")
             plt.ylabel("Eigenvalues (should be 1.0)")
-            plt.title("ik_Jacobian and fk_Jacobian comparison")
+            plt.title("ik_Jacobian and fk_Jacobian multiplication")
+            
+    # test Jacobian represents movement directions
+    delta = 1e-5 #angle increment
+    Jac_err = np.empty((3, 3, numTries))
+    for i in range(numTries):
+        for j in range(3):
+            d_angle = np.zeros(3)
+            d_angle[j] += delta
+            pred_diff = np.matmul(Jac_results[:,:,i], d_angle).reshape(3)
+            calc_diff = forward_kinematics(thetas[:3,i] + d_angle, thetas[3,i]) - fk_results[:,i]
+            Jac_err[:,j,i] = pred_diff / calc_diff
+    print("Jacobian did not approximate position change in ", np.sum(np.logical_or(Jac_err < 0.95, Jac_err > 1.05)), "out of", 9*numTries)
     
+    
+    # test inverse_kinematics
     startTime = time.perf_counter()
     for i in range(numTries):
         ret = inverse_kinematics(fk_results[:,i], thetas[3,i], theta_est = ik_thetas[:3,i])

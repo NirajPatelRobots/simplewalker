@@ -2,9 +2,10 @@
 """
 Created March 2021
 TODO:
-    tests
+    _leg_angle_error incorrect results, many tests failing
     I'm sure MotionController_data isn't very pythonic but I refuse to read a style guide
     tests have a wide range s.t. we expect some tracking error fails
+    deal with leg on ground
 
 @author: Niraj
 """
@@ -48,29 +49,13 @@ class MotionController:
         
         returns (rightCommands, leftCommands)
         each is an array of [theta0_desired, D_theta1, D_theta2]
-        where theta0_desired is the desired theta0 angle,
+        where theta0_desired is the desired theta0 angle [rad],
         D_theta1 and D_theta2 are the duty cycle for the motors."""
         self.set_leg_angles(rightAngles, leftAngles)
         right_pos_ref, left_pos_ref, right_vel_ref, left_vel_ref = self._get_leg_target(self.plan)
         right_error, right_vel_error = self._leg_angle_error(self._rightAngles, self._rightVel, right_pos_ref, right_vel_ref, body_inclination)
         left_error, left_vel_error = self._leg_angle_error(self._leftAngles, self._leftVel, left_pos_ref, left_vel_ref, body_inclination)
-        right_on_ground = (right_pos_ref[kin.UP] < 1e-3)
-        left_on_ground = (left_pos_ref[kin.UP] < 1e-3)
-        if (right_pos_ref[kin.UP] < 1e-3):
-            if (left_pos_ref[kin.UP] < 1e-3):
-                right_on_ground = 0.5
-                left_on_ground = 0.5
-            else:
-                right_on_ground = 1.0
-                left_on_ground = 0.0
-        else:
-            if (left_pos_ref[kin.UP] < 1e-3):
-                left_on_ground = 1.0
-                right_on_ground = 0.0
-            else:
-                left_on_ground = 0.0
-                right_on_ground = 0.0
-        
+        right_on_ground, left_on_ground =  self._get_grounded(right_pos_ref, left_pos_ref)
         rightCommands = np.empty(3)
         leftCommands = np.empty(3)
         rightCommands[0] = self._calc_theta0_ref(right_pos_ref)
@@ -143,13 +128,37 @@ class MotionController:
         self._ik_Jac = ik_Jac
         
         angle_error = ik_Jac @ (pos_ref - pos.reshape(3,1))
-        angVel_error = ik_Jac_dot @ (pos_ref - pos.reshape(3,1)) + ik_Jac @ (vel_ref - angVel.reshape(3,1)) #chain rule
+        angVel_error = np.zeros((3,1)) #ik_Jac_dot @ (pos_ref - pos.reshape(3,1)) + ik_Jac @ (vel_ref - angVel.reshape(3,1)) #chain rule
         np.clip(angle_error, -np.pi, np.pi, out=angle_error)
         
         return (angle_error, angVel_error)
+    
+    def _get_grounded(self, right_pos, left_pos):
+        """given the positions of the feet, return their groundedness.
+        right_pos and left_pos are global foot positions (not leg vectors).
+        0 if feet is not on ground, 0.5 if both feet on ground, 1 if only foot on ground.
+        returns floats right_on_ground, left_on_ground
+        """
+        if (right_pos[kin.UP] < 1e-3):
+            if (left_pos[kin.UP] < 1e-3):
+                right_on_ground = 0.5
+                left_on_ground = 0.5
+            else:
+                right_on_ground = 1.0
+                left_on_ground = 0.0
+        else:
+            if (left_pos[kin.UP] < 1e-3):
+                left_on_ground = 1.0
+                right_on_ground = 0.0
+            else:
+                left_on_ground = 0.0
+                right_on_ground = 0.0
+        right_on_ground = 0 #TODO remove
+        left_on_ground = 0
+        return right_on_ground, left_on_ground
         
     def _calc_theta0_ref(self, pos_ref):
-        """returns (scalar) desired hip sideways angle
+        """returns (scalar) desired hip sideways angle [rad]
         pos_ref is (3x1) position from the leg connection to the foot
         """
         return np.arcsin(pos_ref[kin.RIGHT] / np.linalg.norm(pos_ref))
@@ -225,8 +234,12 @@ def test():
     MC.set_leg_angles(np.zeros(3), np.zeros(3))
     MC.params.kv_1 = 0.0 # don't test dynamics so we can use random inputs and not rotate right_default_pos
     MC.params.kv_2 = 0.0
-    angles = np.array([[np.pi/2], [-3/8*np.pi], [3/8*np.pi]]) * np.random.random((3,numTries))
-    angles += np.array([[0.0], [0.0], [np.pi/4]])
+    
+    default_angles = kin.inverse_kinematics(MC.params.right_default_pos, 0.0, theta_est = [0.0, -1.0, 1.0])
+    print("Default angles", default_angles, "(rad)", default_angles * 180 / np.pi, "(deg)")
+    angle_variation = [[0.01], [-0.1], [0.1]]
+    angles = np.array(angle_variation) * np.random.random((3,numTries))
+    angles += np.array(default_angles.reshape(3,1) - np.array(angle_variation)/2)
     inclination = (np.random.random((numTries))-0.5) * 0.0 #np.pi/4
     
     rightCommands = np.empty((3,numTries))
@@ -244,18 +257,13 @@ def test():
         print("Right and left commands were symmetrical")
     else:
         print("FAIL: Right and left commands were not symmetrical")
-        
-    default_angles = kin.inverse_kinematics(MC.params.right_default_pos, 0.0, theta_est = [0.0, -1.0, 1.0])
-    print("Default angles", default_angles, "(rad)", default_angles * 180 / np.pi, "(deg)")
     
-    #test leg angle error using inverse_kinematics
-    #angles_ref = angles + (np.random.random((3,numTries)) - 0.5) * 0.1
+    #test leg angle error
     pred_err = np.empty((3, numTries))
     err = np.empty((3, numTries))
     for i in range(numTries):
         pred_err[:, i:i+1], _ = MC._leg_angle_error(angles[:,i], np.zeros((3,1)), MC.params.right_default_pos.reshape(3,1), np.zeros((3,1)), inclination[i])
         err[:, i] = default_angles - angles[:,i]
-    
     if makePlot:
         try:
             import matplotlib.pyplot as plt
@@ -268,12 +276,12 @@ def test():
             plt.plot(angles[1,:], pred_err[1,:], 'r.', angles[1,:], err[1,:], 'b.')
             plt.grid(True)
             plt.xlabel("Angle 1 [rad]")
-            plt.ylabel("Angle 1 error [rad]")
+            plt.ylabel("Angle 1 error (capped) [rad]")
             plt.subplot(2, 1, 2)
             plt.plot(angles[2,:], pred_err[2,:], 'r.', angles[2,:], err[2,:], 'b.')
             plt.grid(True)
             plt.xlabel("Angle 2 [rad]")
-            plt.ylabel("Angle 2 error [rad]")
+            plt.ylabel("Angle 2 error (capped) [rad]")
     
     # test calc theta0, calc theta1, calc theta2
     # move using each result, check you got closer to goal
