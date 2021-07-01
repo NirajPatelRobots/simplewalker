@@ -236,7 +236,10 @@ def test():
     MC.params.kv_2 = 0.0
     
     default_angles = kin.inverse_kinematics(MC.params.right_default_pos, 0.0, theta_est = [0.0, -1.0, 1.0])
-    print("Default angles", default_angles, "(rad)", default_angles * 180 / np.pi, "(deg)")
+    if not default_angles is None:
+        print("Default angles", default_angles, "(rad)", default_angles * 180 / np.pi, "(deg)")
+    else:
+        default_angles = np.array([0.16514779, -0.70694972, 1.41390019])
     angle_variation = [[0.01], [-0.1], [0.1]]
     angles = np.array(angle_variation) * np.random.random((3,numTries))
     angles += np.array(default_angles.reshape(3,1) - np.array(angle_variation)/2)
