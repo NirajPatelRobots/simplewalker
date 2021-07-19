@@ -6,6 +6,7 @@ TODO:
     I'm sure MotionController_data isn't very pythonic but I refuse to read a style guide
     tests have a wide range s.t. we expect some tracking error fails
     deal with leg on ground
+    resolve  planner._hstar and MC.params.body_default_pos
 
 @author: Niraj
 """
@@ -55,15 +56,15 @@ class MotionController:
         right_pos_ref, left_pos_ref, right_vel_ref, left_vel_ref = self._get_leg_target(self.plan)
         right_error, right_vel_error = self._leg_angle_error(self._rightAngles, self._rightVel, right_pos_ref, right_vel_ref, body_inclination)
         left_error, left_vel_error = self._leg_angle_error(self._leftAngles, self._leftVel, left_pos_ref, left_vel_ref, body_inclination)
-        right_on_ground, left_on_ground =  self._get_grounded(right_pos_ref, left_pos_ref)
+        right_ground_contact, left_ground_contact =  self._get_grounded(self.plan)
         rightCommands = np.empty(3)
         leftCommands = np.empty(3)
         rightCommands[0] = self._calc_theta0_ref(right_pos_ref)
         leftCommands[0] = self._calc_theta0_ref(left_pos_ref)
-        rightCommands[1] = self._calc_motor1(right_error, right_vel_error, body_inclination, right_on_ground)
-        leftCommands[1] = self._calc_motor1(left_error, left_vel_error, body_inclination, left_on_ground)
-        rightCommands[2] = self._calc_motor2(self._rightAngles, right_error, right_vel_error, body_inclination, right_on_ground)
-        leftCommands[2] = self._calc_motor2(self._leftAngles, left_error, left_vel_error, body_inclination, left_on_ground)
+        rightCommands[1] = self._calc_motor1(right_error, right_vel_error, body_inclination, right_ground_contact)
+        leftCommands[1] = self._calc_motor1(left_error, left_vel_error, body_inclination, left_ground_contact)
+        rightCommands[2] = self._calc_motor2(self._rightAngles, right_error, right_vel_error, body_inclination, right_ground_contact)
+        leftCommands[2] = self._calc_motor2(self._leftAngles, left_error, left_vel_error, body_inclination, left_ground_contact)
         
         return (rightCommands, leftCommands)
     
@@ -92,10 +93,10 @@ class MotionController:
         returns targets as (3x1) arrays in robot coordinates
         where positions are from the leg connections to the feet and velocities are derivatives of those.
         # returns (right_pos_ref, left_pos_ref, right_vel_ref, left_vel_ref)."""
-        # right_leg_pos = (plan.rightPos[:,0] - (plan.pos[:,0] + self.params.right_leg_conn)).reshape(3,1)
-        # left_leg_pos = (plan.leftPos[:,0] - (plan.pos[:,0] + self.params.left_leg_conn)).reshape(3,1)
-        right_leg_pos = plan.rightPos[:,0].reshape(3,1)
-        left_leg_pos = plan.leftPos[:,0].reshape(3,1)
+        right_leg_pos = (plan.rightPos[:,0] - (plan.pos[:,0] + self.params.right_leg_conn)).reshape(3,1)
+        left_leg_pos = (plan.leftPos[:,0] - (plan.pos[:,0] + self.params.left_leg_conn)).reshape(3,1)
+        #right_leg_pos = plan.rightPos[:,0].reshape(3,1)
+        #left_leg_pos = plan.leftPos[:,0].reshape(3,1)
         right_leg_vel = (plan.rightVel[:,0] - plan.vel[:,0]).reshape(3,1)
         left_leg_vel = (plan.leftVel[:,0] - plan.vel[:,0]).reshape(3,1)
         plan.advance()
@@ -128,34 +129,38 @@ class MotionController:
         self._ik_Jac = ik_Jac
         
         angle_error = ik_Jac @ (pos_ref - pos.reshape(3,1))
-        angVel_error = np.zeros((3,1)) #ik_Jac_dot @ (pos_ref - pos.reshape(3,1)) + ik_Jac @ (vel_ref - angVel.reshape(3,1)) #chain rule
+        angVel_error = ik_Jac_dot @ (pos_ref - pos.reshape(3,1)) + ik_Jac @ (vel_ref - angVel.reshape(3,1)) #chain rule
         np.clip(angle_error, -np.pi, np.pi, out=angle_error)
         
         return (angle_error, angVel_error)
     
-    def _get_grounded(self, right_pos, left_pos):
+    def _get_grounded(self, plan):
         """given the positions of the feet, return their groundedness.
         right_pos and left_pos are global foot positions (not leg vectors).
         0 if feet is not on ground, 0.5 if both feet on ground, 1 if only foot on ground.
-        returns floats right_on_ground, left_on_ground
+        returns floats right_ground_contact, left_ground_contact
         """
-        if (right_pos[kin.UP] < 1e-3):
-            if (left_pos[kin.UP] < 1e-3):
-                right_on_ground = 0.5
-                left_on_ground = 0.5
+        rightHeight = plan.rightPos[kin.UP,0]
+        leftHeight = plan.leftPos[kin.UP,0]
+        
+        if (rightHeight < 1e-3):
+            if (leftHeight < 1e-3):
+                right_ground_contact = 0.5
+                left_ground_contact = 0.5
+                #print("Both")
             else:
-                right_on_ground = 1.0
-                left_on_ground = 0.0
+                right_ground_contact = 1.0
+                left_ground_contact = 0.0
         else:
-            if (left_pos[kin.UP] < 1e-3):
-                left_on_ground = 1.0
-                right_on_ground = 0.0
+            if (leftHeight < 1e-3):
+                left_ground_contact = 1.0
+                right_ground_contact = 0.0
             else:
-                left_on_ground = 0.0
-                right_on_ground = 0.0
-        right_on_ground = 0 #TODO remove
-        left_on_ground = 0
-        return right_on_ground, left_on_ground
+                left_ground_contact = 0.0
+                right_ground_contact = 0.0
+        right_ground_contact = 0 #TODO remove
+        left_ground_contact = 0
+        return right_ground_contact, left_ground_contact
         
     def _calc_theta0_ref(self, pos_ref):
         """returns (scalar) desired hip sideways angle [rad]
@@ -199,12 +204,12 @@ class MotionController:
 class MotionController_data:
     """store data about motion controller assumptions and tuning"""
     def __init__(self):
-        self.right_leg_conn = 0.03*kin.RIGHT_DIR
+        self.right_leg_conn = 0.03*kin.RIGHT_DIR #body coordinate to leg 
         self.left_leg_conn = -0.03*kin.RIGHT_DIR
         self.body_weight = .5 * 9.81 # [N]
-        self.right_default_pos = -0.30*kin.UP_DIR + 0.05*kin.RIGHT_DIR
-        self.left_default_pos =  -0.30*kin.UP_DIR - 0.05*kin.RIGHT_DIR
-        self.body_default_pos =   0.30*kin.UP_DIR
+        self.right_default_pos = 0.05*kin.RIGHT_DIR
+        self.left_default_pos = -0.05*kin.RIGHT_DIR
+        self.body_default_pos =  0.30*kin.UP_DIR
         self.kp_1 = 5.0 #proportional gain on motor 1
         self.kp_2 = 5.0
         self.kv_1 = 0.0 #velocity gain on motor 1
@@ -231,6 +236,9 @@ def test():
     from time import process_time
     MC = MotionController()
     kin.forward_kinematics(np.zeros(3), 0.0, return_Jacobian=True) #compile
+    # lift into the air so it doesn't react to ground forces
+    MC.plan.createPlan(MC.params.body_default_pos + 0.01*kin.UP_DIR, MC.params.right_default_pos + 0.01*kin.UP_DIR,
+                       MC.params.left_default_pos + 0.01*kin.UP_DIR, np.zeros(3))
     MC.set_leg_angles(np.zeros(3), np.zeros(3))
     MC.params.kv_1 = 0.0 # don't test dynamics so we can use random inputs and not rotate right_default_pos
     MC.params.kv_2 = 0.0
@@ -324,11 +332,11 @@ def test():
         if t2Spin > startSpin:
             t2Angfails += 1
     if t0fails > 0:
-        print("FAIL: Angle command 0 failed to improve tracking error", t0fails, "(", t0Angfails, ")/", numTries, "times")
+        print("Angle command 0 failed to improve tracking error", t0fails, "cartesian (", t0Angfails, "leg angle)/", numTries, "times")
     if t1fails > 0:
-        print("FAIL: Angle command 1 failed to improve tracking error", t1fails, "(", t1Angfails, ")/", numTries, "times")
+        print("Angle command 1 failed to improve tracking error", t1fails, "cartesian (", t1Angfails, "leg angle)/", numTries, "times")
     if t2fails > 0:
-        print("FAIL: Angle command 2 failed to improve tracking error", t2fails, "(", t2Angfails, ")/", numTries, "times")
+        print("Angle command 2 failed to improve tracking error", t2fails, "cartesian (", t2Angfails, "leg angle)/", numTries, "times")
     
     
     # test parameters saving

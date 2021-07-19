@@ -4,6 +4,7 @@ Motion planning for walking robot
 TODO:
     allow for not always on_ground
     plans where to step next
+    make leg position relative to ground
 
 Created Mar 2021
 @author: Niraj
@@ -16,7 +17,7 @@ class MotionPlanner:
     Use MotionPlanner.createPlan to create a plan.
     Once a plan is created, MotionPlanner.pos is the 3xnumSteps array of positions,
     MotionPlanner.vel is the 3xnumSteps array of velocities.
-    same with MP.rightPos, rightVel, leftPos, and leftVel for the leg positions.
+    same with MP.rightPos, rightVel, leftPos, and leftVel for the leg positions in robot coordinates.
     MotionPlanner.numSteps is the number of points in the plan.
     MotionPlanner.planTime is the length of the plan in seconds."""
     _pos : np.ndarray
@@ -149,11 +150,10 @@ class MotionPlanner:
         returns (pos, vel) both (3xN) for leg FORWARD, OUT, and UP
         """
         body_pos_rel = body_pos - body_pos[:,0:1]
-        on_ground = True # True if the leg is supposed to be on the ground supporting weight
-        if on_ground:
-            planPos = leg_pos.reshape((3,1)) - body_pos_rel
-            planVel = -body_vel
-            planPos[UP,:] = -body_pos[UP,:]
+        planPos = leg_pos.reshape((3,1)) - body_pos_rel
+        planVel = -body_vel
+        on_ground = planPos[UP,:] > 2e-3 # True if the leg is supposed to be on the ground supporting weight
+        planPos[UP,on_ground] = 0.0
         return planPos, planVel
         
     @property
@@ -229,10 +229,10 @@ def test():
             print("FAIL: plan time", planner.planTime, "doesn't match numSteps", planner.numSteps, planner.numSteps*planner.dt)
         
         # check one leg is still on ground
-        right_on_ground = np.logical_and(np.abs(planner.pos[UP,1:] + planner.rightPos[UP,1:]) < 1e-15, 
-                                         np.sum(np.abs(np.diff(planner.rightPos[HORIZONTAL,:]) + np.diff(planner.pos[HORIZONTAL,:])),axis=0) < 1e-13)
+        right_on_ground = np.logical_and(np.abs(planner.rightPos[UP,1:]) < 1e-15, 
+                                         np.sum(np.abs(np.diff(planner.rightPos[HORIZONTAL,:])),axis=0) < 1e-13)
         left_on_ground = np.logical_and(np.abs(planner.leftPos[UP,1:]) < 1e-15, 
-                                         np.sum(np.abs(np.diff(planner.leftPos[HORIZONTAL,:]) + np.diff(planner.pos[HORIZONTAL,:])),axis=0) < 1e-13)
+                                         np.sum(np.abs(np.diff(planner.leftPos[HORIZONTAL,:])),axis=0) < 1e-13)
         if not np.all(np.logical_or(right_on_ground, left_on_ground)):
             print("FAIL: neither leg on ground")
         
