@@ -78,8 +78,8 @@ class MotionPlanner:
                 self._tf = h_time
             self._pos = pos
             self._vel = vel
-        self._rightPos, self._rightVel = self._leg_plan(right_leg_pos, self._pos, self._vel)
-        self._leftPos, self._leftVel = self._leg_plan(left_leg_pos, self._pos, self._vel)
+        self._rightPos, self._rightVel = self._leg_plan(right_leg_pos, self._pos, self._vel, self._numSteps)
+        self._leftPos, self._leftVel = self._leg_plan(left_leg_pos, self._pos, self._vel, self._numSteps)
     
     def advance(self):
         """remove the current timestep, advancing so that the former second step is now the first step.
@@ -143,17 +143,16 @@ class MotionPlanner:
         planVel[-1] = 0.0
         return planPos, planVel, numSteps+1, t_finish
     
-    def _leg_plan(self, leg_pos, body_pos, body_vel):
+    def _leg_plan(self, leg_pos, body_pos, body_vel, num_steps):
         """create a plan for what the leg will do given a body plan.
         leg_pos is current leg position as a 3-vector,
         body_pos is the plan for the body position, body_vel is planned velocity, both 3xN
         returns (pos, vel) both (3xN) for leg FORWARD, OUT, and UP
         """
-        body_pos_rel = body_pos - body_pos[:,0:1]
-        planPos = leg_pos.reshape((3,1)) - body_pos_rel
-        planVel = -body_vel
-        on_ground = planPos[UP,:] > 2e-3 # True if the leg is supposed to be on the ground supporting weight
-        planPos[UP,on_ground] = 0.0
+        planPos = leg_pos.reshape(3,1) * np.ones((1, num_steps))
+        planVel = np.zeros((3,num_steps))
+        #on_ground = planPos[UP,:] > 2e-3 # True if the leg is supposed to be on the ground supporting weight
+        planPos[UP,:] = 0.0
         return planPos, planVel
         
     @property
@@ -191,7 +190,7 @@ def test():
     import kinematics
     planner = MotionPlanner()
     testPos = np.zeros((3,numTries))
-    testPos[UP,:] = planner._hstar + 0.05 * np.random.random((1,numTries))
+    testPos[UP,:] = planner._hstar + 0.02 * np.random.standard_normal((1,numTries))
     testVel = np.random.standard_normal((3,numTries)) * 0.03
     legPos = np.zeros(3)
     legPos[kinematics.RIGHT] = 0.03
@@ -229,12 +228,14 @@ def test():
             print("FAIL: plan time", planner.planTime, "doesn't match numSteps", planner.numSteps, planner.numSteps*planner.dt)
         
         # check one leg is still on ground
-        right_on_ground = np.logical_and(np.abs(planner.rightPos[UP,1:]) < 1e-15, 
-                                         np.sum(np.abs(np.diff(planner.rightPos[HORIZONTAL,:])),axis=0) < 1e-13)
-        left_on_ground = np.logical_and(np.abs(planner.leftPos[UP,1:]) < 1e-15, 
-                                         np.sum(np.abs(np.diff(planner.leftPos[HORIZONTAL,:])),axis=0) < 1e-13)
+        right_on_ground = np.logical_and(np.abs(planner.rightPos[UP,1:]) < 1e-5, 
+                                         np.sum(np.abs(np.diff(planner.rightPos[HORIZONTAL,:])),axis=0) < 1e-5)
+        left_on_ground = np.logical_and(np.abs(planner.leftPos[UP,1:]) < 1e-5, 
+                                         np.sum(np.abs(np.diff(planner.leftPos[HORIZONTAL,:])),axis=0) < 1e-5)
         if not np.all(np.logical_or(right_on_ground, left_on_ground)):
             print("FAIL: neither leg on ground")
+            print("Right", np.sum(np.abs(np.diff(planner.rightPos[HORIZONTAL,:])),axis=0),
+                    "Left", np.sum(np.abs(np.diff(planner.leftPos[HORIZONTAL,:])),axis=0))
         
         # test advancing
         import copy

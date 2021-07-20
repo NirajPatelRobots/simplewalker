@@ -158,8 +158,8 @@ class MotionController:
             else:
                 left_ground_contact = 0.0
                 right_ground_contact = 0.0
-        right_ground_contact = 0 #TODO remove
-        left_ground_contact = 0
+        right_ground_contact = 0.0 #TODO remove
+        left_ground_contact = 0.0
         return right_ground_contact, left_ground_contact
         
     def _calc_theta0_ref(self, pos_ref):
