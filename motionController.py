@@ -2,10 +2,8 @@
 """
 Created March 2021
 TODO:
-    _leg_angle_error incorrect results, many tests failing
     I'm sure MotionController_data isn't very pythonic but I refuse to read a style guide
     tests have a wide range s.t. we expect some tracking error fails
-    deal with leg on ground
     resolve  planner._hstar and MC.params.body_default_pos
 
 @author: Niraj
@@ -216,6 +214,13 @@ class MotionController_data:
         self.kv_2 = 0.0
         self.kp_alpha = 2.0
     
+    @property
+    def right_default_leg(self):
+        return self.right_default_pos - (self.body_default_pos + self.right_leg_conn)
+    @property
+    def left_default_leg(self):
+        return self.left_default_pos - (self.body_default_pos + self.left_leg_conn)
+    
     @staticmethod
     def load(filename):
         """static method that returns a MotionController_data object saved at filename"""
@@ -243,7 +248,7 @@ def test():
     MC.params.kv_1 = 0.0 # don't test dynamics so we can use random inputs and not rotate right_default_pos
     MC.params.kv_2 = 0.0
     
-    default_angles = kin.inverse_kinematics(MC.params.right_default_pos, 0.0, theta_est = [0.0, -1.0, 1.0])
+    default_angles = kin.inverse_kinematics(MC.params.right_default_leg, 0.0, theta_est = [0.0, -1.0, 1.0])
     if not default_angles is None:
         print("Default angles", default_angles, "(rad)", default_angles * 180 / np.pi, "(deg)")
     else:
@@ -310,10 +315,10 @@ def test():
         t1angles = np.array([angles[0,i], angles[1,i] + 0.01 * rightCommands[1,i], angles[2,i]])
         t2angles = np.array([angles[0,i], angles[1,i], angles[2,i] + 0.01 * rightCommands[2,i]])
         
-        startDist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(angles[:,i], inclination[i]))**2)
-        t0Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t0angles, inclination[i]))**2)
-        t1Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t1angles, inclination[i]))**2)
-        t2Dist = np.sum((MC.params.right_default_pos - kin.forward_kinematics(t2angles, inclination[i]))**2)
+        startDist = np.sum((MC.params.right_default_leg - kin.forward_kinematics(angles[:,i], inclination[i]))**2)
+        t0Dist = np.sum((MC.params.right_default_leg - kin.forward_kinematics(t0angles, inclination[i]))**2)
+        t1Dist = np.sum((MC.params.right_default_leg - kin.forward_kinematics(t1angles, inclination[i]))**2)
+        t2Dist = np.sum((MC.params.right_default_leg - kin.forward_kinematics(t2angles, inclination[i]))**2)
         
         startSpin = np.sum((default_angles - angles[:,i])**2)
         t0Spin = np.sum((default_angles - t0angles)**2)
