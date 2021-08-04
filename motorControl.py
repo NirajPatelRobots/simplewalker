@@ -3,15 +3,19 @@
 Simplewalker functions for controlling motors
 
 TODO:
-    check real motor signs and offsets
+    check real motor scales and offsets, store this + use with sensorReader.py
+        -store pins too
     investigate normally on H-bridges vs normally off
 
 Created Jun 2021
 @author: Niraj
 """
 
-import RPi.GPIO as GPIO
-import from numpy import pi
+try:
+    import RPi.GPIO as GPIO
+except:
+    print("motorControl not run on Rpi, no functionality")
+from numpy import pi
 
 pins = {"Lmot0":  7,
         "Lmot1f":  8,
@@ -26,9 +30,8 @@ pins = {"Lmot0":  7,
         "Rmot2r":  19,
         }
 
-angle0offsetR = 0.1 # DC from potentiometer angle=0 to motor angle=0 for angle 0
+angle0offsetR = 0.1 # DC from potentiometer_angle=0 to motor_angle=0 for motor 0
 angle0offsetL = 0.1 # left
-
 
 
 class MotorController:
@@ -37,51 +40,50 @@ class MotorController:
         """Sets up pi pins and electronics so motors can run."""
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(pins.values(), GPIO.OUT)
-        self.Lmot0 = GPIO.PWM("Lmot0", PWMfreq)
-        self.Rmot0 = GPIO.PWM("Rmot0", PWMfreq)
+        self.Lmot0 = GPIO.PWM(pins["Lmot0"], PWMfreq)
+        self.Rmot0 = GPIO.PWM(pins["Rmot0"], PWMfreq)
         
-        self.Lmot1f = GPIO.PWM("Lmot1f", PWMfreq) # forward
-        self.Rmot1f = GPIO.PWM("Rmot1f", PWMfreq)
-        self.Lmot1r = GPIO.PWM("Lmot1r", PWMfreq) # reverse
-        self.Rmot1r = GPIO.PWM("Rmot1r", PWMfreq)
+        self.Lmot1f = GPIO.PWM(pins["Lmot1f"], PWMfreq) # forward
+        self.Rmot1f = GPIO.PWM(pins["Rmot1f"], PWMfreq)
+        self.Lmot1r = GPIO.PWM(pins["Lmot1r"], PWMfreq) # reverse
+        self.Rmot1r = GPIO.PWM(pins["Rmot1r"], PWMfreq)
         
-        self.Lmot2f = GPIO.PWM("Lmot2f", PWMfreq)
-        self.Rmot2f = GPIO.PWM("Rmot2f", PWMfreq)
-        self.Lmot2r = GPIO.PWM("Lmot2r", PWMfreq)
-        self.Rmot2r = GPIO.PWM("Rmot2r", PWMfreq)
+        self.Lmot2f = GPIO.PWM(pins["Lmot2f"], PWMfreq)
+        self.Rmot2f = GPIO.PWM(pins["Rmot2f"], PWMfreq)
+        self.Lmot2r = GPIO.PWM(pins["Lmot2r"], PWMfreq)
+        self.Rmot2r = GPIO.PWM(pins["Rmot2r"], PWMfreq)
         
-        self.Lmot0.start(0.0)
-        self.Rmot0.start(0.0)
-        self.Lmot1f.start(0.0)
-        self.Rmot1f.start(0.0)
-        self.Lmot1r.start(0.0)
-        self.Rmot1r.start(0.0)
-        self.Lmot2f.start(0.0)
-        self.Rmot2f.start(0.0)
-        self.Lmot2r.start(0.0)
-        self.Rmot2r.start(0.0)
+        self.fmotors = [self.Rmot1f, self.Rmot2f, self.Lmot1f, self.Lmot2f]
+        self.rmotors = [self.Rmot1r, self.Rmot2r, self.Lmot1r, self.Lmot2r]
         
-        
+        self.Lmot0.start(angle0offsetL)
+        self.Rmot0.start(angle0offsetR)
+        for mot in self.fmotors + self.rmotors:
+            mot.start(0.0)
 
     def setMotors(self, rightCommands, leftCommands):
         """Sets the target angle for motor 0 and the duty cycle for motors 1 and 2.
         rightCommands and leftCommands are 3x1 arrays from motionController.
+        commands are between -1 and 1 for duty cycles.
         """
         self.Rmot0.ChangeDutyCycle(min(rightCommands[0] / pi + angle0offsetR, 1.0) * 100.0)
         self.Lmot0.ChangeDutyCycle(min(1 + (leftCommands[0] / pi) + angle0offsetL, 1.0) * 100.0)
         
+        self.setMotor(rightCommands[1], 0)
+        self.setMotor(rightCommands[2], 1)
+        self.setMotor(leftCommands[1], 2)
+        self.setMotor(leftCommands[2], 3)
         
-        self._setMotor(rightCommands[1], Rmot1f, Rmot1r)
-        self._setMotor(rightCommands[2], Rmot2f, Rmot2r)
-        self._setMotor(leftCommands[1], Lmot1f, Lmot1r)
-        self._setMotor(leftCommands[2], Lmot2f, Lmot2r)
-        
-    
-    def _setMotor(self, command, fmotor, rmotor):
+    def setMotor(self, command, motorNum):
+        """set duty cycle for motors 1 or 2.
+        command is duty cycle -1 to 1
+        motorNum is (0: right motor 1) (1: right motor 2) (2: left motor 1) (3: left motor 2)"""
+        fmotor = self.fmotors[motorNum]
+        rmotor = self.rmotors[motorNum]
         if command > 0.0:
-            self.fmotor.ChangeDutyCycle(1.0) #TODO investigate two brake Hbridge methods
-            self.rmotor.ChangeDutyCycle(100.0 * (1.0 - command))
+            fmotor.ChangeDutyCycle(1.0) #TODO investigate two brake Hbridge methods
+            rmotor.ChangeDutyCycle(100.0 * (1.0 - command))
         else:
-            self.fmotor.ChangeDutyCycle(100.0 * (1.0 + command))
-            self.rmotor.ChangeDutyCycle(1.0)
+            fmotor.ChangeDutyCycle(100.0 * (1.0 + command))
+            rmotor.ChangeDutyCycle(1.0)
 

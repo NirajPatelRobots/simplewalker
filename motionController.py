@@ -3,8 +3,8 @@
 Created March 2021
 TODO:
     I'm sure MotionController_data isn't very pythonic but I refuse to read a style guide
-    tests have a wide range s.t. we expect some tracking error fails
-    resolve  planner._hstar and MC.params.body_default_pos
+    tests have  some tracking error fails
+    resolve planner._hstar and MC.params.body_default_pos
 
 @author: Niraj
 """
@@ -312,8 +312,10 @@ def test():
     t2Angfails = 0
     for i in range(numTries):
         t0angles = np.array([rightCommands[0,i], angles[1,i], angles[2,i]])
-        t1angles = np.array([angles[0,i], angles[1,i] + 0.01 * rightCommands[1,i], angles[2,i]])
-        t2angles = np.array([angles[0,i], angles[1,i], angles[2,i] + 0.01 * rightCommands[2,i]])
+        # t1angles = np.array([angles[0,i], angles[1,i] + 0.01 * rightCommands[1,i], angles[2,i]])
+        # t2angles = np.array([angles[0,i], angles[1,i], angles[2,i] + 0.01 * rightCommands[2,i]])
+        t1angles = np.array([rightCommands[0,i], angles[1,i] + 0.01 * rightCommands[1,i], angles[2,i]])
+        t2angles = np.array([rightCommands[0,i], angles[1,i], angles[2,i] + 0.01 * rightCommands[2,i]])
         
         startDist = np.sum((MC.params.right_default_leg - kin.forward_kinematics(angles[:,i], inclination[i]))**2)
         t0Dist = np.sum((MC.params.right_default_leg - kin.forward_kinematics(t0angles, inclination[i]))**2)
@@ -326,15 +328,23 @@ def test():
         t2Spin = np.sum((default_angles - t2angles)**2)
         if t0Dist > startDist:
             t0fails += 1
-        if t1Dist > startDist:
+        # if t1Dist > startDist:
+        #     t1fails += 1
+        # if t2Dist > startDist:
+        #     t2fails += 1
+        if t1Dist > t0Dist:
             t1fails += 1
-        if t2Dist > startDist:
+        if t2Dist > t0Dist:
             t2fails += 1
         if t0Spin > startSpin:
             t0Angfails += 1
-        if t1Spin > startSpin:
+        # if t1Spin > startSpin:
+        #     t1Angfails += 1
+        # if t2Spin > startSpin:
+        #     t2Angfails += 1
+        if t1Spin > t0Spin:
             t1Angfails += 1
-        if t2Spin > startSpin:
+        if t2Spin > t0Spin:
             t2Angfails += 1
     if t0fails > 0:
         print("Angle command 0 failed to improve tracking error", t0fails, "cartesian (", t0Angfails, "leg angle)/", numTries, "times")
