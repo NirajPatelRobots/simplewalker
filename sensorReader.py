@@ -24,7 +24,7 @@ class SensorReader:
         """angleOffset is sensor value when angle is zero
         rightAngleValue is sensor value when angle is pi/2"""
         self.imu = mpu6050.mpu6050(0x68) # initialize at default address
-        self.pots = mcp3008.MCP3008(device = 0) # potentiometers
+        self.adc = mcp3008.MCP3008(device = 0) # potentiometers
         self.angleOffset = angleOffset
         self.angleGain = np.pi / 2 / (rightAngleValue - self.angleOffset)
         
@@ -37,11 +37,20 @@ class SensorReader:
         angVel = np.array([gyro_data['x'], gyro_data['y'], gyro_data['z']])
         return accel, angVel
     
+    def readBatteryVoltage(self):
+        """return battery voltage (float)."""
+        """ R_high = 329 kOhm R_low = 993 kOhm
+        O-------/\/\/\/---o----/\/\/\/----O
+        V_Batt  R_high  sensor  R_low   GND
+        V_sens = V_Batt*R_low/(R_high+R_low)
+        scale = V_ref/V_sens/max_sense = 3.3/0.249/1023"""
+        return 0.0130 * self.adc.read(channel = 0)
+    
     def readAngles(self):
         """reads sensors and returns array of 4 angles [rad].
         order is (0: right motor 1) (1: right motor 2) (2: left motor 1) (3: left motor 2)"""
         angles = np.empty(4)
         for i in range(4):
-            angles[i] = self.pots.read(channel = i)
+            angles[i] = self.adc.read(channel = i+1)
         angles = (angles - self.angleOffset) * self.angleGain
         return angles

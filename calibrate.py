@@ -35,17 +35,19 @@ def checkMotorPerformance(motorNum, filename = None, frequency_scale = 1, amplit
     numInRange = 0
     while numInRange < 10:
         angle[0] = sensors.readAngles()[motorNum]
-        V[0] = kp * (targetVal - angle[0])
+        V_set = kp * (targetVal - angle[0])
+        motors.setMotor(V_set, motorNum)
         
-        
+        if np.abs(targetVal - angle[0]) < 0.01:
+            numInRange += 1
+        else:
+            numInRange = 0
         # TODO timing
     
     for i in range(N):
-        # set voltage
-        motors.setMotor(V[i], motorNum)
-        # sense position
         angle[i] = sensors.readAngles()[motorNum]
-        # if angle out of range, abort
+        motors.setMotor(V[i], motorNum)
+        # if angle out of range, break
         # TODO timing
         
     if not filename is None:

@@ -4,6 +4,7 @@ Motion planning for walking robot
 TODO:
     allow for not always on_ground
     plans where to step next
+    other behaviors like sway back + forth
 
 Created Mar 2021
 @author: Niraj
