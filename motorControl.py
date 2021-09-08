@@ -23,9 +23,9 @@ pins = {"Lmot0":  7,
         "Lmot2f":  11,
         "Lmot2r":  12,
         
-        "Rmot0":  13,
-        "Rmot1f":  15,
-        "Rmot1r":  16,
+        "Rmot0":  16,
+        "Rmot1f":  13,
+        "Rmot1r":  15,
         "Rmot2f":  18,
         "Rmot2r":  19,
         }
