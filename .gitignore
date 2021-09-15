@@ -127,7 +127,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-settings/testmc.dat
-motorparams.motorparams
-data1.motortest
-settings/testmc.dat
+
+
+settings/*
+data/*

@@ -28,7 +28,6 @@ class SensorReader:
         rightAngleValue is sensor value when angle is pi/2"""
         #self.imu = mpu6050.mpu6050(0x68) # initialize at default address
         self.adc = mcp3008.MCP3008(device = 0) # potentiometers and voltage
-        self.adc.max_speed_hz = 976000
         self.angleOffset = angleOffset
         self.angleGain = np.pi / 2 / (rightAngleValue - self.angleOffset)
     

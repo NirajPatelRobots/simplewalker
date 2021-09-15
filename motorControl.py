@@ -6,6 +6,7 @@ TODO:
     check real motor scales and offsets, store this + use with sensorReader.py
         -store pins too
     investigate normally on H-bridges vs normally off
+    replace RPi.GPIO with gpiozero? convenient objects, less control
 
 Created Jun 2021
 @author: Niraj
@@ -27,7 +28,7 @@ pins = {"Lmot0":  7,
         "Rmot1f":  13,
         "Rmot1r":  15,
         "Rmot2f":  18,
-        "Rmot2r":  19,
+        "Rmot2r":  22,
         }
 
 angle0offsetR = 0.1 # DC from potentiometer_angle=0 to motor_angle=0 for motor 0
@@ -39,7 +40,7 @@ class MotorController:
     def __init__(self, PWMfreq = 2000):
         """Sets up pi pins and electronics so motors can run."""
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(pins.values(), GPIO.OUT)
+        GPIO.setup(list(pins.values()), GPIO.OUT)
         self.Lmot0 = GPIO.PWM(pins["Lmot0"], PWMfreq)
         self.Rmot0 = GPIO.PWM(pins["Rmot0"], PWMfreq)
         
@@ -80,10 +81,11 @@ class MotorController:
         motorNum is (0: right motor 1) (1: right motor 2) (2: left motor 1) (3: left motor 2)"""
         fmotor = self.fmotors[motorNum]
         rmotor = self.rmotors[motorNum]
+        command = min(max(command, -1.0), 1.0)
         if command > 0.0:
-            fmotor.ChangeDutyCycle(1.0) #TODO investigate two brake Hbridge methods
+            fmotor.ChangeDutyCycle(100.0) #TODO investigate two brake Hbridge methods
             rmotor.ChangeDutyCycle(100.0 * (1.0 - command))
         else:
             fmotor.ChangeDutyCycle(100.0 * (1.0 + command))
-            rmotor.ChangeDutyCycle(1.0)
+            rmotor.ChangeDutyCycle(100.0)
 
