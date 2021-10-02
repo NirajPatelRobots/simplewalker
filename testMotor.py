@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 TODO:
-    replace scipy filter with something lighter
     better loop timing
 
 Created Jun 2021
@@ -61,16 +60,16 @@ def checkMotorPerformance(motorNum, dt, filename = None, frequency_scale = 1, am
         time.sleep(dt)
     V = V[:-1] # unused because of shift
     runTime = time.perf_counter() - startTime
-    print("Test run time:", round(runTime, 2), "("+str(round(runTime/N/dt, 4))+" of expected)")
+    print("Test run time:", round(runTime, 2), "("+str(round(N/dt, 4))+" expected)")
     
     if not filename is None:
         saveRun(filename, V, angle, motorNum, dt)
     return V, angle
 
 
-def saveRun(filename, V, angle, motorNum, dt):
+def saveRun(filename, V, angle, motorNum, dt, test_type="motor"):
     with open("data" + sep + "m" +str(motorNum) + '_' + filename +".motortest", 'wb') as file:
-        np.savez(file, V = V, angle = angle, dt=dt)
+        np.savez(file, V = V, angle = angle, dt=dt, test_type=test_type)
 
 def loadRun(filename):
     try:
@@ -135,6 +134,8 @@ def main():
                     amp_scale = float(args[2])
                     if len(args) > 3:
                         filename = args[3]
+                    else:
+                        filename = None
             V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
         elif command == "motornum":
             try:

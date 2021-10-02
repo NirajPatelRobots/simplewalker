@@ -2,7 +2,9 @@
 """
 TODO:
     look into digital filter implementation
+    delay in acceleration for causality? filter-related?
     better loop timing
+    whole leg
 
 Created Jun 2021
 @author: Niraj
@@ -12,7 +14,6 @@ import numpy as np
 from scipy import signal
 import time
 import matplotlib.pyplot as plt
-import pickle
 from os import listdir, getcwd
 from os.path import exists, sep, isfile, join
 
@@ -189,15 +190,14 @@ def filterData(data):
     filtered, _ = signal.lfilter(b, a, data, zi=zi*data[0])
     return filtered
     
-def saveParams(params, filename = "motorparams"):
-    with open("settings"+ sep + filename +".motorparams", "wb") as file:
-        pickle.dump(params, file)
+def saveParams(params, filename = "new"):
+    with open("settings"+ sep + filename +".learnedparams", "wb") as file:
+        np.savez(file, **params)
     
 def loadParams(filename = "motorparams"):
-    """static method that returns a MotionController_data object saved at filename"""
-    if exists("settings"+ sep + filename +".motorparams"):
-        with open(filename+".motorparams", "rb") as file:
-            return pickle.load(file)
+    if exists("settings"+ sep + filename +".learnedparams"):
+        with open("settings"+ sep + filename+".learnedparams", "rb") as file:
+            return dict(np.load(file))
     else:
         print("Couldn't load parameters")
         return None
@@ -227,7 +227,7 @@ def main():
         elif command == "examine":
             if len(args) > 1:
                 if args[1] == "all" and len(args) > 2:
-                    filenames = [f for f in listdir(directory_path) if isfile(join(directory_path,f)) and f.startswith("m"+args[2])]
+                    filenames = [f for f in listdir(directory_path) if isfile(join(directory_path,f)) and f.startswith(args[2])]
                     print("Loading", filenames)
                     V = [None] * len(filenames)
                     angle = [None] * len(filenames)
@@ -236,10 +236,9 @@ def main():
                         V[i], angle[i], dt = loadRun(f)
                         if i > 0:
                             if not dt == last_dt:
-                                print("mismatched log dt", last_dt, dt)
-                                V = np.array([])
-                                angle = np.array([])
-                                break
+                                print("mismatched log dt", last_dt, dt, "for", f)
+                                V = V[:i]
+                                angle = angle[:i]
                 else:
                     V, angle, dt = loadRun(args[1])
             if len(V) > 0:
