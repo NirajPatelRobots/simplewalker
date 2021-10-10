@@ -32,8 +32,8 @@ def checkLegPerformance(motorNum, dt, filename = None, frequency_scale = 1, ampl
     sensors = sensorReader.SensorReader()
     waveform = testMotor.excitationVoltage(frequency_scale*dt, amplitude_scale)
     N = np.size(waveform) - 1
-    angle_hip = np.empty(N*2*variations); V_hip = np.empty(N*2*variations)
-    angle_knee = np.empty(N*2*variations); V_knee = np.empty(N*2*variations)
+    hip_angle = np.empty(N*2*variations); V_hip = np.empty(N*2*variations)
+    knee_angle = np.empty(N*2*variations); V_knee = np.empty(N*2*variations)
     hipNum = motorNum[0]; kneeNum = motorNum[1]
     runTime = 0.
     i = 0
@@ -68,8 +68,8 @@ def checkLegPerformance(motorNum, dt, filename = None, frequency_scale = 1, ampl
             for j in range(N):
                 V_bat = sensors.readBatteryVoltage()
                 angles = sensors.readAngles()
-                angle_hip[i] = angles[hipNum]
-                angle_knee[i] = angles[kneeNum]
+                hip_angle[i] = angles[hipNum]
+                knee_angle[i] = angles[kneeNum]
                 if waveform[j] > V_bat: # account for voltage clipping
                     V_active[i] = V_bat
                 elif V_active[i] < -V_bat:
@@ -85,12 +85,12 @@ def checkLegPerformance(motorNum, dt, filename = None, frequency_scale = 1, ampl
                 i += 1
             runTime += time.perf_counter() - startTime
     if i < N*2*variations:
-        angle_hip = angle_hip[:i]; V_hip = V_hip[:i]
-        angle_knee = angle_knee[:i]; V_knee = V_knee[:i]
+        hip_angle = hip_angle[:i]; V_hip = V_hip[:i]
+        knee_angle = knee_angle[:i]; V_knee = V_knee[:i]
     print("Test run time:", round(runTime, 2), "("+str(round(i*dt, 4))+" expected)")
     
-    testdata = {"angle_hip":angle_hip, "angle_knee":angle_knee, "V_hip":V_hip, "V_knee":V_knee,
-                "motorNum":motorNum, "dt":dt}
+    testdata = {"hip_angle":hip_angle, "knee_angle":knee_angle, "V_hip":V_hip, "V_knee":V_knee,
+                "motorNum":motorNum, "hip_out_angle":np.pi/2, "dt":dt}
     if not filename is None:
         tag = "l" + str(motorNum[0]) + str(motorNum[1]) + '_'
         saveRun(tag+filename, **testdata, test_type="leg")

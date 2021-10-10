@@ -10,14 +10,15 @@ Created Mar 2021
 @author: Niraj
 """
 import numpy as np
-from kinematics import UP, LEFTSCALE, HORIZONTAL
+from kinematics import UP, LEFTSCALE, HORIZONTAL, RIGHT_DIR
 
 class MotionPlanner:
     """Class for a motion planner.
     Use MotionPlanner.createPlan to create a plan.
     Once a plan is created, MotionPlanner.pos is the 3xnumSteps array of positions,
     MotionPlanner.vel is the 3xnumSteps array of velocities.
-    same with MP.rightPos, rightVel, leftPos, and leftVel for the leg positions in robot coordinates.
+    same with MP.rightPos, rightVel, leftPos, and leftVel for the leg positions in global robot coordinates
+    rightPos and leftPos are not relative to connection point
     MotionPlanner.numSteps is the number of points in the plan.
     MotionPlanner.planTime is the length of the plan in seconds."""
     _pos : np.ndarray
@@ -50,6 +51,9 @@ class MotionPlanner:
         self._astar = heightAccel
         self._hstar = targetHeight
         self.dt = dt
+        start_pos = np.zeros(3)
+        start_pos[UP] = self._hstar
+        self.createPlan(start_pos, np.zeros(3) + 0.05*RIGHT_DIR, np.zeros(3) - 0.05*RIGHT_DIR, np.zeros(3))
 
     def createPlan(self, curr_pos, right_leg_pos, left_leg_pos, curr_vel):
         """ creates a plan based on current position and velocity.

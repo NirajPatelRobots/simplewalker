@@ -60,7 +60,7 @@ def checkMotorPerformance(motorNum, dt, filename = None, frequency_scale = 1, am
         time.sleep(dt)
     V = V[:-1] # unused because of shift
     runTime = time.perf_counter() - startTime
-    print("Test run time:", round(runTime, 2), "("+str(round(N/dt, 4))+" expected)")
+    print("Test run time:", round(runTime, 2), "s, loop takes ", round(runTime/N, 2), "s, code takes", round(1000*(runTime/N - dt), 3), "ms)")
     
     if not filename is None:
         saveRun(filename, V, angle, motorNum, dt)
@@ -96,8 +96,8 @@ def excitationVoltage(frequency_scale, amplitude_scale):
     freq = 1000. * frequency_scale
     amp = 1. * amplitude_scale
     
-    length = int(100./freq)
-    V = np.zeros((5*length))
+    length = int(200./freq)
+    V = np.zeros((2*length))
     for i in range(num_loops):
         V = np.concatenate((V, ((-1)**i)*_voltageLoop(freq, (i+1)/(num_loops+1) * amp)))
     V = np.concatenate((V, -V[::-1]))
@@ -120,6 +120,7 @@ def main():
     V = np.array([])
     angle = np.array([])
     dt = 0.03 # seconds
+    filename = None
     
     while True:
         args = input(">>> ").split()
@@ -144,6 +145,8 @@ def main():
                 print("Invalid motor number")
         elif command == "save" and len(args) > 1:
             saveRun(args[1], V, angle, motorNum, dt)
+        elif command == "dt" and len(args) > 1:
+            dt = float(args[1])
         elif command.startswith("exit"):
             break
         elif command == "code":
