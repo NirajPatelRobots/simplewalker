@@ -45,10 +45,10 @@ def forward_kinematics(theta, body_inclination, return_Jacobian=False):
     
     returns relative leg position p_leg 3-array in robot coordinates"""
     phi1 = body_inclination + theta[1]
-    phi2 = phi1 + theta[2]
+    phi2 = body_inclination + theta[2]
     phi = np.array([theta[0], phi1, phi2])
-    sines = np.sin(phi).reshape(3)
-    cosines = np.cos(phi).reshape(3)
+    sines = np.sin(phi)
+    cosines = np.cos(phi)
     p_leg = np.empty(3)
     p_leg[FORWARD] = (THIGH_LENGTH * sines[1] + SHIN_LENGTH * sines[2]) * cosines[0]
     p_leg[RIGHT] = (THIGH_LENGTH * cosines[1] + SHIN_LENGTH * cosines[2]) * sines[0]
@@ -70,7 +70,7 @@ def fk_Jacobian(theta, body_inclination):
     
     returns Jacobian as 3x3 matrix"""
     phi1 = body_inclination + theta[1]
-    phi2 = phi1 + theta[2]
+    phi2 = body_inclination + theta[2]
     phi = np.array([theta[0], phi1, phi2])
     return _fk_Jac_physTrig(np.sin(phi), np.cos(phi))
 
@@ -92,7 +92,7 @@ def ik_Jacobian(fk_Jac, angle):
         backup[1:, (FORWARD, UP)] += 0.005 * np.array([[-1, 1], [-1, 1]], dtype=float)
         if width > 0.02:
             ik_Jac = np.linalg.inv(fk_Jac)
-            return (width / max_width) * ik_Jac + (1 - width / max_width) * backup
+            return (width / max_width) * ik_Jac + (1. - width / max_width) * backup
         else: # too close to singularity for any inverse
             return backup
 
@@ -126,7 +126,6 @@ def inverse_kinematics(p_leg, body_inclination, theta_est = None, ignore_failure
     #angles = (ret.x + np.pi) % (2 * np.pi) - np.pi # wrap -pi to pi
     if ret.success or ignore_failure:
         return ret.x
-    #print(ret.message)
     return None
     
 
@@ -143,13 +142,13 @@ def _fk_Jac_physTrig(sines, cosines):
     """
     Jac = np.zeros((3,3))
     Jac[FORWARD,0] = -(sines[1] + sines[2]) * sines[0]
-    Jac[FORWARD,1] = (cosines[1] + cosines[2]) * cosines[0]
+    Jac[FORWARD,1] = cosines[1] * cosines[0]
     Jac[FORWARD,2] = cosines[2] * cosines[0]
     Jac[RIGHT,0] = (cosines[1] + cosines[2]) * cosines[0]
-    Jac[RIGHT,1] = -(sines[1] + sines[2]) * sines[0]
+    Jac[RIGHT,1] = -sines[1] * sines[0]
     Jac[RIGHT,2] = -sines[2] * sines[0]
     Jac[UP,0] = (cosines[1] + cosines[2]) * sines[0]
-    Jac[UP,1] = (sines[1] + sines[2]) * cosines[0]
+    Jac[UP,1] = sines[1] * cosines[0]
     Jac[UP,2] = sines[2] * cosines[0]
     return SHIN_LENGTH * Jac
     
@@ -234,25 +233,28 @@ def test():
     
     
     # test inverse_kinematics
-    startTime = time.perf_counter()
-    for i in range(numTries):
-        ret = inverse_kinematics(fk_results[:,i], thetas[3,i], theta_est = ik_thetas[:3,i])
-        if ret is None:
-            ik_fails[i] = 1
-        else:
-            ik_results[:,i] = ret
-    ik_time = time.perf_counter() - startTime
-    print("inverse_kinematics takes", round(ik_time * 1e6 / numTries, 3), "us with close estimate")
-    print(np.sum(ik_fails), "/", numTries, "inverse_kinematics optimizer failures")
+    if optimizer_installed:
+        startTime = time.perf_counter()
+        for i in range(numTries):
+            ret = inverse_kinematics(fk_results[:,i], thetas[3,i], theta_est = ik_thetas[:3,i])
+            if ret is None:
+                ik_fails[i] = 1
+            else:
+                ik_results[:,i] = ret
+        ik_time = time.perf_counter() - startTime
+        print("inverse_kinematics takes", round(ik_time * 1e6 / numTries, 3), "us with close estimate")
+        print(np.sum(ik_fails), "/", numTries, "inverse_kinematics optimizer failures")
+        failnum = 0
+        for i in range(numTries):
+            if not (np.all(np.isclose(forward_kinematics(ik_results[:,i], thetas[3,i]), fk_results[:,i], atol=0.001)) or ik_fails[i]):
+                #print("FAIL: inverse_kinematics on forward_kinematics yielded different values at", i)
+                print(ik_results[:,i], " ||| ", thetas[:3,i])
+                print("\t", forward_kinematics(ik_results[:,i], thetas[3,i]), " ||| ", fk_results[:,i])
+                failnum += 1
+        print(failnum, "inverse_kinematics incorrect results")
+    else:
+        print("inverse_kinematics requires scipy.optimize")
     
-    failnum = 0
-    for i in range(numTries):
-        if not (np.all(np.isclose(forward_kinematics(ik_results[:,i], thetas[3,i]), fk_results[:,i], atol=0.001)) or ik_fails[i]):
-            #print("FAIL: inverse_kinematics on forward_kinematics yielded different values at", i)
-            print(ik_results[:,i], " ||| ", thetas[:3,i])
-            print("\t", forward_kinematics(ik_results[:,i], thetas[3,i]), " ||| ", fk_results[:,i])
-            failnum += 1
-    print(failnum, "inverse_kinematics incorrect results")
     
     
         

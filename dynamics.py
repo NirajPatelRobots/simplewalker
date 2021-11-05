@@ -18,11 +18,16 @@ from copy import deepcopy
 class Dynamics:
     """class that contains multiple LegDynamics.
     Interprets the plan, calculates legs"""
-    def __init__(self, dt, right_learned_params = None, left_learned_params = None):
+    def __init__(self, dt, learned_params = None):
+        """dt is dt
+        learned_params is None or an array of [right hip, right knee, left hip, left knee]
+            where each element is a dict of learned motor parameters or None"""
         self.plan = MotionPlanner()
         self.dt = dt
-        self.right = LegDynamics(dt, right_learned_params)
-        self.left = LegDynamics(dt, left_learned_params)
+        if learned_params is None:
+            learned_params = [None, None, None, None]
+        self.right = LegDynamics(dt, learned_params[0], learned_params[1])
+        self.left = LegDynamics(dt, learned_params[2], learned_params[3])
         self.right_leg_conn = 0.03*kin.RIGHT_DIR
         self.left_leg_conn = -0.03*kin.RIGHT_DIR
         
@@ -49,7 +54,7 @@ class LegDynamics:
     use LegDynamics.set_plan() to set a new plan
     use LegDynamics.calculate() to calculate motor commands from angle sensors.
     then access LegDynamics.pos, LegDynamics.angle_ref, LegDynamics.angvel_ref, LegDynamics.load_torque"""
-    def __init__(self, dt, learned_params = None):
+    def __init__(self, dt, hip_learned_params = None, knee_learned_params = None):
         """ constructor.
         dt is time difference between function calls
         learned_params is the learned parameters for the leg
@@ -61,16 +66,16 @@ class LegDynamics:
         self.angvel_ref = np.zeros(3)
         self.grounded = 0.
         self.load_torque = np.zeros(3)
-        if not learned_params is None and "leg_weight_1" in learned_params.keys():
-            self.leg_weight_1 = learned_params["leg_weight_1"]
+        if not hip_learned_params is None and "leg_weight_1" in hip_learned_params.keys():
+            self.leg_weight_1 = hip_learned_params["leg_weight_1"]
         else:
             self.leg_weight_1 = 0.
-        if not learned_params is None and "leg_weight_2" in learned_params.keys():
-            self.leg_weight_2 = learned_params["leg_weight_2"]
+        if not knee_learned_params is None and "leg_weight_2" in knee_learned_params.keys():
+            self.leg_weight_2 = knee_learned_params["leg_weight_2"]
         else:
             self.leg_weight_2 = 0.
-        if not learned_params is None and "leg_weight_12" in learned_params.keys():
-            self.leg_weight_12 = learned_params["leg_weight_12"]
+        if not hip_learned_params is None and "leg_weight_12" in hip_learned_params.keys():
+            self.leg_weight_12 = hip_learned_params["leg_weight_12"]
         else:
             self.leg_weight_12 = 0.
         

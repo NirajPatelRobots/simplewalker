@@ -5,6 +5,7 @@ TODO:
     delay in acceleration for causality? filter-related?
     better loop timing
     whole leg
+    different dts
 
 Created Jun 2021
 @author: Niraj
@@ -37,24 +38,26 @@ def examineMotor(testdata, model = None, params = None):
             elif mod == "Vsq":
                 X = np.hstack((X, (np.abs(V_f) * V_f).reshape(-1,1)))
             elif mod == "knee":
-                X = np.hstack((X, -np.sin(results["angle_f"] + results["hip_angle_f"]).reshape(-1,1)))
+                X = np.hstack((X, -np.sin(results["angle_f"]).reshape(-1,1)))
             elif mod == "hip":
                 X = np.hstack((X, -np.sin(results["angle_f"]).reshape(-1,1)))
-                X = np.hstack((X, np.sin(results["angle_f"] + results["knee_angle_f"]).reshape(-1,1)))
+                X = np.hstack((X, np.sin(results["knee_angle_f"]).reshape(-1,1)))
         return X
     
-    def determine_params(X, acc_f, results, model, outlier_thresh = None):
+    def determine_params(X, acc_f, results, model, remove_outliers = False):
         paramArr = np.linalg.inv(X.T @ X) @ X.T @ acc_f
-        if outlier_thresh is None:
-            return paramArr
-        else:
+        if remove_outliers:
             params, accel_predic = assign_parameters(paramArr, {}, results, model)
             accel_error = acc_f - accel_predic
-            outliers = np.abs(accel_error) > outlier_thresh
+            std_dev = (np.sum(accel_error**2)/results["N"])**.5
+            results["outlier_thresh"] = 3 * std_dev
+            outliers = np.abs(accel_error) > results["outlier_thresh"]
             acc_f_clean = np.where(outliers, 0., acc_f)
             X_clean = np.where(outliers.reshape((-1,1)) * np.ones((1,2)), 0., X)
-            print("removed", np.sum(outliers), "outliers out of", results["N"])
+            print("removed", np.sum(outliers), "outliers out of", results["N"], "(Error >", round(results["outlier_thresh"]), "m/s^2)")
             return determine_params(X_clean, acc_f_clean, results, model)
+        else:
+            return paramArr
         
     def assign_parameters(param_array, params, results, model):
         """assigns parameters based on regression outputs and model"""
@@ -74,19 +77,18 @@ def examineMotor(testdata, model = None, params = None):
                 i += 1
             elif mod == "knee":
                 params["leg_weight_2"] = param_array[2+i]
-                accel_predic = accel_predic + params["leg_weight_2"] * -np.sin(results["angle_f"] + results["hip_angle_f"]).reshape(-1,1)
+                accel_predic = accel_predic + params["leg_weight_2"] * -np.sin(results["angle_f"]).reshape(-1,1)
                 i += 1
-            elif mod == "knee":
+            elif mod == "hip":
                 params["leg_weight_1"] = param_array[2+i]
                 params["leg_weight_12"] = param_array[3+i]
-                accel_predic = accel_predic \
+                accel_predic = accel_predic    \
                     + params["leg_weight_1"] * -np.sin(results["angle_f"]).reshape(-1,1) \
-                    + params["leg_weight_12"] * np.sin(results["angle_f"] + results["hip_angle_f"]).reshape(-1,1)
+                    + params["leg_weight_12"] * np.sin(results["knee_angle_f"]).reshape(-1,1)
                 i += 2
         return params, accel_predic
     
     dt = testdata[0]["dt"]
-    print("dt", dt)
     if params is None:
         params = {}
     if model is None:
@@ -112,7 +114,7 @@ def examineMotor(testdata, model = None, params = None):
     # use Linear Least Squares regression to determine parameters
     X = make_independent_variable(results, model)
     startTime = time.perf_counter()
-    paramArr = determine_params(X, results["acc_f"], results, model, outlier_thresh = 200)
+    paramArr = determine_params(X, results["acc_f"], results, model, remove_outliers=True)
     print("Parameter determination took", time.perf_counter() - startTime, "s")
     params, results["accel_predic"] = assign_parameters(paramArr, params, results, model)
     return params, results
@@ -120,28 +122,29 @@ def examineMotor(testdata, model = None, params = None):
 def graphMotorResults(testdata, params, results):
     print("Parameters:", params)
     accel_error = results["acc_f"] - results["accel_predic"]
-    rms_error = np.sum(np.abs(accel_error)) / results["N"]
-    print("Average error =", rms_error, "rad/s^2")
+    avg_error = np.sum(np.abs(accel_error)) / results["N"]
+    print("Average error =", round(avg_error, 3), "rad/s^2, Average acceleration", 
+          round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
 
     # graph voltage, angle, velocity, and acceleration filtered and unfiltered over time
     if len(testdata) == 1:
         plt.figure(1)
         plt.clf()
-        plt.subplot(411)
+        ax = plt.subplot(411)
         plt.suptitle("Raw and Filtered Data")
         plt.ylabel("Driving Voltage (V)")
         lines = plt.plot(results["t"], testdata[0]["V"], results["t"], results["V_f"])
         plt.legend(lines, ["Raw", "Filtered"])
         plt.grid()
-        plt.subplot(412)
+        plt.subplot(412, sharex=ax)
         plt.ylabel("Angle [rad]")
         plt.plot(results["t"], testdata[0]["angle"], results["t"], results["angle_f"])
         plt.grid()
-        plt.subplot(413)
+        plt.subplot(413, sharex=ax)
         plt.ylabel("Velocity [rad/s]")
         plt.plot(results["t"], results["velocity"], results["t"], results["vel_f"])
         plt.grid()
-        plt.subplot(414)
+        plt.subplot(414, sharex=ax)
         plt.ylabel("Acceleration [rad/s^2]")
         plt.xlabel("Time [s]")
         plt.plot(results["t"], results["accel"], results["t"], results["acc_f"])
@@ -161,7 +164,7 @@ def graphMotorResults(testdata, params, results):
     fig = plt.figure(3)
     plt.clf()
     ax = fig.add_subplot(projection = '3d')
-    ax.scatter(results["V_f"], results["vel_f"], zs=accel_error, c=accel_error)
+    ax.scatter(results["V_f"], results["vel_f"], zs=np.where(np.abs(accel_error) < results["outlier_thresh"], accel_error, np.NaN), c=accel_error)
     plt.title("Acceleration Error")
     ax.set_zlabel("Acceleration Error [rad/s^2]")
     plt.xlabel("Voltage [V]")
@@ -260,7 +263,7 @@ def main():
                                 test_type = testdata[0]["test_type"]
                             else:
                                 if not testdata[i]["dt"] == dt:
-                                    print("mismatched log dt", dt, testdata[i]["dt"], "for", f)
+                                    print("mismatched log timestep was", dt, "but is", testdata[i]["dt"], "for", f)
                                 if not testdata[i]["test_type"] == test_type:
                                     print("mismatched test_type", test_type, testdata[i]["test_type"], "for", f)
                 else:

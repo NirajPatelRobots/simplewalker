@@ -87,7 +87,7 @@ def excitationVoltage(frequency_scale, amplitude_scale):
     The voltages are sent to the motor and used to determine parameters."""
     def _voltageLoop(maxChange, maxVal):
         """returns an array of voltages starting and ending at zero"""
-        freq = maxChange / maxVal
+        freq = maxChange / abs(maxVal)
         t = np.arange(0., np.pi/freq, 0.01)
         return maxVal * np.sin(freq*t)
     
@@ -99,7 +99,8 @@ def excitationVoltage(frequency_scale, amplitude_scale):
     length = int(200./freq)
     V = np.zeros((2*length))
     for i in range(num_loops):
-        V = np.concatenate((V, ((-1)**i)*_voltageLoop(freq, (i+1)/(num_loops+1) * amp)))
+        loop_amp = (i+1)/(num_loops+1) * amp * (-1. if i%2 == 1 else 1.)
+        V = np.concatenate((V, _voltageLoop(freq, loop_amp)))
     V = np.concatenate((V, -V[::-1]))
     for i in range(num_square):
         V = np.concatenate((V, amp*np.ones(length), -amp*np.ones(2*length), amp*np.ones(length)))
