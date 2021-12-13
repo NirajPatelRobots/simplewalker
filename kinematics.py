@@ -18,8 +18,8 @@ else:
     optimizer_installed = True
 #from numba import njit
 
-SHIN_LENGTH = 0.2 # [m]
-THIGH_LENGTH = 0.2 # [m] (if you make them different, fix _fk_Jac_physTrig to do that)
+SHIN_LENGTH = 0.1 # [m]
+THIGH_LENGTH = 0.1 # [m] (if you make them different, fix _fk_Jac_physTrig to do that)
 
 # array indexes
 RIGHT = 0
@@ -29,6 +29,7 @@ HORIZONTAL = (RIGHT, FORWARD)
 RIGHT_DIR = np.array([1,0,0])
 FORWARD_DIR = np.array([0,1,0])
 UP_DIR = np.array([0,0,1])
+HORIZONTAL_DIR = RIGHT_DIR + FORWARD_DIR
 
 LEFTSCALE = np.ones(3)
 LEFTSCALE[RIGHT] *= -1 # multiply vectors by LEFTSCALE to change right to left

@@ -34,8 +34,9 @@ class Dynamics:
     def calculate(self, right_angle, right_angVel, left_angle, left_angVel, body_inclination):
         """find the leg reference angles and angular velocity from the next step in the plan
         takes leg angles and angular velocity as (3x1) and body_inclination"""
-        right_pos_ref = (self.plan.rightPos[:,0] - (self.plan.pos[:,0] + self.right_leg_conn)).reshape(3,1)
-        left_pos_ref = (self.plan.leftPos[:,0] - (self.plan.pos[:,0] + self.left_leg_conn)).reshape(3,1)
+        #self.plan.leg_plan(right_angle, right_angVel, left_angle, left_angVel)
+        right_pos_ref = (self.plan.rightPos[:,0] - (self.plan.pos[kin.UP,0] * kin.UP_DIR + self.right_leg_conn)).reshape(3,1)
+        left_pos_ref = (self.plan.leftPos[:,0] - (self.plan.pos[kin.UP,0] * kin.UP_DIR + self.left_leg_conn)).reshape(3,1)
         right_vel_ref = (self.plan.rightVel[:,0:1] - self.plan.vel[:,0:1])
         left_vel_ref = (self.plan.leftVel[:,0:1] - self.plan.vel[:,0:1])
         self.right.calculate(right_angle, right_angVel, right_pos_ref, right_vel_ref, body_inclination)
