@@ -5,132 +5,146 @@ TODO:
     adjust + log other leg joint*/
 
 
-#include <motors.hpp>
-#include <sensorReader.hpp>
-#include <vector>
+#include "motors.hpp"
+#include "sensorReader.hpp"
+#include "pico/stdlib.h"
+#include <stdio.h>
 #include <math.h>
-#include <iostream>
-#include <fstream>
 
-void excitationVoltage(std::vector<float> &V, float frequency_scale, float amplitude_scale) {
-    /* create a vector of voltages over time as inputs to the motor.
+volatile bool timer_fired = false;
+bool timer_callback(struct repeating_timer *t) {
+    timer_fired = true;
+    return true;
+}
+
+int excitationVoltage(float frequency_scale, float amplitude_scale, float *V) {
+    /* Choose voltage for test input to the motor.
+    Starts at counter = 0, creates a waveform over each time it's called
     Made up of a sinusoid then a square wave */
-    int num_loops = 20, num_square = 5;
-    float freq = 1000. * frequency_scale;
-    float amp = 2. * amplitude_scale;
-    int squarelength = (int)(200.0 / freq)
-    V.assign(2*squarelength, 0.);
+    float freq = 500. * frequency_scale, amp = 2. * amplitude_scale;
+    int num_loops = 6, num_square = 3, square_length = (int)(200.0 / freq);
+    static int place, loop_num, extra_count;
 
-    for (int loop = 0; loop < num_loops; loop++) { // loops
-        float loop_amp = (loop+1)/(num_loops+1) * amp;
+    if ( loop_num < num_loops) { // loops
+        float loop_amp = (loop_num+1)/(num_loops+1) * amp;
         float loop_freq = freq / loop_amp;
-        if (loop % 2 == 1) loop_amp *= -1;
-        for (float t = 0; t < (M_PI / freq); t += 0.01) {
-            V.push_back(loop_amp * sin(loop_freq * t));
+        if (loop_num % 2 == 1) loop_amp *= -1;
+        *V = loop_amp * sin(loop_freq * 0.01 * place);
+        if (place < 314.0 / loop_freq) {
+            place++;
+        } else {
+            place = 0;
+            loop_num++;
+        }
+    } else if (loop_num < 2 * num_loops) { // loops with wiggles
+        float loop_amp = (1-(loop_num-num_loops+1)/(num_loops+1)) * amp;
+        float loop_freq = freq / loop_amp;
+        if (loop_num % 2 == 1) loop_amp *= -1;
+        *V = loop_amp * sin(loop_freq * 0.01 * place) + 0.1 * amp * sin(13 * freq / amp * extra_count++);
+        if (place < 314.0 / loop_freq) {
+            place++;
+        } else {
+            place = 0;
+            loop_num++;
+        }
+    } else {
+        int square_num = (loop_num - (2 * num_loops)) / (4 *square_length);
+        if (square_num < num_square) {
+            if (place < square_length)           *V = amp;
+            else if (place < 3*square_length)    *V = -amp;
+            else                                 *V = amp;
+            if (++place == 4*square_length) {
+                loop_num++;
+                place = 0;
+            }
+        } else {
+            if (place++ < square_length)      *V = 0.0;
+            else { //finally done
+                loop_num = 0;
+                place = 0;
+                extra_count = 0;
+                return 1;
+            }
         }
     }
-
-    for (int loop = 0; loop < num_loops; loop++) { // loops with wiggles
-        float loop_amp = (1-(loop+1)/(num_loops+1)) * amp;
-        float loop_freq = freq / loop_amp;
-        if (loop % 2 == 1) loop_amp *= -1;
-        for (float t = 0; t < (M_PI / freq); t += 0.01) {
-            V.push_back(loop_amp * sin(loop_freq * t) + 0.2 * amp * sin(13 * freq / amp * t));
-        }
-    }
-
-    for (int square = 0; square < num_square; square++) {
-        for (int i = 0; i < square_length; i++)      V.push_back(amp);
-        for (int i = 0; i < 2*square_length; i++)    V.push_back(-amp);
-        for (int i = 0; i < square_length; i++)      V.push_back(amp);
-    }
-    for (int i = 0; i < square_length; i++)      V.push_back(0.0);
+    return 0;
 }
 
 
-int checkMotorPerformance(int motorNum, float dt, std::vector<float> &V, std::vector<float> &angle,
-                          float frequency_scale, float amplitude_scale) {
-    float centerVal = M_PI_2; //[rad]
-    float kp = 0.002;
-    float maxDisplacement = 0.45 * np.pi; //[rad]
-    Motors motors();
-    SensorReader sensors();
-    excitationVoltage(V, frequency_scale * dt, amplitude_scale);
-    angle.reserve(V.size() - 1);
+int checkMotorPerformance(int motorNum, float dt, Motors& motors, SensorReader& sensors,
+                            float frequency_scale, float amplitude_scale) {
+    float centerVal = M_PI_2, maxDisplacement = 0.45 * M_PI; //[rad]
+    float kp = 0.002, V, lastV = 0.0, angle;
+
 
     //return to start
     int numInRange = 0;
-    angle.push_back(0.0)
+    angle = 0.0;
     while (numInRange < 10) {
-        angle.at(0) = sensors.readAngle(motorNum);
-        motors.setMotor(motorNum, kp * (centerVal - angle.at(0)));
-        if (fabs(centerVal - angle.at(0)) < 0.01) {
+        angle = sensors.readAngle(motorNum);
+        motors.setMotor((Motornum)motorNum, kp * (centerVal - angle));
+        if (fabs(centerVal - angle) < 0.01) {
             numInRange++;
         } else {
             numInRange = 0;
         }
         sleep_ms(dt*1000);
     }
-    
-    for (int i = 0; i < V.size() - 1; i++) {
+    int i = 0;
+    struct repeating_timer timer;
+    add_repeating_timer_us(-(int)(1000000 * dt), timer_callback, NULL, &timer);
+    while(excitationVoltage(frequency_scale * dt, amplitude_scale, &V) == 0) {
+        while (!timer_fired) {
+            sleep_us(1);
+        }
+        timer_fired = false;
         float V_bat = sensors.readBatteryVoltage();
-        angle.push_back(sensors.readAngle(motorNum));
-        if (V.at(i+1) > V_bat) { // constrain to battery voltage
-            V.at(i+1) = V_bat;
-        } else if (V.at(i+1) < -V_bat) {
-            V.at(i+1) = -V_bat;
-        } 
-        motors.setMotor(motorNum, V.at(i+1) / V_bat); // shift i+1 because causality. So V[i] affects angle[i]
-        if (fabs(centerVal - angle.at(i)) > maxDisplacement) { // if out of range
-            V.erase(V.begin() + i, V.end());
-            angle.reserve(0);
+        if (V > V_bat) { // constrain to battery voltage
+            V = V_bat;
+        } else if (V < -V_bat) {
+            V = -V_bat;
+        }
+        motors.setMotor((Motornum)motorNum, V / V_bat); 
+        angle = sensors.readAngle(motorNum);
+        if (fabs(centerVal - angle) > maxDisplacement) {
+            printf("Test went out of range and was terminated\n");
             return -1;
         }
-        sleep_ms(dt*1000);
+        printf("%f,%f,%f\n", dt * i, lastV, angle);
+        i++;
+        lastV = V; // shift i+1 because causality. So V[i] affects angle[i]
+        sleep_ms(dt*1000.);
     }
-    V.pop_back(); //causality shift
+    cancel_repeating_timer(&timer);
     return 0;
 }
 
 
-void sendRun(std::vector<float> &V, std::vector<float> &angle, int motorNum, float dt) {
-    std::cout << "Time (s), Voltage (V), Angle (rad)\n";
-    for (int i = 0; i < V.size(); i++) { // CSV format is easy
-        std::cout << dt * i << "," << V.at(i) << "," << angle.at(i) << "\n";
-        sleep_ms(2); //give the listener some time
-    }
-}
 
-int main(int argc, char *argv) {
+int main() {
+    stdio_init_all();
+    Motors motors;
+    SensorReader sensors;
+    //TODO: get info from sender
     int motorNum = 0;
-    std::vector<float> V;
-    std::vector<float> angle;
-    float dt = 0.01;
-    if (argc <= 1) {
-        float amp_scale = 1.0;
-    } else {
-        float amp_scale = argv[1];
-        if (argc <= 2) {
-            float freq_scale = 1.0;
-        } else {
-            float freq_scale = argv[2];
-            if (argc <= 3) {
-                std::string filename = "";
-            } else {
-                std::string filename = argv[3];
-    }}}
-
-    std::cout<<"Run Amplitude "<<amp_scale<<" Frequency "<<freq_scale<<" dt "<<dt<<" motorNum "<<motorNum<<"\n";
-    int ret = checkMotorPerformance(motorNum, dt, V, angle, freq_scale, amp_scale);
-    if (ret == -1) {
-        std::cout<<"Test went out of range and was terminated\n";
-    } else if (ret > 0) {
-        return ret;
-    }
-    if (filename.length() > 0) {
-        ret = saveRun(filename, V, angle, motorNum, dt);
-        if (ret > 0) {
-            std::cout<<"Data save failed\n";
+    float dt = 0.003;
+    float amp_scale = 1.0;
+    float freq_scale = 1.0;
+    //^info from sender
+    while (1) {
+        int inChar = getchar_timeout_us(400*1000);
+        if (inChar == PICO_ERROR_TIMEOUT) {
+            float battery_voltage = sensors.readBatteryVoltage();
+            printf("Battery Voltage: %f\n", battery_voltage);
+        }
+        else {
+            printf("read %c\n", inChar);
+        }
+        if (0) {
+            printf("Running Amplitude %f, Frequency %f, dt %f, motorNum %f\n", amp_scale, freq_scale, dt, motorNum);
+            //send in CSV format
+            printf("Time (s), Voltage (V), Angle (rad)\n");
+            checkMotorPerformance(motorNum, dt, motors, sensors, freq_scale, amp_scale);
         }
     }
 }

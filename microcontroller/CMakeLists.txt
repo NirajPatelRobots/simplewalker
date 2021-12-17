@@ -18,3 +18,16 @@ pico_enable_stdio_usb(hardware_test 1)
 pico_enable_stdio_uart(hardware_test 0)
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(hardware_test)
+
+add_executable(test_motor
+testMotor.cpp
+motors.cpp
+sensorReader.cpp
+)
+# pull in common dependencies
+target_link_libraries(test_motor pico_stdlib hardware_pwm hardware_spi)
+# enable usb output, disable uart output
+pico_enable_stdio_usb(test_motor 1)
+pico_enable_stdio_uart(test_motor 0)
+# create map/bin/hex/uf2 file etc.
+pico_add_extra_outputs(test_motor)

@@ -23,7 +23,7 @@ sudo picotool load <name>.uf2 -v -x
 ```
 
 To read output from printf, use USB. Can change to UART in CMakeLists.txt.
-`minicom -b 115200 -o -D /dev/ttyACM0` to listen to the output.
+`minicom -b 115200 -o -D /dev/ttyACM0` to listen to the output. To exit minicom, use CTRL-A followed by X.
 
 Requires python 3.5 or newer.
 

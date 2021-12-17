@@ -13,6 +13,10 @@ import numpy as np
 import time
 from os.path import sep
 
+RUN_LOCAL = False # if RUN_LOCAL, then the computer running this code is controlling the motors. IF RUN_LOCAL is False, then this code sends and receives information from a microcontroller
+
+if not RUN_LOCAL:
+    import serial
 
 def checkMotorPerformance(motorNum, dt, filename = None, frequency_scale = 1, amplitude_scale = 1):
     """test the motor by setting voltages and sensing position.
@@ -122,6 +126,9 @@ def main():
     angle = np.array([])
     dt = 0.03 # seconds
     filename = None
+    if not RUN_LOCAL:
+        ser = serial.Serial(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
+                            stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
     
     while True:
         args = input(">>> ").split()
@@ -131,14 +138,17 @@ def main():
             continue
         elif command == "run":
             if len(args) > 1:
-                freq_scale = float(args[1])
+                amp_scale = float(args[1])
                 if len(args) > 2:
-                    amp_scale = float(args[2])
+                    freq_scale = float(args[2])
                     if len(args) > 3:
                         filename = args[3]
                     else:
                         filename = None
-            V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
+            if RUN_LOCAL:
+                V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
+            else:
+                ser.write("Run {} {} {} {}".format(amp_scale, freq_scale, dt, motorNum).encode('utf-8'))
         elif command == "motornum":
             try:
                 motorNum = int(args[1])
