@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Created Sept 2021 based on motionController.py
-runtime:
+runtime (old):
     8% is ik_Jac_dot chain rule term from velocity error calculation
     27% is ik_Jac and ik_Jac_dot calculations
     92% leg.calculate

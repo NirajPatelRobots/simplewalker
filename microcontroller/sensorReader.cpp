@@ -12,7 +12,8 @@ SensorReader::SensorReader(float angleZero[], float angleRight[]) {
     SPI_Rx_pin = 0;
     SPI_CLK_pin = 2;
     // SPI
-    spi_init(spi0, 1000 * 1000); // 1MHz
+    spi_init(spi0, 1350000);
+    spi_set_format( spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST );
     gpio_set_function(SPI_Tx_pin, GPIO_FUNC_SPI);
     gpio_set_function(SPI_Rx_pin, GPIO_FUNC_SPI);
     gpio_set_function(SPI_CLK_pin, GPIO_FUNC_SPI);
@@ -23,14 +24,16 @@ SensorReader::SensorReader(float angleZero[], float angleRight[]) {
 
 SensorReader::SensorReader(void) {
     float zero[4] = {0,0,0,0};
-    SensorReader(zero, zero);
+    float halfangle[4] = {512,512,512,512};
+    SensorReader(zero, halfangle);
 }
 
 int SensorReader::read_ADC(int channel_num) {
     gpio_put(SPI_CS_pin, 0);
+    sleep_ms(2);
     uint8_t indata[3], outdata[3] = {1, 0, 0};
     outdata[1] = (8 + channel_num) << 4;
-    spi_write_read_blocking(spi0, outdata, indata, sizeof(outdata));
+    spi_write_read_blocking(spi0, outdata, indata, 3);
     gpio_put(SPI_CS_pin, 1);
     int value = ((indata[1] & 3) << 8 ) | indata[2];
     return value;
