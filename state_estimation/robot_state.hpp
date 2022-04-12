@@ -15,9 +15,11 @@ const int N = 12;
 class RobotState {
     Matrix3f R_, RT_;
 public:
+    enum index {IDX_POS = 0, IDX_EUL = 3, IDX_VEL = 6, IDX_ANGVEL = 9};
     VectorXf vect;
     RobotState();
     void calculate(); //calculates the rotation matrix and leg pos after state values are set
+    void calculate(Matrix3f *dRT_deul);
     //state elements
     const Vector3f pos() const;
     Block3f pos();
@@ -32,7 +34,8 @@ public:
     //calculated values
     const Matrix3f& R; //rotation matrix; world_frame = R * body_frame
     const Matrix3f& RT; //transposed rotation matrix; body_frame = RT * world_frame
+    //Matrix3f * const &Jac_RT_Eul; // TODO: should this be part of state estimation calculated by calculate()
 };
 
 std::ostream &operator<<(std::ostream &output, const RobotState &State);
-
+std::string state_CSV_header(void); //TODO list of const strings of names that get output by <<

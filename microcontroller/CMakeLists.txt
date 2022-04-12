@@ -6,6 +6,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(PICO_ENABLE_CXX_EXCEPTIONS 1)
 pico_sdk_init()
 
+add_executable(controller_main
+controller_main.cpp
+mpu6050_i2c.c
+mpu6050.cpp
+pico_comm.cpp
+../communication/messages.h
+)
+# pull in common dependencies
+target_link_libraries(controller_main pico_stdlib hardware_i2c)
+# enable usb output, disable uart output
+pico_enable_stdio_usb(controller_main 1)
+pico_enable_stdio_uart(controller_main 0)
+# create map/bin/hex/uf2 file etc.
+pico_add_extra_outputs(controller_main)
+
 add_executable(hardware_test
 hardwareTest.cpp
 motors.cpp
@@ -31,3 +46,5 @@ pico_enable_stdio_usb(test_motor 1)
 pico_enable_stdio_uart(test_motor 0)
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(test_motor)
+
+

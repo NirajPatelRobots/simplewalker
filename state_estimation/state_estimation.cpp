@@ -7,7 +7,7 @@
 #define YI_ACCEL 0
 #define YI_GYRO 3
 const int M = 6;
- 
+const Vector3f gravity(0, 0, -1);
 
 StateEstimator::StateEstimator(float accel_stddev, float gyro_stddev, float timestep,
                                 float pos_stddev, float euler_stddev, float vel_stddev, float angvel_stddev)
@@ -18,15 +18,18 @@ StateEstimator::StateEstimator(float accel_stddev, float gyro_stddev, float time
     sens_cov = MatrixXf::Identity(M, M) * dt;
     sens_cov.block<3,3>(YI_ACCEL, YI_ACCEL) *= pow(accel_stddev, 2);
     sens_cov.block<3,3>(YI_GYRO, YI_GYRO) *= pow(gyro_stddev, 2);
+    for (int i = 0; i < 3; i++) {
+        Jac_RT_Eul[i] = Matrix3f::Zero();
+    }
     motion_noise = MatrixXf::Identity(N, N) * dt;
-    motion_noise.block<3,3>(STATEIDX_POS, STATEIDX_POS) *= pow(pos_stddev, 2);
-    motion_noise.block<3,3>(STATEIDX_EUL, STATEIDX_EUL) *= pow(euler_stddev, 2);
-    motion_noise.block<3,3>(STATEIDX_VEL, STATEIDX_VEL) *= pow(vel_stddev, 2);
-    motion_noise.block<3,3>(STATEIDX_ANGVEL, STATEIDX_ANGVEL) *= pow(angvel_stddev, 2);
+    motion_noise.block<3,3>(RobotState::IDX_POS, RobotState::IDX_POS) *= pow(pos_stddev, 2);
+    motion_noise.block<3,3>(RobotState::IDX_EUL, RobotState::IDX_EUL) *= pow(euler_stddev, 2);
+    motion_noise.block<3,3>(RobotState::IDX_VEL, RobotState::IDX_VEL) *= pow(vel_stddev, 2);
+    motion_noise.block<3,3>(RobotState::IDX_ANGVEL, RobotState::IDX_ANGVEL) *= pow(angvel_stddev, 2);
     // set sens_jac and motion_jac from models
     motion_jac = MatrixXf::Identity(N, N);
-    motion_jac.block<3,3>(STATEIDX_POS, STATEIDX_VEL) = Matrix3f::Identity() * dt;
-    motion_jac.block<3,3>(STATEIDX_EUL, STATEIDX_ANGVEL) = Matrix3f::Identity() * dt;
+    motion_jac.block<3,3>(RobotState::IDX_POS, RobotState::IDX_VEL) = Matrix3f::Identity() * dt;
+    motion_jac.block<3,3>(RobotState::IDX_EUL, RobotState::IDX_ANGVEL) = Matrix3f::Identity() * dt;
     sens_jac = MatrixXf::Zero(M, N);
 }
 
@@ -34,18 +37,24 @@ void StateEstimator::predict() {
     //set state_pred from state (motion model)
     state_pred.pos() = state.pos() + state.vel() * dt;
     state_pred.euler() = state.euler() + state.angvel() * dt;
-    state_pred.vel() = state.vel();
+    state_pred.vel() = state.vel() * (1-dt); // DEBUG DEBUG TODO REMOVE DAMPING
     state_pred.angvel() = state.angvel();
-    state_pred.calculate();
+    state_pred.calculate(Jac_RT_Eul);
     cov_pred = motion_jac * cov * motion_jac.transpose() + motion_noise;
     //set sens_pred and sens_jac from state_pred (sensor model)
-    sens_pred.segment<3>(YI_ACCEL) = state_pred.RT * (state_pred.vel() - state.vel()) / dt;
-    sens_jac.block<3,3>(YI_ACCEL, STATEIDX_VEL) = state_pred.RT / dt;
-    sens_pred.segment<3>(YI_GYRO) = /*state_pred.RT * */state_pred.angvel() / dt;
-    sens_jac.block<3,3>(YI_GYRO, STATEIDX_ANGVEL) = Matrix3f::Identity() / dt; //state_pred.RT / dt;;
+    sens_pred.segment<3>(YI_ACCEL) = state_pred.RT * (state_pred.vel() - state.vel() + gravity) / dt;
+    sens_jac.block<3,3>(YI_ACCEL, RobotState::IDX_VEL) = state_pred.RT / dt;
+    for (int i=0; i<3; i++) {
+        sens_jac.block<3,1>(YI_ACCEL, RobotState::IDX_EUL + i) = Jac_RT_Eul[i] * (state_pred.vel() - state.vel() + gravity) / dt;
+    }
+    sens_pred.segment<3>(YI_GYRO) = state_pred.RT * state_pred.angvel();
+    sens_jac.block<3,3>(YI_GYRO, RobotState::IDX_ANGVEL) = state_pred.RT;
+    for (int i=0; i<3; i++) {
+        sens_jac.block<3,1>(YI_GYRO, RobotState::IDX_EUL + i) = Jac_RT_Eul[i] * state_pred.angvel();
+    }
 }
 
-void StateEstimator::correct(Vector3f accel, Vector3f gyro) {
+void StateEstimator::correct(Eigen::Map<Vector3f> accel, Eigen::Map<Vector3f> gyro) {
     sensordata.segment<3>(YI_ACCEL) = accel;
     sensordata.segment<3>(YI_GYRO) = gyro;
 
@@ -63,11 +72,10 @@ std::ostream &operator<<(std::ostream &output, const StateEstimator &EKF) {
         <<EKF.state.vel().transpose() << "," << EKF.state.angvel().transpose() << ","
         <<EKF.state_pred.pos().transpose() << "," << EKF.state_pred.euler().transpose() << ","
         <<EKF.state_pred.vel().transpose() << "," << EKF.state_pred.angvel().transpose() << ","
-        <<EKF.sensor_prediction.transpose() << "\n";
+        <<EKF.sensor_prediction.transpose();
     return output;
 }
 
 std::string estimator_CSV_header(void) {
-    return "time,pos[3],euler[3],vel[3],angvel[3],pos_pred[3],euler_pred[3],vel_pred[3],angvel_pred[3],"
-            "sensor_prediction[6]\n";
+    return "pos[3],euler[3],vel[3],angvel[3],pos_pred[3],euler_pred[3],vel_pred[3],angvel_pred[3],sensor_prediction[6]";
 }

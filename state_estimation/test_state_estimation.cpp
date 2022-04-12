@@ -38,7 +38,7 @@ int main() {
     const long int ONE_SECOND = 1000000000;
 	struct timespec gettime_now, waittime = {0, 0};
     std::ofstream logfile("localizeTestLog.csv", std::ios::out | std::ios::trunc);
-    logfile << estimator_CSV_header() << 0.0 << "," << EKF;
+    logfile <<"time,"<< estimator_CSV_header() << 0.0 << "," << EKF<<"\n";
 
     for (int i =0; i < num_steps; i++) {
         accel_data(0) = -accel_mag * sin(angle);
@@ -68,7 +68,7 @@ int main() {
         nanosleep(&waittime, NULL);
     }
     logfile.close();
-    std::cout<<EKF.state;
+    std::cout<<EKF.state<<"\n";
     std::cout<<"Prediction time: " << 1e-6 * avg_predict_time
             << " ms, Correction time: " << 1e-6 * avg_correct_time << " ms\n";
 }
