@@ -1,9 +1,20 @@
 eigen = -I ~/eigen-3.4.0
 incLocal = -I./communication -I./state_estimation
-state_depnd = ./state_estimation/state_estimation.cpp ./state_estimation/robot_state.cpp
+build = ./build/
+CFLAGS = -std=c++17 -Wall -Wextra -O
+objnames = simplewalker.o maincomp_comm.o state_estimation.o robot_state.o
+objects := $(addprefix $(build),$(objnames))
+	
+simplewalker: $(objects)
+	g++ $(incLocal) -o $(build)$@ $^ -lwiringPi -lpthread
 
-localize_test: ./state_estimation/test_state_estimation.cpp $(state_depnd)
-	g++ $(eigen) -I/state_estimation -o ./build/$@ $^ -std=c++17 -Wall -Wextra
+localize_test: $(build)*state_estimation.o $(build)robot_state.o
+	g++ -I/state_estimation $(eigen) -o $(build)$@ $^
 
-simplewalker: simplewalker.cpp communication/maincomp_comm.cpp $(state_depnd)
-	g++ $(eigen) $(incLocal)  -o ./build/$@ $^ -lwiringPi -lpthread -std=c++17 -Wall -Wextra
+$(build)%.o : %.cpp
+	g++ -c $(incLocal) $(eigen) $^  $(CFLAGS) -o $@
+$(build)%.o : ./*/%.cpp
+	g++ -c $(incLocal) $(eigen) $^  $(CFLAGS) -o $@
+
+clean : 
+	rm -f $(build)*.o $(build)simplewalker $(build)localize_test
