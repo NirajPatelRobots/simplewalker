@@ -16,13 +16,12 @@ int main() {
     controlstate->ID = 0;
     Communicator comm(ControlStateMsgID, sizeof(ControlStateMsg),
                       ControlTargetMsgID, sizeof(ControlTargetMsg));
+    float accel_stddev = 1.0, gyro_stddev = 0.01;
+    SensorBoss *sensors = new SensorBoss(controlstate->accel, accel_stddev, gyro_stddev);
     // EKF parameters
-    float accel_stddev = 1.0, gyro_stddev = 0.01, timestep = 0.03,
-        pos_stddev = 0.01, euler_stddev = 0.05, vel_stddev = 1.0, angvel_stddev = 1.0;
-    StateEstimator *EKF = new StateEstimator(accel_stddev, gyro_stddev, timestep, 
+    float timestep = 0.03, pos_stddev = 0.01, euler_stddev = 0.05, vel_stddev = 1.0, angvel_stddev = 1.0;
+    StateEstimator *EKF = new StateEstimator(timestep, *sensors,
                                     pos_stddev, euler_stddev, vel_stddev, angvel_stddev);
-
-    Eigen::Map<Vector3f> accel_data(controlstate->accel), gyro_data(controlstate->gyro);
 
     chrono::milliseconds looptime(LOOP_TIME_MS);
     chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
@@ -45,11 +44,11 @@ int main() {
         }
 
         EKF->predict();
-        EKF->correct(accel_data, gyro_data);
+        EKF->correct();
 
-        std::cout<<"\r"<<controlstate->timestamp_us<<" | "<<comm.num_bad_bytes<<" | "<<EKF->state<<"  |";
-        /*       <<"  |  "<<controlstate->accel[0]<<' '<<controlstate->accel[1]<<' '<<controlstate->accel[2]
-                 <<"  |  "<<controlstate->gyro[0]<<' '<<controlstate->gyro[1]<<' '<<controlstate->gyro[2]<<std::flush;*/
+        std::cout<<"\r"<<controlstate->timestamp_us<<" | "<<comm.num_bad_bytes//<<" | "<<EKF->state<<"  |";
+                 <<"  |  "<<sensors->accel()[0]<<' '<<sensors->accel()[1]<<' '<<sensors->accel()[2]
+                 <<"  |  "<<sensors->gyro()[0]<<' '<<sensors->gyro()[1]<<' '<<sensors->gyro()[2]<<std::flush;
         loopstart += looptime;
         std::this_thread::sleep_until(loopstart);
     }

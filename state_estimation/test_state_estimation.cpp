@@ -2,6 +2,8 @@
 TODO:
     read in parameters instead of hardcoded
     sensor noise
+    gravity
+    load and play log
 March 2022 */
 #include "state_estimation.hpp"
 #include <cmath>

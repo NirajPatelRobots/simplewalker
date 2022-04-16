@@ -1,5 +1,7 @@
 /* simplewalker state for state estimation 
 March 2022 blame Niraj*/
+#ifndef ROBOT_STATE_HPP
+#define ROBOT_STATE_HPP
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 using Eigen::MatrixXf, Eigen::Matrix3f, Eigen::VectorXf, Eigen::Vector3f;
@@ -39,3 +41,5 @@ public:
 
 std::ostream &operator<<(std::ostream &output, const RobotState &State);
 std::string state_CSV_header(void); //TODO list of const strings of names that get output by <<
+
+#endif
