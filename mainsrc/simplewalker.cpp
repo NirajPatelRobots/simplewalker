@@ -3,6 +3,7 @@
 */
 #include "maincomp_comm.hpp"
 #include "state_estimation.hpp"
+#include "logger.hpp"
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -28,8 +29,8 @@ int main() {
     chrono::time_point<chrono::steady_clock> readtime;
     bool ERR_msg_late = false;
     int num_msgs = 0;
+    Logger logger;
 
-    std::cout<<"Time    | BAD | "<<state_CSV_header()<<"\n";
     auto loopstart = chrono::steady_clock::now();
     while (true) {
         comm.handle_messages();
@@ -39,16 +40,18 @@ int main() {
         }
         ERR_msg_late = (readtime > loopstart);
         if (ERR_msg_late) {
-            std::cout<<"late\n";
+            std::cout<<"late  \n";
             loopstart = readtime; // slow down time so we don't get ahead
         }
 
         EKF->predict();
         EKF->correct();
+        logger.log("Calctime [ms]", chrono::duration<float, std::milli>(chrono::steady_clock::now() - loopstart).count());
+        logger.log(EKF->state);
 
-        std::cout<<"\r"<<controlstate->timestamp_us<<" | "<<comm.num_bad_bytes//<<" | "<<EKF->state<<"  |";
-                 <<"  |  "<<sensors->accel()[0]<<' '<<sensors->accel()[1]<<' '<<sensors->accel()[2]
-                 <<"  |  "<<sensors->gyro()[0]<<' '<<sensors->gyro()[1]<<' '<<sensors->gyro()[2]<<std::flush;
+        logger.print(10);
+        //std::cout<<"\r"<<controlstate->timestamp_us<<" | "<<comm.num_bad_bytes//<<" |";
+
         loopstart += looptime;
         std::this_thread::sleep_until(loopstart);
     }

@@ -33,6 +33,10 @@ void SensorBoss::predict(const RobotState &state_pred, const RobotState &last_st
     }
 }
 
+void SensorBoss::incrementdata(int numtoskip) {
+    new (&data) Eigen::Map<const VectorXf>(data.data() + M + numtoskip, M);
+}
+
 const Vector3f SensorBoss::accel() const {return data.segment<3>(IDX_ACCEL);}
 const Vector3f SensorBoss::gyro() const {return data.segment<3>(IDX_GYRO);}
 

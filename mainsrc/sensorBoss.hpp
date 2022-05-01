@@ -4,9 +4,11 @@ Responsible for:
     sensor covariance, the accuracy of the sensors
     sensor prediction and sensor jacobian wrt state.
 TODO:
-    read data continuously incrementing (file) buffer instead of passively watching pointer 
     sensor bias/health estimate
-    active covariance report*/
+    active covariance report
+*/
+#ifndef SENSORBOSS_HPP
+#define SENSORBOSS_HPP
 #include "robot_state.hpp"
 const int M = 6;
 
@@ -25,9 +27,12 @@ public:
 
     SensorBoss(const float *msgsensordata, float accel_stddev, float gyro_stddev);
     void predict(const RobotState &state_pred, const RobotState &last_state, float dt, const Matrix3f *Jac_RT_Eul);
+    //if initialized from a data stream instead of an updating vector, incrementdata increments to the next data
+    void incrementdata(int numtoskip); //numtoskip is how many extra floats to skip forward when incrementing the buffer
+    void calibrate(); // use this data to estimate calibration
 
     //get elements
     const Vector3f accel() const;
     const Vector3f gyro() const;
 };
-
+#endif

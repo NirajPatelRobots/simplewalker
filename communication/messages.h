@@ -1,6 +1,8 @@
 /*structs to use in simplewalker communication
 TODO: values accessible in multiple ways. bitfields for errcode and command?
 */
+#ifndef SIMPLEWALKER_MESSAGES_H
+#define SIMPLEWALKER_MESSAGES_H
 #include <stdint.h>
 
 //everything in SI units and radians unless stated otherwise
@@ -41,3 +43,4 @@ struct ControlStateMsg { // sends current motor control and sensor state from th
     float angvel_l[3];
 };
 const uint16_t ControlStateMsgID = 0x0C01;
+#endif
