@@ -4,6 +4,7 @@
 #include <fstream>
 
 const int W = 9;
+std::chrono::time_point<std::chrono::steady_clock> timerstart;
 
 Logger::Logger(std::string filename, int logoptions)
     : disable(false), headerSent(false), filename(filename),
@@ -58,7 +59,20 @@ void Logger::log(std::string name, const RobotState &x) {
     log(name + " angvel", x.angvel());
 }
 
-void Logger::print(unsigned skipevery) {
+void Logger::log(std::string name, const SensorBoss &x) {
+    log(name + " accel", x.accel());
+    log(name + " gyro", x.gyro());
+}
+
+void Logger::log(const Logtimes &logtimes) {
+    log("predict", logtimes.predict);
+    log("correct", logtimes.correct);
+    log("commreceive", logtimes.commreceive);
+    log("log", logtimes.log);
+}
+
+bool Logger::print(unsigned skipevery) {
+    bool retval = false;
     if (skipcntr == 0 && !disable) {
         if (!headerSent) {
             std::cout << header << std::endl;
@@ -68,6 +82,7 @@ void Logger::print(unsigned skipevery) {
         if (options & LOGNEWLINE) {std::cout << "\n";}
         else {std::cout << std::flush;}
         outstr = std::stringstream("");
+        retval = true;
     }
     if (skipcntr++ > skipevery) {
         skipcntr = 0;
@@ -76,8 +91,23 @@ void Logger::print(unsigned skipevery) {
         disable = true;
     }
     lognum = 0;
+    return retval;
 }
 
-void Logger::dontprint(unsigned) {
+bool Logger::dontprint(unsigned) {
     disable = true;
+    return false;
 }
+
+    
+namespace chrono = std::chrono;
+void start_logtiming(chrono::time_point<chrono::steady_clock> time) {
+    timerstart = time;
+}
+
+void set_logtime(float &logtime) {
+    chrono::time_point<chrono::steady_clock> now = chrono::steady_clock::now();
+    logtime = chrono::duration<float, std::milli>(now - timerstart).count();
+    timerstart = now;
+}
+

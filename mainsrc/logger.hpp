@@ -15,6 +15,7 @@ TODO:
     BUG: not always the right width
     can output to file
     Fancy macro or something so logging doesn't happen?
+    smaller log class for getting data from anywhere
     Binary logger is child class?
     binary logger knows where data is
     log to desktop
@@ -27,8 +28,16 @@ TODO:
 #include "robot_state.hpp"
 #include "sensorBoss.hpp"
 #include <vector>
+#include <chrono>
 
 enum Logoptions {LOGNEWLINE = 0b1, LOGBINARY = 0b10};
+
+struct Logtimes {
+    float predict, correct, commreceive, log;
+};
+
+void start_logtiming(std::chrono::time_point<std::chrono::steady_clock> time); //starts timing, logtime is relative to this
+void set_logtime(float &logtime); //sets this log time and starts counting from 0 again
 
 class Logger {
     bool disable, headerSent;
@@ -46,9 +55,10 @@ public:
     void log(const RobotState &x) {log("", x);}
     void log(std::string name, const SensorBoss &x);
     void log(const SensorBoss &x) {log("", x);}
+    void log(const Logtimes &logtimes);
 
-    void print(unsigned skipevery = 0);
-    void dontprint(unsigned skipevery = 0); //removes logging
+    bool print(unsigned skipevery = 0);
+    bool dontprint(unsigned skipevery = 0); //removes logging
 };
 
 class LoadedBinaryLog {

@@ -30,9 +30,11 @@ int main() {
     bool ERR_msg_late = false;
     int num_msgs = 0;
     Logger logger;
+    Logtimes logtimes;
 
     auto loopstart = chrono::steady_clock::now();
     while (true) {
+        start_logtiming(loopstart);
         comm.handle_messages();
         while ((num_msgs = comm.read_message((char *)controlstate)) < 0 && readtime - loopstart < msgwaittime) {
             comm.handle_messages();
@@ -43,14 +45,17 @@ int main() {
             std::cout<<"late  \n";
             loopstart = readtime; // slow down time so we don't get ahead
         }
+        set_logtime(logtimes.commreceive);
 
         EKF->predict();
+        set_logtime(logtimes.predict);
         EKF->correct();
-        logger.log("Calctime [ms]", chrono::duration<float, std::milli>(chrono::steady_clock::now() - loopstart).count());
-        logger.log(EKF->state);
-
-        logger.print(10);
-        //std::cout<<"\r"<<controlstate->timestamp_us<<" | "<<comm.num_bad_bytes//<<" |";
+        set_logtime(logtimes.correct);
+        logger.log(logtimes);
+        logger.log(*sensors);
+        if (logger.print(10)) {
+            set_logtime(logtimes.log);
+        }
 
         loopstart += looptime;
         std::this_thread::sleep_until(loopstart);
