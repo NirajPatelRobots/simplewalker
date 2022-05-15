@@ -1,5 +1,7 @@
 /* Simplewalker main program
 
+TODO:
+    BUG: Sometimes, correlated with receiving message late first, state estimation takes 30 ms. 
 */
 #include "maincomp_comm.hpp"
 #include "state_estimation.hpp"
@@ -12,38 +14,45 @@ namespace chrono = std::chrono;
 #define LOOP_TIME_MS 30
 #define MSG_WAIT_TIME_US 1000
 
+
+
 int main() {
+    WalkerSettings settings("settings/settings.xml"); //settings
+
     ControlStateMsg *controlstate = new ControlStateMsg;
     controlstate->ID = 0;
     Communicator comm(ControlStateMsgID, sizeof(ControlStateMsg),
                       ControlTargetMsgID, sizeof(ControlTargetMsg));
-    float accel_stddev = 1.0, gyro_stddev = 0.01;
-    SensorBoss *sensors = new SensorBoss(controlstate->accel, accel_stddev, gyro_stddev);
-    // EKF parameters
-    float timestep = 0.03, pos_stddev = 0.01, euler_stddev = 0.05, vel_stddev = 1.0, angvel_stddev = 1.0;
-    StateEstimator *EKF = new StateEstimator(timestep, *sensors,
-                                    pos_stddev, euler_stddev, vel_stddev, angvel_stddev);
+    SensorBoss *sensors = new SensorBoss(controlstate->accel,
+                        settings.f("SensorBoss", "accel_stddev"), settings.f("SensorBoss", "gyro_stddev"));
+    float timestep = settings.f("General", "main_timestep");
+    StateEstimator *EKF = new StateEstimator(timestep, *sensors, settings.f("State_Estimation", "pos_stddev"), 
+                                            settings.f("State_Estimation", "euler_stddev"),
+                                            settings.f("State_Estimation", "vel_stddev"),
+                                            settings.f("State_Estimation", "angvel_stddev"));
 
     chrono::milliseconds looptime(LOOP_TIME_MS);
     chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
-    chrono::time_point<chrono::steady_clock> readtime;
+    chrono::time_point<chrono::steady_clock> latereadtime;
     bool ERR_msg_late = false;
     int num_msgs = 0;
-    Logger logger;
+    Logger logger(settings.b("Logger", "newline"));
+    //Logger savelog("data/statelog.csv"); TODO BUG
     Logtimes logtimes;
 
+    std::cout<<"Start main loop"<<std::endl;
     auto loopstart = chrono::steady_clock::now();
     while (true) {
-        start_logtiming(loopstart);
+        set_logtime(logtimes.sleep);
         comm.handle_messages();
-        while ((num_msgs = comm.read_message((char *)controlstate)) < 0 && readtime - loopstart < msgwaittime) {
+        while ((num_msgs = comm.read_message((char *)controlstate)) < 0 && latereadtime - loopstart < msgwaittime) {
             comm.handle_messages();
-            readtime = chrono::steady_clock::now();
+            latereadtime = chrono::steady_clock::now();
         }
-        ERR_msg_late = (readtime > loopstart);
+        ERR_msg_late = (latereadtime > loopstart);
         if (ERR_msg_late) {
             std::cout<<"late  \n";
-            loopstart = readtime; // slow down time so we don't get ahead
+            loopstart = latereadtime; // slow down time so we don't get ahead
         }
         set_logtime(logtimes.commreceive);
 
@@ -51,8 +60,12 @@ int main() {
         set_logtime(logtimes.predict);
         EKF->correct();
         set_logtime(logtimes.correct);
-        logger.log(logtimes);
-        logger.log(*sensors);
+        logger.log("SensorBoss", "accel_stddev", settings);
+        logger.log("SensorBoss", "gyro_stddev", settings);
+        if (settings.b("Logger", "log_times")) logger.log(logtimes);
+        if (settings.b("Logger", "log_sensor")) logger.log(*sensors);
+        if (settings.b("Logger", "log_state")) logger.log(EKF->state);
+        //savelog.log(EKF->state);
         if (logger.print(10)) {
             set_logtime(logtimes.log);
         }

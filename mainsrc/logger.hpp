@@ -4,21 +4,18 @@ Logging simplewalker data
 Can output:
     header to explain other data
     relevant data of many objects
-        -SensorBoss, pico communication, state, timing, state estimation
-        -human readable or raw data
-
-Can output to:
-    stdout
-    file
-    future: desktop?
+    human readable or raw data
+    Can output to stdout or file
+    
 TODO:
+    BUG: log to file
     BUG: not always the right width
     can output to file
     Fancy macro or something so logging doesn't happen?
     smaller log class for getting data from anywhere
     Binary logger is child class?
     binary logger knows where data is
-    log to desktop
+    multiple lines to text file
 */
 #ifndef SIMPLEWALKER_LOGGER
 #define SIMPLEWALKER_LOGGER
@@ -29,26 +26,39 @@ TODO:
 #include "sensorBoss.hpp"
 #include <vector>
 #include <chrono>
+#include <cstdlib>
+#include <fstream>
+#include "rapidxml.hpp"
 
-enum Logoptions {LOGNEWLINE = 0b1, LOGBINARY = 0b10};
+class WalkerSettings {
+    rapidxml::xml_document<> doc;
+    std::vector<char> text;
+public:
+    WalkerSettings(std::string filename);
+    float f(const char * const fieldname) const;
+    float f(const char * const groupname, const char * const fieldname) const;
+    bool b(const char * const fieldname) const;
+    bool b(const char * const groupname, const char * const fieldname) const;
+};
 
 struct Logtimes {
-    float predict, correct, commreceive, log;
+    float predict, correct, commreceive, log, sleep;
 };
 
 void start_logtiming(std::chrono::time_point<std::chrono::steady_clock> time); //starts timing, logtime is relative to this
 void set_logtime(float &logtime); //sets this log time and starts counting from 0 again
 
 class Logger {
-    bool disable, headerSent;
-    //std::ostream & ostream;
+    bool disable, headerSent, newline, savetofile;
+    std::ofstream outFile;
     std::string filename, header;
     std::stringstream outstr;
-    unsigned options, lognum, skipcntr;
+    unsigned lognum, skipcntr;
     std::vector<unsigned> endindexes;
 public:
-    Logger(int logoptions = 0); //default stdout
-    Logger(std::string filename, int logoptions = 0);
+    Logger(bool log_newline = false); //default stdout
+    Logger(std::string filename, bool log_newline);
+    ~Logger();
     void log(std::string name, float x);
     void log(std::string name, const Vector3f &x);
     void log(std::string name, const RobotState &x);
@@ -56,6 +66,8 @@ public:
     void log(std::string name, const SensorBoss &x);
     void log(const SensorBoss &x) {log("", x);}
     void log(const Logtimes &logtimes);
+    void log(std::string name, const WalkerSettings &settings);
+    void log(std::string groupname, std::string name, const WalkerSettings &settings);
 
     bool print(unsigned skipevery = 0);
     bool dontprint(unsigned skipevery = 0); //removes logging
@@ -70,5 +82,6 @@ public:
     std::vector<std::string> &log_names;
     std::vector<size_t> offsets;
 };
+
 
 #endif
