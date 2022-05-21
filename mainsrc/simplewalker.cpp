@@ -11,8 +11,7 @@ TODO:
 #include <thread>
 
 namespace chrono = std::chrono;
-#define LOOP_TIME_MS 30
-#define MSG_WAIT_TIME_US 1000
+#define MSG_WAIT_TIME_US 1000 //wait this long before skipipng
 
 
 
@@ -31,7 +30,7 @@ int main() {
                                             settings.f("State_Estimation", "vel_stddev"),
                                             settings.f("State_Estimation", "angvel_stddev"));
 
-    chrono::milliseconds looptime(LOOP_TIME_MS);
+    chrono::milliseconds looptime(static_cast<int>(1000 * timestep));
     chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
     chrono::time_point<chrono::steady_clock> latereadtime;
     bool ERR_msg_late = false;
@@ -40,19 +39,25 @@ int main() {
     //Logger savelog("data/statelog.csv"); TODO BUG
     Logtimes logtimes;
 
-    std::cout<<"Start main loop"<<std::endl;
+    //std::this_thread::sleep_until(chrono::steady_clock::now() + looptime); //give it time to receive
+    std::cout<<"Start main loop, T = "<< looptime.count() << " ms" << std::endl;
     auto loopstart = chrono::steady_clock::now();
     while (true) {
         set_logtime(logtimes.sleep);
         comm.handle_messages();
-        while ((num_msgs = comm.read_message((char *)controlstate)) < 0 && latereadtime - loopstart < msgwaittime) {
+        while ((num_msgs = comm.read_message((char *)controlstate)) < 0 ) {
             comm.handle_messages();
             latereadtime = chrono::steady_clock::now();
+            ERR_msg_late = true;
+            if (latereadtime - loopstart > msgwaittime) {
+                std::cout<<"ERROR: message missing -";
+                break;
+            }
         }
-        ERR_msg_late = (latereadtime > loopstart);
         if (ERR_msg_late) {
             std::cout<<"late  \n";
             loopstart = latereadtime; // slow down time so we don't get ahead
+            ERR_msg_late = false;
         }
         set_logtime(logtimes.commreceive);
 
@@ -60,8 +65,7 @@ int main() {
         set_logtime(logtimes.predict);
         EKF->correct();
         set_logtime(logtimes.correct);
-        logger.log("SensorBoss", "accel_stddev", settings);
-        logger.log("SensorBoss", "gyro_stddev", settings);
+        logger.log("General", "main_timestep", settings);
         if (settings.b("Logger", "log_times")) logger.log(logtimes);
         if (settings.b("Logger", "log_sensor")) logger.log(*sensors);
         if (settings.b("Logger", "log_state")) logger.log(EKF->state);
