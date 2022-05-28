@@ -72,7 +72,8 @@ void Logger::log(std::string name, const SensorBoss &x) {
 void Logger::log(const Logtimes &logtimes) {
     log("predict", logtimes.predict);
     log("correct", logtimes.correct);
-    log("commreceive", logtimes.commreceive);
+    log("comm_rec", logtimes.commreceive);
+    log("comm_send", logtimes.commsend);
     log("log", logtimes.log);
     log("sleep", logtimes.sleep);
 }

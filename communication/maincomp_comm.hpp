@@ -3,7 +3,7 @@ TODO:
     detects stream disruption
     receive multiple IDs
     make pointers safe
-    BUG: messages to desktop have random settings text?
+    can disconnect viewer from server without stopping execution
     wait for connection in another thread
 */
 #include <queue>

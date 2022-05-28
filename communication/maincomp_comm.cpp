@@ -1,6 +1,7 @@
 #include <iostream>
 #include <wiringSerial.h>
-#include <unistd.h>
+#include <unistd.h>  //write()
+#include <pthread.h>
 #include "maincomp_comm.hpp"
 
 Communicator::Communicator(void) 
@@ -13,6 +14,8 @@ Communicator::Communicator(void)
     bad_bytes = 0;
     send_ID = 0;
     _readindex = 0;
+    server_open = false;
+    viewer_connected = false;
 }
 
 Communicator::Communicator(uint16_t listen_ID, size_t listen_size)
@@ -77,7 +80,13 @@ void Communicator::send_message(const char *buff) {
     }
 }
 
+// server stuff
 //thank you to https://github.com/Mad-Scientist-Monkey/sockets-ccpp-rpi
+
+void connection_starter(void *comm_in) {
+    Communicator *comm = (Communicator *)comm_in;
+
+}
 
 void Communicator::try_connect(void) {
     if (server_open) {
@@ -90,6 +99,8 @@ void Communicator::try_connect(void) {
         viewer_connected = true;
         sendskipcntr = 0;
         std::cout<<"Connection accepted with "<<inet_ntoa(client.sin_addr)<<std::endl;
+    } else {
+        std::cout<<"Server not opened"<<std::endl;
     }
 }
 
@@ -105,21 +116,17 @@ void Communicator::start_server(int port_num, uint16_t msg_ID, size_t size, cons
     server.sin_addr.s_addr = INADDR_ANY;
     server.sin_port = htons( port_num );
     //Bind
-    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0) std::cout<<"Server bind failed-";
+    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0) std::cout<<"Server bind failed-"<<std::endl;
     else server_open = true;
-    std::cout<<"Server bind done"<<std::endl;
     viewer_ID = msg_ID;
     viewer_message = msg;
     viewer_size = size;
 }
 
 void Communicator::broadcast_message(unsigned skip_every) {
-    if (viewer_connected) {
-        if (sendskipcntr++ == skip_every) {
-            write(viewer_socket, viewer_message, viewer_size);
-            sendskipcntr = 0;
-        }
-    } else {
-        try_connect();
+    if (viewer_connected && sendskipcntr++ == skip_every) {
+        write(viewer_socket, viewer_message, viewer_size);
+        sendskipcntr = 0;
     }
 }
+

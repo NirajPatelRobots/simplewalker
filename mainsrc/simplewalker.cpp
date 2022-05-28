@@ -7,6 +7,7 @@ TODO:
 #include "state_estimation.hpp"
 #include "logger.hpp"
 #include <iostream>
+#include <memory>
 #include <chrono>
 #include <thread>
 
@@ -18,22 +19,27 @@ namespace chrono = std::chrono;
 int main() {
     WalkerSettings settings("settings/settings.xml"); //settings
 
-    ControlStateMsg *controlstate = new ControlStateMsg;
+    std::unique_ptr<ControlStateMsg> controlstate(new ControlStateMsg);
     controlstate->ID = 0;
-    RobotStateMsg *sendstate = new RobotStateMsg;
-    sendstate->ID = 0;
+    std::unique_ptr<RobotStateMsg> sendstate(new RobotStateMsg);
+    sendstate->ID = RobotStateMsgID;
     sendstate->errcode = 0;
-    Communicator comm(ControlStateMsgID, sizeof(ControlStateMsg),
-                      ControlTargetMsgID, sizeof(ControlTargetMsg));
-    comm.start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
-                        sizeof(RobotStateMsg), (const char *)sendstate);
-    SensorBoss *sensors = new SensorBoss(controlstate->accel,
-                        settings.f("SensorBoss", "accel_stddev"), settings.f("SensorBoss", "gyro_stddev"));
+    for (int i = 0; i < 6; ++i) {sendstate->leg_pos[i] = 0; sendstate->leg_vel[i] = 0;}
+
+    std::unique_ptr<Communicator> comm(new Communicator(ControlStateMsgID, sizeof(ControlStateMsg),
+                      ControlTargetMsgID, sizeof(ControlTargetMsg)));
+    comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
+                        sizeof(RobotStateMsg), (const char *)sendstate.get());
+    if (settings.b("General", "state_send")) comm->try_connect();
+    
+    std::unique_ptr<SensorBoss> sensors(new SensorBoss(controlstate->accel,
+                        settings.f("SensorBoss", "accel_stddev"), settings.f("SensorBoss", "gyro_stddev")));
     float timestep = settings.f("General", "main_timestep");
-    StateEstimator *EKF = new StateEstimator(timestep, *sensors, settings.f("State_Estimation", "pos_stddev"), 
+    std::unique_ptr<StateEstimator> EKF(new StateEstimator(timestep, *sensors, 
+                                            settings.f("State_Estimation", "pos_stddev"), 
                                             settings.f("State_Estimation", "euler_stddev"),
                                             settings.f("State_Estimation", "vel_stddev"),
-                                            settings.f("State_Estimation", "angvel_stddev"));
+                                            settings.f("State_Estimation", "angvel_stddev")));
 
     chrono::milliseconds looptime(static_cast<int>(1000 * timestep));
     chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
@@ -44,15 +50,14 @@ int main() {
     //Logger savelog("data/statelog.csv"); TODO BUG
     Logtimes logtimes;
 
-    //std::this_thread::sleep_until(chrono::steady_clock::now() + looptime); //give it time to receive
     std::cout<<"Start main loop, T = "<< looptime.count() << " ms" << std::endl;
     auto timestart = chrono::steady_clock::now();
     chrono::time_point<chrono::steady_clock> loopstart = timestart;
     while (true) {
         set_logtime(logtimes.sleep);
-        comm.handle_messages();
-        while ((num_msgs = comm.read_message((char *)controlstate)) < 0 ) {
-            comm.handle_messages();
+        comm->handle_messages();
+        while ((num_msgs = comm->read_message((char *)controlstate.get())) < 0 ) {
+            comm->handle_messages();
             latereadtime = chrono::steady_clock::now();
             ERR_msg_late = true;
             if (latereadtime - loopstart > msgwaittime) {
@@ -65,13 +70,14 @@ int main() {
             loopstart = latereadtime; // slow down time so we don't get ahead
             ERR_msg_late = false;
         }
-        //sendstate->timestamp_us = chrono::microseconds(loopstart - timestart).count(); //BUG
+        set_logtime(logtimes.commreceive);
+        sendstate->timestamp_us = chrono::duration_cast<chrono::microseconds>(loopstart - timestart).count();
         for (int i = 0; i < N; ++i) {
             float *float_out = sendstate->pos + i;
             *float_out = EKF->state.vect[i];
         }
-        if (settings.b("General", "state_send")) comm.broadcast_message(settings.f("General", "broadcast_rate_div"));
-        set_logtime(logtimes.commreceive);
+        comm->broadcast_message(settings.f("General", "broadcast_rate_div"));
+        set_logtime(logtimes.commsend);
 
         EKF->predict();
         set_logtime(logtimes.predict);

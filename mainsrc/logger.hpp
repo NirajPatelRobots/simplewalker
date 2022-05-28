@@ -44,7 +44,7 @@ public:
 };
 
 struct Logtimes {
-    float predict, correct, commreceive, log, sleep;
+    float predict, correct, commreceive, commsend, log, sleep;
 };
 
 void start_logtiming(std::chrono::time_point<std::chrono::steady_clock> time); //starts timing, logtime is relative to this
