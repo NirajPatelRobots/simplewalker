@@ -16,6 +16,8 @@ TODO:
     Binary logger is child class?
     binary logger knows where data is
     multiple lines to text file
+    settings int
+    settings fieldname with no groupname
 */
 #ifndef SIMPLEWALKER_LOGGER
 #define SIMPLEWALKER_LOGGER

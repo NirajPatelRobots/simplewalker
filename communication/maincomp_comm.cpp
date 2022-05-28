@@ -1,9 +1,11 @@
-#include <stdio.h>
+#include <iostream>
 #include <wiringSerial.h>
+#include <unistd.h>
 #include "maincomp_comm.hpp"
 
 Communicator::Communicator(void) 
-: num_inbox(num_messages), num_bad_bytes(bad_bytes), is_controller_connected(controller_connected) {
+: num_inbox(num_messages), num_bad_bytes(bad_bytes), is_controller_connected(controller_connected),
+  is_server_open(server_open), is_viewer_connected(viewer_connected) {
     serialfile = serialOpen("/dev/ttyACM0", 115200);
     serialFlush(serialfile);
     controller_connected = (serialfile < 0);
@@ -72,5 +74,52 @@ void Communicator::handle_messages(void) {
 void Communicator::send_message(const char *buff) {
     for (unsigned i = 0; i < send_size; i++) {
         serialPutchar(serialfile, buff[i]);
+    }
+}
+
+//thank you to https://github.com/Mad-Scientist-Monkey/sockets-ccpp-rpi
+
+void Communicator::try_connect(void) {
+    if (server_open) {
+        std::cout<<"Trying to connect... "<<std::flush;
+        listen(socket_desc, 3);
+        int sock_length = sizeof(struct sockaddr_in);
+        //Accept an incoming connection
+        viewer_socket = accept(socket_desc, (struct sockaddr *)&client, (socklen_t*)&sock_length);
+        if (viewer_socket < 0)   return;
+        viewer_connected = true;
+        sendskipcntr = 0;
+        std::cout<<"Connection accepted with "<<inet_ntoa(client.sin_addr)<<std::endl;
+    }
+}
+
+void Communicator::start_server(int port_num, uint16_t msg_ID, size_t size, const char *msg) {
+    //Create socket
+    socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+    if (socket_desc == -1) {
+        std::cout<<"Could not create socket"<<std::endl;
+        return;
+    }
+    //Prepare the sockaddr_in structure
+    server.sin_family = AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons( port_num );
+    //Bind
+    if( bind(socket_desc,(struct sockaddr *)&server , sizeof(server)) < 0) std::cout<<"Server bind failed-";
+    else server_open = true;
+    std::cout<<"Server bind done"<<std::endl;
+    viewer_ID = msg_ID;
+    viewer_message = msg;
+    viewer_size = size;
+}
+
+void Communicator::broadcast_message(unsigned skip_every) {
+    if (viewer_connected) {
+        if (sendskipcntr++ == skip_every) {
+            write(viewer_socket, viewer_message, viewer_size);
+            sendskipcntr = 0;
+        }
+    } else {
+        try_connect();
     }
 }

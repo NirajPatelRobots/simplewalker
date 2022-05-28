@@ -20,8 +20,13 @@ int main() {
 
     ControlStateMsg *controlstate = new ControlStateMsg;
     controlstate->ID = 0;
+    RobotStateMsg *sendstate = new RobotStateMsg;
+    sendstate->ID = 0;
+    sendstate->errcode = 0;
     Communicator comm(ControlStateMsgID, sizeof(ControlStateMsg),
                       ControlTargetMsgID, sizeof(ControlTargetMsg));
+    comm.start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
+                        sizeof(RobotStateMsg), (const char *)sendstate);
     SensorBoss *sensors = new SensorBoss(controlstate->accel,
                         settings.f("SensorBoss", "accel_stddev"), settings.f("SensorBoss", "gyro_stddev"));
     float timestep = settings.f("General", "main_timestep");
@@ -41,7 +46,8 @@ int main() {
 
     //std::this_thread::sleep_until(chrono::steady_clock::now() + looptime); //give it time to receive
     std::cout<<"Start main loop, T = "<< looptime.count() << " ms" << std::endl;
-    auto loopstart = chrono::steady_clock::now();
+    auto timestart = chrono::steady_clock::now();
+    chrono::time_point<chrono::steady_clock> loopstart = timestart;
     while (true) {
         set_logtime(logtimes.sleep);
         comm.handle_messages();
@@ -59,18 +65,23 @@ int main() {
             loopstart = latereadtime; // slow down time so we don't get ahead
             ERR_msg_late = false;
         }
+        //sendstate->timestamp_us = chrono::microseconds(loopstart - timestart).count(); //BUG
+        for (int i = 0; i < N; ++i) {
+            float *float_out = sendstate->pos + i;
+            *float_out = EKF->state.vect[i];
+        }
+        if (settings.b("General", "state_send")) comm.broadcast_message(settings.f("General", "broadcast_rate_div"));
         set_logtime(logtimes.commreceive);
 
         EKF->predict();
         set_logtime(logtimes.predict);
         EKF->correct();
         set_logtime(logtimes.correct);
-        logger.log("General", "main_timestep", settings);
         if (settings.b("Logger", "log_times")) logger.log(logtimes);
         if (settings.b("Logger", "log_sensor")) logger.log(*sensors);
         if (settings.b("Logger", "log_state")) logger.log(EKF->state);
         //savelog.log(EKF->state);
-        if (logger.print(10)) {
+        if (logger.print(settings.f("Logger", "skip_every"))) {
             set_logtime(logtimes.log);
         }
 

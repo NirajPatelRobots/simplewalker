@@ -173,7 +173,6 @@ bool WalkerSettings::b(const char * const groupname, const char * const fieldnam
             return (node->value_size() > 0 && std::string("false").compare(node->value()) != 0
                     && std::string("0").compare(node->value()) != 0);
         }
-        std::cout<<"Couldn't load "<<fieldname<<std::endl;
     }
     std::cout<<"Couldn't load "<< groupname << "::" << fieldname << std::endl;
     return false;
