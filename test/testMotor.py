@@ -17,6 +17,7 @@ RUN_LOCAL = False # if RUN_LOCAL, then the computer running this code is control
 
 if not RUN_LOCAL:
     import serial
+    import struct
 
 def checkMotorPerformance(motorNum, dt, filename = None, frequency_scale = 1, amplitude_scale = 1):
     """test the motor by setting voltages and sensing position.
@@ -128,7 +129,7 @@ def main():
     filename = None
     if not RUN_LOCAL:
         ser = serial.Serial(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
-                            stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+                            stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=0.2)
     
     while True:
         args = input(">>> ").split()
@@ -138,9 +139,9 @@ def main():
             continue
         elif command == "run":
             if len(args) > 1:
-                amp_scale = float(args[1])
+                amp_scale = float(args[2])
                 if len(args) > 2:
-                    freq_scale = float(args[2])
+                    freq_scale = float(args[1])
                     if len(args) > 3:
                         filename = args[3]
                     else:
@@ -148,7 +149,13 @@ def main():
             if RUN_LOCAL:
                 V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
             else:
-                ser.write("Run {} {} {} {}".format(amp_scale, freq_scale, dt, motorNum).encode('utf-8'))
+                send = struct.pack("<hhfff", 0x0D01, motorNum, amp_scale, freq_scale, dt)
+                ser.reset_input_buffer()
+                ser.write(send)
+                line = ser.read_until()
+                while len(line) > 0:
+                    print(line)
+                    line = ser.read_until()
         elif command == "motornum":
             try:
                 motorNum = int(args[1])
@@ -156,8 +163,10 @@ def main():
                 print("Invalid motor number")
         elif command == "save" and len(args) > 1:
             saveRun(args[1], V, angle, motorNum, dt)
-        elif command == "dt" and len(args) > 1:
-            dt = float(args[1])
+        elif command == "dt":
+            if len(args) > 1:
+                dt = float(args[1])
+            print("dt:", dt)
         elif command.startswith("exit"):
             break
         elif command == "code":
