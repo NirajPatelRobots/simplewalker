@@ -1,5 +1,5 @@
-eigen = -I ~/eigen-3.4.0
-rapidxml = -I ~/rapidxml-1.13
+eigen = -I ../eigen-3.4.0
+rapidxml = -I ../rapidxml
 incLocal = -I./mainsrc -I./communication -I./state_estimation -I./test -I./physics
 build = ./build/
 CFLAGS = -std=c++17 -Wall -Wextra -O
@@ -10,10 +10,10 @@ simplewalker: $(objects)
 	g++ $(incLocal) $(rapidxml) -o $(build)$@ $^ -lwiringPi -lpthread
 
 localize_test: $(build)*state_estimation.o $(build)robot_state.o
-	g++ -I/state_estimation $(eigen) -o $(build)$@ $^
+	g++ -I/state_estimation $(eigen) $^ -o $(build)$@
 
 unittests: $(build)leg_kinematics.o $(build)unittests.o $(build)test_utils.o
-	g++ $(incLocal) -o $(build)$@ $^
+	g++ $(incLocal) $^ -o $(build)$@
 
 $(build)%.o : ./*/%.cpp
 	g++ -c $(incLocal) $(eigen) $(rapidxml) $^  $(CFLAGS) -o $@

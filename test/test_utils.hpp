@@ -2,36 +2,45 @@
 TODO:
     typedef for jacobiantest functions?
     std_dev could be nan
-    statistic for magnitude of out change over in change (not error, just interesting)
+    statistic for magnitude of jacobian out change over in change (not error, just interesting)
+    break out Vector3f comparison for use separate from JacobianTest
+    Give Jacobiantest another independent input
+    Verify Matrices are inverses
+    Vector3_result struct
 
 Niraj, May 2022*/
-#include "leg_kinematics.hpp"
 #include <cmath>
 #include <iostream>
 #include <chrono>
+#include "leg_kinematics.hpp"
+#ifndef M_PI_2  // I can't believe I have to do this
+#define M_PI_2 (1.57079632679489661923)
+#endif
 
 using Eigen::Array3f, Eigen::MatrixXf, Eigen::VectorXf;
 
-template<typename T>
-struct run_data {
-    T mean;
-    T max;
-    T std_dev;
+
+struct scalar_result {
+    float mean;
+    float max;
+    float std_dev;
     unsigned num_data;
     unsigned num_bad;
-    run_data() : mean(T{}), max(T{}), std_dev(T{}), num_data(0), num_bad(0) {};
+    scalar_result() : mean(0), max(0), std_dev(0), num_data(0), num_bad(0) {};
+    bool update(float new_val);
 };
 
-void update_run_data(run_data<float> &data, float new_val);
+std::ostream& operator<<(std::ostream& os, const scalar_result& data);
 
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const run_data<T>& data) {
-    os<<"Mean: "<<data.mean<<", max: "<<data.max<<", std_dev: "<<data.std_dev<<" / "<<data.num_data<<" elements";
-    if (data.num_bad) 
-        os<<" ("<<data.num_bad<<" bad)";
-    os<<std::endl;
-    return os;
-}
+struct Vector_result {
+    Vector3f mean;
+    Vector3f max;
+    Matrix3f covariance;
+    unsigned num_data;
+    unsigned num_bad;
+    Vector_result() : mean({0, 0, 0}), max({0, 0, 0}), covariance(Matrix3f::Identity()), num_data(0), num_bad(0) {};
+    bool update(Vector3f new_val);
+};
 
 
 struct single_Jac_run_result {
@@ -63,17 +72,26 @@ class JacobianTest {
     error_angle, dot(unit(jac_output - jac_calc_point), unit(true_output - jac_calc_point))
         the angle between the direction the true output moved after the perturbation and the direction the jacobian output moved
     */
-    void (*jac_calc_func)(Matrix3f &jacobian, const Vector3f &input);
-    void (*true_ref_function)(Vector3f &output, const Vector3f &input);
-    run_data<float> jacCalcTime_us_, refCalcTime_us_, output_error_, error_mag_, error_angle_;
+    void (*jac_calc_func)(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input);
+    void (*true_ref_function)(Vector3f &output, const Vector3f &input, const Vector3f &other_input);
+    scalar_result jacCalcTime_us_, refCalcTime_us_, output_error_, error_mag_, error_angle_;
     VectorXf singleRunResults; // TODO: Do a linear regression on this to get error as fcn of all other results
+    void start_timing(void);
+    std::chrono::time_point<std::chrono::steady_clock> starttime;
+    unsigned elapsed_time(void);
 public:
+    void initResults(void);
     int num_Jac_samples, num_diff_samples;
     float max_diff;
     Array3f input_mean, input_max_change;
     JacobianTest(int jacobian_samples, int differential_samples, float max_differential_change);
-    int run(void (*jac_calc_func)(Matrix3f&, const Vector3f&), void (*true_ref_function)(Vector3f&, const Vector3f&),
-               float input_mean_val, float input_max_change_val);
-    //results
-    const run_data<float> &jacCalcTime_us, &refCalcTime_us, &output_error, &error_mag, &error_angle;
+    int run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Vector3f&),
+            void (*true_ref_function)(Vector3f&, const Vector3f&, const Vector3f&),
+            float input_mean_val, float input_max_change_val);
+    const scalar_result &jacCalcTime_us, &refCalcTime_us, &output_error, &error_mag, &error_angle;
 };
+
+
+void error_mag_angle_results(scalar_result &scalar_error, scalar_result &error_mag, scalar_result &error_angle, 
+                             const Vector3f &true_ref, const Vector3f &approx_out, const Vector3f &base_out);
+

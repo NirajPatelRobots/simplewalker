@@ -5,65 +5,90 @@ JacobianTest::JacobianTest(int jacobian_samples, int differential_samples, float
     : jac_calc_func(NULL), true_ref_function(NULL),
     num_Jac_samples(jacobian_samples), num_diff_samples(differential_samples), max_diff(max_differential_change),
     jacCalcTime_us(jacCalcTime_us_), refCalcTime_us(refCalcTime_us_),
-    output_error(output_error_), error_mag(error_mag_), error_angle(error_angle_)
-{}
+    output_error(output_error_), error_mag(error_mag_), error_angle(error_angle_) 
+    {
+    initResults();
+}
 
-int JacobianTest::run(void (*jac_calc_func)(Matrix3f&, const Vector3f&),
-                void (*true_ref_function)(Vector3f&, const Vector3f&),
+void JacobianTest::initResults(void) {
+    jacCalcTime_us_ = scalar_result();
+    refCalcTime_us_ = scalar_result();
+    output_error_ = scalar_result();
+    error_mag_ = scalar_result();
+    error_angle_ = scalar_result();
+    //singleRunResults = VectorXf(num_Jac_samples * num_diff_samples);
+}
+
+int JacobianTest::run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Vector3f&),
+                void (*true_ref_function)(Vector3f&, const Vector3f&, const Vector3f&),
                 float input_mean_val, float input_max_change_val) {
     this->jac_calc_func = jac_calc_func;
     this->true_ref_function = true_ref_function;
     input_mean = Array3f::Constant(1) * input_mean_val;
     input_max_change = Array3f::Constant(1) * input_max_change_val;
-    jacCalcTime_us_ = run_data<float>();
-    refCalcTime_us_ = run_data<float>();
-    output_error_ = run_data<float>();
-    error_mag_ = run_data<float>();
-    error_angle_ = run_data<float>();
-    //singleRunResults = VectorXf(num_Jac_samples * num_diff_samples);
+    initResults();
     Matrix3f this_jac;
-    Vector3f input, diff, base_out, diff_out, approx_out, true_out, output_diff;
-    chrono::time_point<chrono::steady_clock> starttime;
-    chrono::microseconds elapsed_time;
+    Vector3f input, alt_input, diff, base_out, approx_out, true_out;
     for (int n_jac = 0; n_jac < num_Jac_samples; ++n_jac) {
         input = input_mean + Array3f::Random() * input_max_change;
-            starttime = chrono::steady_clock::now();
-        jac_calc_func(this_jac, input);
-            elapsed_time = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - starttime);
-            update_run_data(jacCalcTime_us_, elapsed_time.count());
-            starttime = chrono::steady_clock::now();
-        true_ref_function(base_out, input);
-            elapsed_time = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - starttime);
-            update_run_data(refCalcTime_us_, elapsed_time.count());
+        alt_input = input_mean + Array3f::Random() * input_max_change;
+            start_timing();
+        jac_calc_func(this_jac, input, alt_input);
+            jacCalcTime_us_.update(elapsed_time());
+            start_timing();
+        true_ref_function(base_out, input, alt_input);
+            refCalcTime_us_.update(elapsed_time());
         for (int n_dif = 0; n_dif < num_diff_samples; ++n_dif) {
             diff = Array3f::Random() * max_diff;
-            diff_out = this_jac * diff;
-            approx_out = base_out + diff_out;
-                starttime = chrono::steady_clock::now();
-            true_ref_function(true_out, input + diff);
-                elapsed_time = chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - starttime);
-                update_run_data(refCalcTime_us_, elapsed_time.count());
-            float scalar_error = (approx_out - true_out).norm();
-            update_run_data(output_error_, scalar_error);
-            output_diff = true_out - base_out;
-            update_run_data(error_mag_, scalar_error / output_diff.norm());
-            diff_out.normalize();
-            output_diff.normalize();
-            update_run_data(error_angle_, acos(diff_out.dot(output_diff)));
+            approx_out = base_out + this_jac * diff;
+                start_timing();
+            true_ref_function(true_out, input + diff, alt_input);
+                refCalcTime_us_.update(elapsed_time());
+            error_mag_angle_results(output_error_, error_mag_, error_angle_, true_out, approx_out, base_out);
         }
     }
     return 0;
 }
 
-
-void update_run_data(run_data<float> &data, float new_val) {
-    if (!std::isfinite(new_val)) {
-        data.num_bad++;
-        return;
-    }
-    unsigned n = data.num_data++;
-    float new_mean = (data.mean * n + new_val)/(n + 1);
-    if (new_val > data.max) data.max = new_val;
-    data.std_dev = sqrtf((n * powf(data.std_dev, 2) + n*(n-1) * powf(new_mean - data.mean, 2)) / (n+1) );
-    data.mean = new_mean;
+void JacobianTest::start_timing(void) {
+    starttime = chrono::steady_clock::now();
 }
+
+unsigned JacobianTest::elapsed_time(void) {
+    return chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - starttime).count();
+}
+
+
+bool scalar_result::update(float new_val) {
+    if (!std::isfinite(new_val)) {
+        num_bad++;
+        return false;
+    }
+    unsigned n = num_data++;
+    float new_mean = (mean * n + new_val)/(n + 1);
+    if (new_val > max) max = new_val;
+    std_dev = sqrtf((n * powf(std_dev, 2) + n*(n-1) * powf(new_mean - mean, 2)) / (n+1) );
+    mean = new_mean;
+    return true;
+}
+
+std::ostream& operator<<(std::ostream& os, const scalar_result& data) {
+    os<<"Mean: "<<data.mean<<", max: "<<data.max<<", std_dev: "<<data.std_dev<<" / "<<data.num_data<<" elements";
+    if (data.num_bad) 
+        os<<" ("<<data.num_bad<<" bad)";
+    os<<std::endl;
+    return os;
+}
+
+void error_mag_angle_results(scalar_result &scalar_error, scalar_result &error_mag, scalar_result &error_angle, 
+                             const Vector3f &true_out, const Vector3f &approx_out, const Vector3f &base_out) {
+    float new_scalar_error = (approx_out - true_out).norm();
+    scalar_error.update(new_scalar_error);
+    Vector3f true_diff = true_out - base_out;
+    Vector3f approx_diff = approx_out - base_out;
+    error_mag.update(new_scalar_error / true_diff.norm());
+    approx_diff.normalize();
+    true_diff.normalize();
+    error_angle.update(acos(approx_diff.dot(true_diff)));
+}
+

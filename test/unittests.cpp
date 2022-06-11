@@ -1,17 +1,15 @@
 /* Test parts of simplewalker code to prove functionality
-
+TODO:
 Niraj, June 2022 */
 #include <memory>
-#define _USE_MATH_DEFINES
-#include <math.h>
 #include <iostream>
 #include "test_utils.hpp"
 
 
-void fk_jac_forTest(Matrix3f &jacobian, const Vector3f &input) {
+void fk_jac_forTest(Matrix3f &jacobian, const Vector3f &input, const Vector3f&) {
     forward_Jacobian(jacobian, input);
 }
-void fk_jac_true_ref(Vector3f &output, const Vector3f &input) {
+void fk_jac_true_ref(Vector3f &output, const Vector3f &input, const Vector3f&) {
     forward_kinematics(output, input);
 }
 
