@@ -3,8 +3,6 @@ TODO:
     typedef for jacobiantest functions?
     std_dev could be nan
     statistic for magnitude of jacobian out change over in change (not error, just interesting)
-    break out Vector3f comparison for use separate from JacobianTest
-    Give Jacobiantest another independent input
     Verify Matrices are inverses
     Vector3_result struct
 
@@ -12,6 +10,7 @@ Niraj, May 2022*/
 #include <cmath>
 #include <iostream>
 #include <chrono>
+#include <string>
 #include "leg_kinematics.hpp"
 #ifndef M_PI_2  // I can't believe I have to do this
 #define M_PI_2 (1.57079632679489661923)
@@ -32,7 +31,7 @@ struct scalar_result {
 
 std::ostream& operator<<(std::ostream& os, const scalar_result& data);
 
-struct Vector_result {
+struct Vector_result { //TODO
     Vector3f mean;
     Vector3f max;
     Matrix3f covariance;
@@ -88,6 +87,7 @@ public:
     int run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Vector3f&),
             void (*true_ref_function)(Vector3f&, const Vector3f&, const Vector3f&),
             float input_mean_val, float input_max_change_val);
+    void print(std::string name, std::string shortname);
     const scalar_result &jacCalcTime_us, &refCalcTime_us, &output_error, &error_mag, &error_angle;
 };
 

@@ -27,8 +27,8 @@ int JacobianTest::run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Ve
     input_mean = Array3f::Constant(1) * input_mean_val;
     input_max_change = Array3f::Constant(1) * input_max_change_val;
     initResults();
-    Matrix3f this_jac;
-    Vector3f input, alt_input, diff, base_out, approx_out, true_out;
+    Matrix3f this_jac{Matrix3f::Identity()};
+    Vector3f input, alt_input, diff, base_out{0, 0, 0}, approx_out, true_out{1, 0, 0};
     for (int n_jac = 0; n_jac < num_Jac_samples; ++n_jac) {
         input = input_mean + Array3f::Random() * input_max_change;
         alt_input = input_mean + Array3f::Random() * input_max_change;
@@ -58,6 +58,15 @@ unsigned JacobianTest::elapsed_time(void) {
     return chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - starttime).count();
 }
 
+void JacobianTest::print(std::string name, std::string shortname) {
+    std::cout<<name<<" Jacobian max_differential_change = "<< max_diff <<std::endl
+             <<shortname<<" jac output error:"<<std::endl<< output_error
+             <<shortname<<" jac fractional magnitude error:"<<std::endl<< error_mag
+             <<shortname<<" jac error angle [rad]:"<<std::endl<< error_angle
+             <<shortname<<" Jacobian Calculation time [us]:"<<std::endl<< jacCalcTime_us
+             <<shortname<<" True Function Calculation time [us]:"<<std::endl<< refCalcTime_us <<std::endl;
+}
+
 
 bool scalar_result::update(float new_val) {
     if (!std::isfinite(new_val)) {
@@ -82,6 +91,7 @@ std::ostream& operator<<(std::ostream& os, const scalar_result& data) {
 
 void error_mag_angle_results(scalar_result &scalar_error, scalar_result &error_mag, scalar_result &error_angle, 
                              const Vector3f &true_out, const Vector3f &approx_out, const Vector3f &base_out) {
+    //std::cout<<"Base "<<base_out.transpose()<<" True "<<true_out.transpose()<<" Approx "<<approx_out.transpose()<<std::endl;                                
     float new_scalar_error = (approx_out - true_out).norm();
     scalar_error.update(new_scalar_error);
     Vector3f true_diff = true_out - base_out;

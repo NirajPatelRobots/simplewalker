@@ -13,21 +13,26 @@ void fk_jac_true_ref(Vector3f &output, const Vector3f &input, const Vector3f&) {
     forward_kinematics(output, input);
 }
 
+void body_axis_angle_jac_forTest(Matrix3f &jacobian, const Vector3f &axis_angle, const Vector3f&world_vector) {
+    // body_Jac_axis_angle(jacobian, axis_angle, world_vector);
+}
+void body_axis_angle_jac_true_ref(Vector3f &output, const Vector3f &axis_angle, const Vector3f&world_vector) {
+    // output = R(w) * world_vector;
+}
+
 
 int main(void) {
     int jacobian_samples {1000}, differential_samples {1000};
     float max_differential_change {0.1};
-    auto jacobianTest = std::make_unique<JacobianTest>(jacobian_samples, differential_samples, max_differential_change);
+    auto jacobianTest {std::make_unique<JacobianTest>(jacobian_samples, differential_samples, max_differential_change)};
 
     // test forward kinematics
     float theta_mean{0}, theta_max{M_PI_2};
     jacobianTest->run(fk_jac_forTest, fk_jac_true_ref, theta_mean, theta_max);
-    std::cout<<"Forward kinematics Jacobian: max_differential_change = "<<max_differential_change<<std::endl
-             <<"FK Jac output error:"<<std::endl<<jacobianTest->output_error
-             <<"FK Jac fractional magnitude error:"<<std::endl<<jacobianTest->error_mag
-             <<"FK Jacobian error angle [rad]:"<<std::endl<<jacobianTest->error_angle
-             <<"Jacobian Calculation time [us]:"<<std::endl<<jacobianTest->jacCalcTime_us
-             <<"True Function Calculation time [us]:"<<std::endl<<jacobianTest->refCalcTime_us<<std::endl;
+    jacobianTest->print("Forward Kinematics", "fk");
 
+    // test body frame vector wrt axis-angle rotation vector
+    jacobianTest->run(body_axis_angle_jac_forTest, body_axis_angle_jac_true_ref, theta_mean, theta_max);
+    jacobianTest->print("Body frame vector axis-angle", "Body frame");
     return 0;
 }
