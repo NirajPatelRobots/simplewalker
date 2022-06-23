@@ -12,31 +12,33 @@ TODO:
     BUG: not always the right width
     can output to file
     Fancy macro or something so logging doesn't happen?
-    smaller log class for getting data from anywhere
     Binary logger is child class?
     binary logger knows where data is
     multiple lines to text file
     settings int
     settings fieldname with no groupname
+    settings refactor for reuse
+    add/remove prefix from logger name for surrounding code blocks so we can tell logs come from that block
 */
 #ifndef SIMPLEWALKER_LOGGER
 #define SIMPLEWALKER_LOGGER
 #include <string>
 #include <iostream>
 #include <sstream>
-#include "robot_state.hpp"
-#include "sensorBoss.hpp"
 #include <vector>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <memory>
 #include "rapidxml.hpp"
+#include <Eigen/Core>
+using std::cout, std::endl, std::string, std::unique_ptr, std::shared_ptr, std::make_unique, std::make_shared;
 
 class WalkerSettings {
     rapidxml::xml_document<> doc;
     std::vector<char> text;
 public:
-    WalkerSettings(std::string filename);
+    WalkerSettings(string filename);
     float f(const char * const fieldname) const;
     float f(const char * const groupname, const char * const fieldname) const;
     bool b(const char * const fieldname) const;
@@ -51,37 +53,37 @@ void start_logtiming(std::chrono::time_point<std::chrono::steady_clock> time); /
 void set_logtime(float &logtime); //sets this log time and starts counting from 0 again
 
 class Logger {
+protected:
     bool disable, headerSent, newline, savetofile;
     std::ofstream outFile;
     std::string filename, header;
     std::stringstream outstr;
     unsigned lognum, skipcntr;
-    std::vector<unsigned> endindexes;
+    std::vector<unsigned> fieldEndIndexes;
+    void make_field(string name);
+    void print_line(void);
 public:
-    Logger(bool log_newline = false); //default stdout
-    Logger(std::string filename, bool log_newline);
+    Logger(string filename = "", bool log_newline = false);  //default file is stdout
     ~Logger();
-    void log(std::string name, float x);
-    void log(std::string name, const Vector3f &x);
-    void log(std::string name, const RobotState &x);
-    void log(const RobotState &x) {log("", x);}
-    void log(std::string name, const SensorBoss &x);
-    void log(const SensorBoss &x) {log("", x);}
+    void log(string name, float x);
+    void log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x);
     void log(const Logtimes &logtimes);
-    void log(std::string name, const WalkerSettings &settings);
-    void log(std::string groupname, std::string name, const WalkerSettings &settings);
+    void log(string name, const WalkerSettings &settings);
+    void log(string groupname, string name, const WalkerSettings &settings);
 
     bool print(unsigned skipevery = 0);
     bool dontprint(unsigned skipevery = 0); //removes logging
 };
 
+extern shared_ptr<Logger> stdlogger;
+
 class LoadedBinaryLog {
     int len;
 public:
-    LoadedBinaryLog(std::string filename);
+    LoadedBinaryLog(string filename);
     float *datastart;
     const int &segmentlength; // how many floats in one segment (all the data saved at one call to print())
-    std::vector<std::string> &log_names;
+    std::vector<string> &log_names;
     std::vector<size_t> offsets;
 };
 

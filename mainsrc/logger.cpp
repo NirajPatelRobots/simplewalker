@@ -5,9 +5,11 @@
 const int W = 9;
 std::chrono::time_point<std::chrono::steady_clock> timerstart;
 
-Logger::Logger(std::string filename, bool log_newline)
+shared_ptr<Logger> stdlogger = make_shared<Logger>();
+
+Logger::Logger(string filename, bool log_newline)
     : disable(false), headerSent(false), newline(log_newline), savetofile(false),
-    filename(filename), header(""), outstr(""),  lognum(0), skipcntr(0) {
+      filename(filename), header(""), outstr(""),  lognum(0), skipcntr(0) {
     if (filename.size() > 0) {
         outFile.open(filename);
         if (outFile.is_open()) {
@@ -20,53 +22,48 @@ Logger::~Logger() {
     outFile.close();
 }
 
-Logger::Logger(bool log_newline) 
-    : Logger("", log_newline) {}
+void Logger::make_field(string name) {
+    header += name + "|, ";
+    fieldEndIndexes.push_back(std::max(header.size(), outstr.str().size()));
+    while (header.size() < fieldEndIndexes.back()) {
+        header += " ";
+    }
+}
 
-void Logger::log(std::string name, float x) {
+void Logger::log(string name, float x) {
     if (disable) return;
     //outstr += std::format("{%9f} |, ", x);
     outstr << std::setw(W) << x << " |, ";
     if (!headerSent) {
-        header += name + ", ";
-        endindexes.push_back(std::max(header.size(), outstr.str().size()));
-        while (header.size() < endindexes.back()) {
-            header += " ";
-        }
+        make_field(name);
     }
-    while (outstr.str().size() < endindexes.at(lognum)) {
+    while (outstr.str().size() < fieldEndIndexes.at(lognum)) {
         outstr << " ";
     }
     lognum++;
 }
 
-void Logger::log(std::string name, const Vector3f &x) {
+void Logger::log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x) {
     if (disable) return;
-    //outstr += std::format("[{%9f} {%9f} {%9f}] |, ", x(0), x(1), x(2));
-    outstr << std::setw(W) << x(0) << " " << std::setw(W) << x(1) << " " << std::setw(W) << x(2) << " |, ";
-    if (!headerSent) {
-        header += name + ", ";
-        endindexes.push_back(std::max(header.size(), outstr.str().size()));
-        while (header.size() < endindexes.back()) {
-            header += " ";
+    outstr << "[ ";
+    int numcols {x.cols()}, numrows {x.rows()};
+    for (int i = 0; i < numrows; ++i) {
+        if (numcols > 1 && numrows > 1) outstr << "[";
+        for (int j = 0; j < numcols; ++j) {
+            outstr << std::setw(W) << x(i, j) << " ";
         }
+        if (numcols > 1 && numrows > 1) outstr << "]";
     }
-    while (outstr.str().size() < endindexes.at(lognum)) {
+    outstr << "], ";
+    if (!headerSent) {
+        std::stringstream namestr{};
+        namestr << name << " (" << x.rows() << "x" << x.cols() << ")";
+        make_field(namestr.str());
+    }
+    while (outstr.str().size() < fieldEndIndexes.at(lognum)) {
         outstr << " ";
     }
     lognum++;
-}
-
-void Logger::log(std::string name, const RobotState &x) {
-    log(name + " pos", x.pos());
-    log(name + " euler", x.euler());
-    log(name + " vel", x.vel());
-    log(name + " angvel", x.angvel());
-}
-
-void Logger::log(std::string name, const SensorBoss &x) {
-    log(name + " accel", x.accel());
-    log(name + " gyro", x.gyro());
 }
 
 void Logger::log(const Logtimes &logtimes) {
@@ -78,33 +75,18 @@ void Logger::log(const Logtimes &logtimes) {
     log("sleep", logtimes.sleep);
 }
 
-void Logger::log(std::string name, const WalkerSettings &settings) {
+void Logger::log(string name, const WalkerSettings &settings) {
     log(name, settings.f(name.c_str()));
 }
 
-void Logger::log(std::string groupname, std::string name, const WalkerSettings &settings) {
+void Logger::log(string groupname, string name, const WalkerSettings &settings) {
     log(name, settings.f(groupname.c_str(), name.c_str()));
 }
 
 bool Logger::print(unsigned skipevery) {
     bool retval = false;
     if (skipcntr == 0 && !disable) {
-        if (!headerSent) {
-            if (savetofile) {
-                outFile << header << std::endl;
-            } else {
-                std::cout << header << std::endl;
-            }
-            headerSent = true;
-        }
-        if (savetofile) {
-            outFile << outstr.str() << std::endl;
-        } else {
-            std::cout << outstr.str() << "\r";
-            if (newline) {std::cout << "\n";}
-            else {std::cout << std::flush;}
-        }
-        outstr = std::stringstream("");
+        print_line();
         retval = true;
     }
     if (skipcntr++ > skipevery) {
@@ -117,6 +99,25 @@ bool Logger::print(unsigned skipevery) {
     return retval;
 }
 
+void Logger::print_line(void) {
+    if (!headerSent) {
+        if (savetofile) {
+            outFile << header << std::endl;
+        } else {
+            std::cout << header << std::endl;
+        }
+        headerSent = true;
+    }
+    if (savetofile) {
+        outFile << outstr.str() << std::endl;
+    } else {
+        std::cout << outstr.str() << "\r";
+        if (newline) {std::cout << "\n";}
+        else {std::cout << std::flush;}
+    }
+    outstr = std::stringstream("");
+}
+
 bool Logger::dontprint(unsigned) {
     disable = true;
     return false;
@@ -125,7 +126,7 @@ bool Logger::dontprint(unsigned) {
 
 // <<<<<<<<<<<<<<<<<<<<<<<<<<< SETTINGS              <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-WalkerSettings::WalkerSettings(std::string filename) {
+WalkerSettings::WalkerSettings(string filename) {
     std::ifstream inFile(filename);
     if (inFile.is_open()) {
         text = std::vector<char>((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
@@ -160,7 +161,7 @@ float WalkerSettings::f(const char * const groupname, const char * const fieldna
 bool WalkerSettings::b(const char * const fieldname) const {
     rapidxml::xml_node<> *node = doc.first_node(fieldname);
     if (node) {
-        return (node->value_size() > 0 && std::string("false").compare(node->value()) != 0);
+        return (node->value_size() > 0 && string("false").compare(node->value()) != 0);
     }
     std::cout<<"Couldn't load "<<fieldname<<std::endl;
     return false;
@@ -171,8 +172,8 @@ bool WalkerSettings::b(const char * const groupname, const char * const fieldnam
     if (node) {
         node = node->first_node(fieldname);
         if (node) {
-            return (node->value_size() > 0 && std::string("false").compare(node->value()) != 0
-                    && std::string("0").compare(node->value()) != 0);
+            return (node->value_size() > 0 && string("false").compare(node->value()) != 0
+                    && string("0").compare(node->value()) != 0);
         }
     }
     std::cout<<"Couldn't load "<< groupname << "::" << fieldname << std::endl;
