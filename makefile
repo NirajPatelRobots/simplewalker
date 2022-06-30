@@ -19,4 +19,4 @@ $(build)%.o : ./*/%.cpp
 	g++ -c $(incLocal) $(eigen) $(rapidxml) $^  $(CFLAGS) -o $@
 
 clean : 
-	rm -f $(build)*.o $(build)simplewalker $(build)localize_test
+	rm -f $(build)*.o $(build)simplewalker $(build)localize_test $(build)unittests

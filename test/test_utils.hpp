@@ -5,40 +5,42 @@ TODO:
     statistic for magnitude of jacobian out change over in change (not error, just interesting)
     Verify Matrices are inverses
     Vector3_result struct
+    use process clock for timing
+    result structs have member string for unit
+    JacobianTest subclass of inputoutput_vector_compare
 
 Niraj, May 2022*/
-#include <cmath>
 #include <iostream>
 #include <chrono>
 #include <string>
 #include "leg_kinematics.hpp"
-#ifndef M_PI_2  // I can't believe I have to do this
-#define M_PI_2 (1.57079632679489661923)
-#endif
 
 using Eigen::Array3f, Eigen::MatrixXf, Eigen::VectorXf;
 
 
 struct scalar_result {
-    float mean;
-    float max;
-    float std_dev;
-    unsigned num_data;
-    unsigned num_bad;
-    scalar_result() : mean(0), max(0), std_dev(0), num_data(0), num_bad(0) {};
-    bool update(float new_val);
+    float mean{0};
+    float max {0};
+    float std_dev{0};
+    float most_recent{0};
+    unsigned num_data{0};
+    unsigned num_bad{0};
+    std::string unit{};
+    bool update(float new_val); 
+    bool is_max(void) const {return (most_recent == max);}
 };
 
 std::ostream& operator<<(std::ostream& os, const scalar_result& data);
 
 struct Vector_result { //TODO
-    Vector3f mean;
-    Vector3f max;
-    Matrix3f covariance;
-    unsigned num_data;
-    unsigned num_bad;
-    Vector_result() : mean({0, 0, 0}), max({0, 0, 0}), covariance(Matrix3f::Identity()), num_data(0), num_bad(0) {};
+    Vector3f mean{0, 0, 0};
+    Vector3f max{0, 0, 0};
+    Matrix3f covariance{Matrix3f::Identity()};
+    Vector3f most_recent{0, 0, 0};
+    unsigned num_data{0};
+    unsigned num_bad{0};
     bool update(Vector3f new_val);
+    bool is_max(void) const {return (most_recent == max);}
 };
 
 
@@ -78,20 +80,23 @@ class JacobianTest {
     void start_timing(void);
     std::chrono::time_point<std::chrono::steady_clock> starttime;
     unsigned elapsed_time(void);
+    void error_mag_angle_results(const Vector3f &true_out, const Vector3f &approx_out, const Vector3f &base_out);
+    void calcAndTimeTrue(Vector3f &output, const Vector3f &input, const Vector3f &other_input);
+    void calcAndTimeJac(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input);
+    void updateFailures(void);
+    int failures;
 public:
     void initResults(void);
     int num_Jac_samples, num_diff_samples;
-    float max_diff;
+    float max_diff, failure_percent_thresh;
     Array3f input_mean, input_max_change;
+    Vector3f worst_mag_input, worst_angle_input;
     JacobianTest(int jacobian_samples, int differential_samples, float max_differential_change);
-    int run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Vector3f&),
-            void (*true_ref_function)(Vector3f&, const Vector3f&, const Vector3f&),
-            float input_mean_val, float input_max_change_val);
+    int run(void (*jac_calc_func)(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input),
+            void (*true_ref_function)(Vector3f &output, const Vector3f &input, const Vector3f &other_input));
     void print(std::string name, std::string shortname);
     const scalar_result &jacCalcTime_us, &refCalcTime_us, &output_error, &error_mag, &error_angle;
 };
 
 
-void error_mag_angle_results(scalar_result &scalar_error, scalar_result &error_mag, scalar_result &error_angle, 
-                             const Vector3f &true_ref, const Vector3f &approx_out, const Vector3f &base_out);
 

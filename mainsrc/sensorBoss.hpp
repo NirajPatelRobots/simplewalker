@@ -1,9 +1,10 @@
 /* The sensor boss deals with the sensors. 
 Responsible for:
     wrapping raw sensor data from the Communicator,
-    sensor covariance, the accuracy of the sensors
+    sensor covariance, the inverse precision of the sensors
     sensor prediction and sensor jacobian wrt state.
 TODO:
+    try covariance asDiagonal
     sensor bias/health estimate
     active covariance report
 */
@@ -26,7 +27,7 @@ public:
     const MatrixXf &jacobian;
 
     SensorBoss(const float *msgsensordata, float accel_stddev, float gyro_stddev);
-    void predict(const RobotState &state_pred, const RobotState &last_state, float dt, const Matrix3f *Jac_RT_Eul);
+    void predict(const RobotState &state_pred, const RobotState &last_state, float dt);
     //if initialized from a data stream instead of an updating vector, incrementdata increments to the next data
     void incrementdata(int numtoskip); //numtoskip is how many extra floats to skip forward when incrementing the buffer
     void calibrate(); // use this data to estimate calibration

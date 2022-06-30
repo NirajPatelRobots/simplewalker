@@ -1,5 +1,6 @@
 /* Test parts of simplewalker code to prove functionality
 TODO:
+    load settings
 Niraj, June 2022 */
 #include <memory>
 #include <iostream>
@@ -13,11 +14,21 @@ void fk_jac_true_ref(Vector3f &output, const Vector3f &input, const Vector3f&) {
     forward_kinematics(output, input);
 }
 
-void body_axis_angle_jac_forTest(Matrix3f &jacobian, const Vector3f &axis_angle, const Vector3f&world_vector) {
-    // body_Jac_axis_angle(jacobian, axis_angle, world_vector);
+void axis_jac_forTest(Matrix3f &jacobian, const Vector3f &input, const Vector3f&other_input) {
+    Jac_rotated_wrt_axis_angle(jacobian, input, other_input);
 }
-void body_axis_angle_jac_true_ref(Vector3f &output, const Vector3f &axis_angle, const Vector3f&world_vector) {
-    // output = R(w) * world_vector;
+void axis_angle_jac_true_ref(Vector3f &output, const Vector3f &axis_angle, const Vector3f&vector) {
+    float angle = axis_angle.norm();
+    Vector3f axis = axis_angle / angle;
+    output = Eigen::AngleAxisf(angle, axis) * vector;
+}
+
+void unit_jac_forTest(Matrix3f &jacobian, const Vector3f &input, const Vector3f&) {
+    jacobian_unitvec_wrt_vec(jacobian, input);
+}
+void unit_jac_true_ref(Vector3f &output, const Vector3f &input, const Vector3f&) {
+    output = input;
+    output.normalize();
 }
 
 
@@ -26,13 +37,19 @@ int main(void) {
     float max_differential_change {0.1};
     auto jacobianTest {std::make_unique<JacobianTest>(jacobian_samples, differential_samples, max_differential_change)};
 
-    // test forward kinematics
-    float theta_mean{0}, theta_max{M_PI_2};
-    jacobianTest->run(fk_jac_forTest, fk_jac_true_ref, theta_mean, theta_max);
-    jacobianTest->print("Forward Kinematics", "fk");
+    Array3f &theta_mean{jacobianTest->input_mean}, &theta_max_change{jacobianTest->input_max_change};
+    theta_mean = Array3f::Constant(0 / sqrt(3));
+    //theta_mean(1) *= -1;
+    theta_max_change = Array3f::Constant((M_PI - 0.2) / sqrt(3));
 
-    // test body frame vector wrt axis-angle rotation vector
-    jacobianTest->run(body_axis_angle_jac_forTest, body_axis_angle_jac_true_ref, theta_mean, theta_max);
-    jacobianTest->print("Body frame vector axis-angle", "Body frame");
+    // jacobianTest->run(fk_jac_forTest, fk_jac_true_ref);
+    // jacobianTest->print("Forward Kinematics", "fk");
+
+    //jacobianTest->run(unit_jac_forTest, unit_jac_true_ref);
+    //jacobianTest->print("Unit vector wrt vector", "Unit");
+
+    jacobianTest->max_diff = 0.001;
+    jacobianTest->run(axis_jac_forTest, axis_angle_jac_true_ref);
+    jacobianTest->print("Rotated vector wrt axis-angle", "Rotated");
     return 0;
 }
