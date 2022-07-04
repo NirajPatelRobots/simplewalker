@@ -22,17 +22,13 @@ TODO:
 */
 #ifndef SIMPLEWALKER_LOGGER
 #define SIMPLEWALKER_LOGGER
-#include <string>
-#include <iostream>
 #include <sstream>
 #include <vector>
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
-#include <memory>
+#include "walkerUtils.hpp"
 #include "rapidxml.hpp"
-#include <Eigen/Core>
-using std::cout, std::endl, std::string, std::unique_ptr, std::shared_ptr, std::make_unique, std::make_shared;
 
 class WalkerSettings {
     rapidxml::xml_document<> doc;

@@ -6,13 +6,8 @@ March 2022 blame Niraj*/
 #ifndef ROBOT_STATE_HPP
 #define ROBOT_STATE_HPP
 #include "leg_kinematics.hpp"
-using Eigen::MatrixXf, Eigen::Matrix3f, Eigen::VectorXf, Eigen::Vector3f;
+using Eigen::MatrixXf, Eigen::VectorXf;
 typedef Eigen::VectorBlock<Eigen::VectorXf, 3> Block3f;
-
-#define STATEIDX_POS 0
-#define STATEIDX_AXIS 3
-#define STATEIDX_VEL 6
-#define STATEIDX_ANGVEL 9
 
 const int N = 12;
 
@@ -48,8 +43,5 @@ public:
     const Matrix3f& R;
     const Matrix3f& RT;
 };
-
-std::ostream &operator<<(std::ostream &output, const RobotState &State);
-std::string state_CSV_header(void); //TODO list of const strings of names that get output by <<
 
 #endif

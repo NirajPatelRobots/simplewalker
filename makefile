@@ -3,7 +3,7 @@ rapidxml = -I ../rapidxml
 incLocal = -I./mainsrc -I./communication -I./state_estimation -I./test -I./physics
 build = ./build/
 CFLAGS = -std=c++17 -Wall -Wextra -O
-objnames = simplewalker.o maincomp_comm.o state_estimation.o robot_state.o sensorBoss.o logger.o leg_kinematics.o
+objnames = simplewalker.o maincomp_comm.o state_estimation.o robot_state.o sensorBoss.o logger.o leg_kinematics.o walkerUtils.o
 objects := $(addprefix $(build),$(objnames))
 	
 simplewalker: $(objects)
@@ -12,7 +12,7 @@ simplewalker: $(objects)
 localize_test: $(build)*state_estimation.o $(build)robot_state.o
 	g++ -I/state_estimation $(eigen) $^ -o $(build)$@
 
-unittests: $(build)leg_kinematics.o $(build)unittests.o $(build)test_utils.o
+unittests: $(build)leg_kinematics.o $(build)unittests.o $(build)test_utils.o $(build)walkerUtils.o
 	g++ $(incLocal) $^ -o $(build)$@
 
 $(build)%.o : ./*/%.cpp

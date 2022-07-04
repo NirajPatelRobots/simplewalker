@@ -12,22 +12,22 @@ JacobianTest::JacobianTest(int jacobian_samples, int differential_samples, float
 }
 
 void JacobianTest::initResults(void) {
-    jacCalcTime_us_ = scalar_result();
-    refCalcTime_us_ = scalar_result();
-    output_error_ = scalar_result();
-    error_mag_ = scalar_result();
-    error_angle_ = scalar_result();
+    jacCalcTime_us_ = scalar_statistic();
+    refCalcTime_us_ = scalar_statistic();
+    output_error_ = scalar_statistic();
+    error_mag_ = scalar_statistic();
+    error_angle_ = scalar_statistic();
     failures = 0;
     //singleRunResults = VectorXf(num_Jac_samples * num_diff_samples);
 }
 
-void printInputAndResult(const Vector3f &input, const scalar_result &result) {
+void printInputAndResult(const Vector3f &input, const scalar_statistic &result) {
     std::cout<< result.most_recent<<" "<<result.unit<<" ["<<input.transpose() / M_PI
             <<"]pi   norm: "<< input.norm() / M_PI <<"pi  basisness:"
             << input.lpNorm<Eigen::Infinity>() / input.norm() <<std::endl;
 }
 
-void updateWorstInput(Vector3f &worst_input_save, const Vector3f &input, const scalar_result &result_stat) {
+void updateWorstInput(Vector3f &worst_input_save, const Vector3f &input, const scalar_statistic &result_stat) {
     if (result_stat.is_max()) {
         worst_input_save = input;
         printInputAndResult(worst_input_save, result_stat);
@@ -103,27 +103,5 @@ void JacobianTest::error_mag_angle_results(const Vector3f &true_out, const Vecto
     error_angle_.update(acos(approx_diff.dot(true_diff)));
 }
 
-
-bool scalar_result::update(float new_val) {
-    if (!std::isfinite(new_val)) {
-        num_bad++;
-        return false;
-    }
-    unsigned n = num_data++;
-    float new_mean = (mean * n + new_val)/(n + 1);
-    if (new_val > max)  max = new_val;
-    std_dev = sqrtf((n * powf(std_dev, 2) + n*(n-1) * powf(new_mean - mean, 2)) / (n+1) );
-    mean = new_mean;
-    most_recent = new_val;
-    return true;
-}
-
-std::ostream& operator<<(std::ostream& os, const scalar_result& data) {
-    os<<"Mean: "<<data.mean<<", max: "<<data.max<<", std_dev: "<<data.std_dev<<" / "<<data.num_data<<" elements";
-    if (data.num_bad) 
-        os<<" ("<<data.num_bad<<" bad)";
-    os<<std::endl;
-    return os;
-}
 
 

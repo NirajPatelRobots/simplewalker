@@ -1,3 +1,9 @@
+/* state estimation
+March 2022
+TODO:
+    legs
+    velocity damping
+*/
 #include "robot_state.hpp"
 #include "sensorBoss.hpp"
 
@@ -18,6 +24,3 @@ public:
     void predict(void);
     void correct(void);
 };
-
-std::ostream &operator<<(std::ostream &output, const StateEstimator &Estimator);
-std::string estimator_CSV_header(void);

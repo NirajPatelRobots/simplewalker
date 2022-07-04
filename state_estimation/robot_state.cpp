@@ -3,7 +3,6 @@ March 2022 blame Niraj
 ?*/
 #include "robot_state.hpp"
 #include "logger.hpp"
-#include <cmath>
 
 RobotState::RobotState()
 : vect(VectorXf::Zero(N)), R(R_), RT(RT_) {
@@ -36,22 +35,6 @@ void RobotState::stabilizeRotation_(void) {
     Eigen::AngleAxisf angle_axis{R};
     axis() = angle_axis.axis() * angle_axis.angle();
     R_cached_axis = axis();
-}
-
-
-std::string state_CSV_header(void){
-    return "pos[3],axis[3],vel[3],angvel[3]";
-}
-std::ostream &operator<<( std::ostream &output, const RobotState &State ) {
-    /*output <<"Pos [m]: "<<State.pos().transpose()
-            <<"\nEul [rad]: "<<State.axis().transpose()
-            <<"\nVel [m/s]: "<<State.vel().transpose()
-            <<"\nAngvel [rad/s]: "<<State.angvel().transpose()<<"\n"; */
-    output <<State.pos().transpose()
-            <<"  |  "<<State.axis().transpose()
-            <<"  |  "<<State.vel().transpose()
-            <<"  |  "<<State.angvel().transpose();
-    return output;
 }
 
 Block3f RobotState::pos() {return vect.segment<3>(IDX_POS);}

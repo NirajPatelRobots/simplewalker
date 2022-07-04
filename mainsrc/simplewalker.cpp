@@ -12,8 +12,15 @@ TODO:
 #include <thread>
 
 namespace chrono = std::chrono;
-#define MSG_WAIT_TIME_US 1000 //wait this long before skipipng
+const static int MSG_WAIT_TIME_US {1000}; //wait this long before skipipng
 
+void set_state_msg(RobotStateMsg *msg, const RobotState &state, chrono::duration<float> timestamp) {
+    msg->timestamp_us = chrono::duration_cast<chrono::microseconds>(timestamp).count();
+    for (int i = 0; i < N; ++i) {
+        float *float_out = msg->pos + i;
+        *float_out = state.vect[i];
+    }
+}
 
 int main() {
     WalkerSettings settings("settings/settings.xml"); //settings
@@ -55,7 +62,7 @@ int main() {
     state.angvel() << 0, 0, M_PI / 5.0;
 
     std::cout<<"\tStart main loop, T = "<< looptime.count() << " ms" << std::endl;
-    auto timestart = chrono::steady_clock::now();
+    chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
     chrono::time_point<chrono::steady_clock> loopstart = timestart;
     while (true) {
         set_logtime(logtimes.sleep);
@@ -75,11 +82,7 @@ int main() {
             ERR_msg_late = false;
         }
         set_logtime(logtimes.commreceive);
-        sendstate->timestamp_us = chrono::duration_cast<chrono::microseconds>(loopstart - timestart).count();
-        for (int i = 0; i < N; ++i) {
-            float *float_out = sendstate->pos + i;
-            *float_out = EKF->state.vect[i];
-        }
+        set_state_msg(sendstate.get(), EKF->state, loopstart - timestart);
         comm->broadcast_message(settings.f("General", "broadcast_rate_div"));
         set_logtime(logtimes.commsend);
 

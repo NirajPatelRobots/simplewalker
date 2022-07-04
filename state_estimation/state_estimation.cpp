@@ -1,8 +1,3 @@
-/* state estimation
-March 2022
-TODO:
-    legs
-*/
 #include "state_estimation.hpp"
 
 
@@ -42,16 +37,4 @@ void StateEstimator::correct(void) {
     state.calculate();
     cov = cov_scale * cov_pred * cov_scale.transpose() + filter_gain * sensors.covariance * filter_gain.transpose();
     state.vel() *= (1 - 10*dt); // DEBUG DEBUG TODO REMOVE DAMPING
-}
-
-std::ostream &operator<<(std::ostream &output, const StateEstimator &EKF) {
-    output<<EKF.state.pos().transpose() << "," << EKF.state.axis().transpose() << ","
-        <<EKF.state.vel().transpose() << "," << EKF.state.angvel().transpose() << ","
-        <<EKF.state_pred.pos().transpose() << "," << EKF.state_pred.axis().transpose() << ","
-        <<EKF.state_pred.vel().transpose() << "," << EKF.state_pred.angvel().transpose();
-    return output;
-}
-
-std::string estimator_CSV_header(void) {
-    return "pos[3],axis[3],vel[3],angvel[3],pos_pred[3],axis_pred[3],vel_pred[3],angvel_pred[3]";
 }

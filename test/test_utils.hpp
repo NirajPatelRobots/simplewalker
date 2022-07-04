@@ -17,33 +17,6 @@ Niraj, May 2022*/
 
 using Eigen::Array3f, Eigen::MatrixXf, Eigen::VectorXf;
 
-
-struct scalar_result {
-    float mean{0};
-    float max {0};
-    float std_dev{0};
-    float most_recent{0};
-    unsigned num_data{0};
-    unsigned num_bad{0};
-    std::string unit{};
-    bool update(float new_val); 
-    bool is_max(void) const {return (most_recent == max);}
-};
-
-std::ostream& operator<<(std::ostream& os, const scalar_result& data);
-
-struct Vector_result { //TODO
-    Vector3f mean{0, 0, 0};
-    Vector3f max{0, 0, 0};
-    Matrix3f covariance{Matrix3f::Identity()};
-    Vector3f most_recent{0, 0, 0};
-    unsigned num_data{0};
-    unsigned num_bad{0};
-    bool update(Vector3f new_val);
-    bool is_max(void) const {return (most_recent == max);}
-};
-
-
 struct single_Jac_run_result {
     float error; //the magnitude of difference between jacobian calculated and true output
     float input_delta; //mag of how much the input changed
@@ -75,7 +48,7 @@ class JacobianTest {
     */
     void (*jac_calc_func)(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input);
     void (*true_ref_function)(Vector3f &output, const Vector3f &input, const Vector3f &other_input);
-    scalar_result jacCalcTime_us_, refCalcTime_us_, output_error_, error_mag_, error_angle_;
+    scalar_statistic jacCalcTime_us_, refCalcTime_us_, output_error_, error_mag_, error_angle_;
     VectorXf singleRunResults; // TODO: Do a linear regression on this to get error as fcn of all other results
     void start_timing(void);
     std::chrono::time_point<std::chrono::steady_clock> starttime;
@@ -95,7 +68,7 @@ public:
     int run(void (*jac_calc_func)(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input),
             void (*true_ref_function)(Vector3f &output, const Vector3f &input, const Vector3f &other_input));
     void print(std::string name, std::string shortname);
-    const scalar_result &jacCalcTime_us, &refCalcTime_us, &output_error, &error_mag, &error_angle;
+    const scalar_statistic &jacCalcTime_us, &refCalcTime_us, &output_error, &error_mag, &error_angle;
 };
 
 
