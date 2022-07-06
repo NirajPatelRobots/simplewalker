@@ -49,7 +49,7 @@ struct RobotStateMsg {
     uint16_t errcode;
     uint32_t timestamp_us; //microseconds
     float pos[3];
-    float eul[3];
+    float axis[3];
     float vel[3];
     float angvel[3];
     float leg_pos[6];

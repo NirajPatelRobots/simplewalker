@@ -4,6 +4,7 @@ TODO:
     receive multiple IDs
     make pointers safe
     can disconnect viewer from server without stopping execution
+    can exit program without leaking server
     wait for connection in another thread
 */
 #include <queue>

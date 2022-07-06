@@ -1,6 +1,6 @@
 eigen = -I ../eigen-3.4.0
 rapidxml = -I ../rapidxml
-incLocal = -I./mainsrc -I./communication -I./state_estimation -I./test -I./physics
+incLocal = -I./mainsrc -I./communication -I./state_estimation -I./test -I./physics -I./display
 build = ./build/
 CFLAGS = -std=c++17 -Wall -Wextra -O
 objnames = simplewalker.o maincomp_comm.o state_estimation.o robot_state.o sensorBoss.o logger.o leg_kinematics.o walkerUtils.o

@@ -13,7 +13,6 @@ class StateEstimator {
     MatrixXf sens_cov; //sensor covariance
     MatrixXf sens_jac; //d(sensor)/d(state)
     MatrixXf motion_jac; //d(new state)/d(state)
-    Matrix3f Jac_RT_Eul[3]; //d(RT matrix)/d(euler angle[3])
     SensorBoss &sensors;
 public:
     StateEstimator(float timestep, SensorBoss &sensorBoss,

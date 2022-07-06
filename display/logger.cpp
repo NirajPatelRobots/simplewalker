@@ -133,51 +133,52 @@ WalkerSettings::WalkerSettings(string filename) {
         inFile.close();
         text.push_back('\0');
         doc.parse<rapidxml::parse_trim_whitespace>(&text[0]);
+        settings_node = doc.first_node("settings");
+        if (!settings_node) std::cerr<<"Couldn't find settings node in "<<filename<<endl;
     }
     else {
-        std::cerr<<"Couldn't find "<<filename<<std::endl;
+        std::cerr<<"Couldn't find "<<filename<<endl;
     }
+}
+
+const char *WalkerSettings::cstr(const char * const groupname, const char * const fieldname) const {
+    rapidxml::xml_node<> *node = settings_node->first_node(groupname);
+    if (node) {
+        node = node->first_node(fieldname);
+        if (node) return node->value();
+    }
+    std::cout<<"Couldn't load "<< groupname << "::" << fieldname <<std::endl;
+    return nullptr;
+}
+
+const char *WalkerSettings::cstr(const char * const fieldname) const {
+    rapidxml::xml_node<> *node = settings_node->first_node(fieldname);
+    if (node) return node->value();
+    std::cout<<"Couldn't load "<<fieldname<<std::endl;
+    return nullptr;
 }
 
 float WalkerSettings::f(const char * const fieldname) const {
-    rapidxml::xml_node<> *node = doc.first_node(fieldname);
-    if (node) {
-        return std::atof(node->value());
-    }
-    std::cout<<"Couldn't load "<<fieldname<<std::endl;
-    return 0;
+    return std::atof( cstr(fieldname));
+}
+float WalkerSettings::f(const char * const groupname, const char * const fieldname) const {
+    return std::atof( cstr(groupname, fieldname));
 }
 
-float WalkerSettings::f(const char * const groupname, const char * const fieldname) const {
-    rapidxml::xml_node<> *node = doc.first_node(groupname);
-    if (node) {
-        node = node->first_node(fieldname);
-        if (node) return std::atof(node->value());
-    }
-    std::cout<<"Couldn't load "<< groupname << "::" << fieldname <<std::endl;
-    return 0;
+int WalkerSettings::i(const char * const fieldname) const {
+    return std::atoi( cstr(fieldname));
+}
+int WalkerSettings::i(const char * const groupname, const char * const fieldname) const {
+    return std::atoi( cstr(groupname, fieldname));
 }
 
 bool WalkerSettings::b(const char * const fieldname) const {
-    rapidxml::xml_node<> *node = doc.first_node(fieldname);
-    if (node) {
-        return (node->value_size() > 0 && string("false").compare(node->value()) != 0);
-    }
-    std::cout<<"Couldn't load "<<fieldname<<std::endl;
-    return false;
+    const char * value = cstr(fieldname);
+    return (value && std::strlen(value) > 0 && string("false").compare(value) != 0 && string("0").compare(value) != 0);
 }
-
 bool WalkerSettings::b(const char * const groupname, const char * const fieldname) const {
-    rapidxml::xml_node<> *node = doc.first_node(groupname);
-    if (node) {
-        node = node->first_node(fieldname);
-        if (node) {
-            return (node->value_size() > 0 && string("false").compare(node->value()) != 0
-                    && string("0").compare(node->value()) != 0);
-        }
-    }
-    std::cout<<"Couldn't load "<< groupname << "::" << fieldname << std::endl;
-    return false;
+    const char * value = cstr(groupname, fieldname);
+    return (value && std::strlen(value) > 0 && string("false").compare(value) != 0 && string("0").compare(value) != 0);
 }
 
 

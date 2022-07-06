@@ -15,9 +15,7 @@ TODO:
     Binary logger is child class?
     binary logger knows where data is
     multiple lines to text file
-    settings int
     settings fieldname with no groupname
-    settings refactor for reuse
     add/remove prefix from logger name for surrounding code blocks so we can tell logs come from that block
 */
 #ifndef SIMPLEWALKER_LOGGER
@@ -30,16 +28,23 @@ TODO:
 #include "walkerUtils.hpp"
 #include "rapidxml.hpp"
 
+
 class WalkerSettings {
     rapidxml::xml_document<> doc;
+    rapidxml::xml_node<> *settings_node = NULL;
     std::vector<char> text;
 public:
     WalkerSettings(string filename);
+    const char *cstr(const char * const fieldname) const;
+    const char *cstr(const char * const groupname, const char * const fieldname) const;
     float f(const char * const fieldname) const;
     float f(const char * const groupname, const char * const fieldname) const;
+    int i(const char * const fieldname) const;
+    int i(const char * const groupname, const char * const fieldname) const;
     bool b(const char * const fieldname) const;
     bool b(const char * const groupname, const char * const fieldname) const;
 };
+
 
 struct Logtimes {
     float predict, correct, commreceive, commsend, log, sleep;
