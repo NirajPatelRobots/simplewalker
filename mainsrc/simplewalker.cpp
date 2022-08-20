@@ -15,41 +15,48 @@ namespace chrono = std::chrono;
 const static int MSG_WAIT_TIME_US {1000}; //wait this long before skipipng
 
 void set_state_msg(RobotStateMsg *msg, const RobotState &state, chrono::duration<float> timestamp) {
-    msg->timestamp_us = chrono::duration_cast<chrono::microseconds>(timestamp).count();
     for (int i = 0; i < N; ++i) {
         float *float_out = msg->pos + i;
         *float_out = state.vect[i];
     }
+    msg->timestamp_us = chrono::duration_cast<chrono::microseconds>(timestamp).count();
 }
 
-int main() {
-    WalkerSettings settings("settings/settings.xml"); //settings
-
-    std::unique_ptr<ControlStateMsg> controlstate(new ControlStateMsg);
+void start_control_communication(Communicator &comm, ControlStateMsg *controlstate, RobotStateMsg *sendstate) {
     controlstate->ID = 0;
-    std::unique_ptr<RobotStateMsg> sendstate(new RobotStateMsg);
     sendstate->ID = RobotStateMsgID;
     sendstate->errcode = 0;
     for (int i = 0; i < 6; ++i) {sendstate->leg_pos[i] = 0; sendstate->leg_vel[i] = 0;}
+    std::cout<<"Waiting for controller messages..."<<std::endl;
+    int num_msgs = 0;
+    while (num_msgs < 3) {
+        comm.handle_messages();
+        if (comm.read_message((char *)controlstate) >= 0)  ++num_msgs;
+    }
+}
 
-    std::unique_ptr<Communicator> comm(new Communicator(ControlStateMsgID, sizeof(ControlStateMsg),
-                      ControlTargetMsgID, sizeof(ControlTargetMsg)));
-    comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
-                        sizeof(RobotStateMsg), (const char *)sendstate.get());
-    if (settings.b("General", "state_send")) comm->try_connect();
+
+int main() {
+    WalkerSettings settings("settings/settings.xml"); //settings
     
-    std::unique_ptr<SensorBoss> sensors(new SensorBoss(controlstate->accel,
+    
+    unique_ptr<ControlStateMsg> controlstate(new ControlStateMsg);
+    unique_ptr<RobotStateMsg> sendstate(new RobotStateMsg);
+
+    unique_ptr<Communicator> comm(new Communicator(ControlStateMsgID, sizeof(ControlStateMsg),
+                      ControlTargetMsgID, sizeof(ControlTargetMsg)));
+
+    unique_ptr<SensorBoss> sensors(new SensorBoss(controlstate->accel,
                         settings.f("SensorBoss", "accel_stddev"), settings.f("SensorBoss", "gyro_stddev")));
     float timestep = settings.f("General", "main_timestep");
     const bool prediction_only = settings.b("State_Estimation", "prediction_only");
     if (prediction_only) std::cout<<"\tPrediction Only, Ignoring Sensors"<<std::endl;
-    std::unique_ptr<StateEstimator> EKF(new StateEstimator(timestep, *sensors, 
-                                            settings.f("State_Estimation", "pos_stddev"), 
-                                            settings.f("State_Estimation", "axis_stddev"),
-                                            settings.f("State_Estimation", "vel_stddev"),
-                                            settings.f("State_Estimation", "angvel_stddev")));
+    unique_ptr<StateEstimator> EKF(new StateEstimator(timestep, *sensors, 
+                                   settings.f("State_Estimation", "pos_stddev"), 
+                                   settings.f("State_Estimation", "axis_stddev"),
+                                   settings.f("State_Estimation", "vel_stddev"),
+                                   settings.f("State_Estimation", "angvel_stddev")));
     RobotState &state = EKF->state;
-
     chrono::milliseconds looptime(static_cast<int>(1000 * timestep));
     chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
     chrono::time_point<chrono::steady_clock> latereadtime;
@@ -60,10 +67,16 @@ int main() {
     Logtimes logtimes;
 
     state.angvel() << 0, 0, M_PI / 5.0;
+    
+    comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
+                        sizeof(RobotStateMsg), (const char *)sendstate.get());
+    if (settings.b("General", "state_send")) comm->try_connect();
+    start_control_communication(*comm, controlstate.get(), sendstate.get());
 
     std::cout<<"\tStart main loop, T = "<< looptime.count() << " ms" << std::endl;
     chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
-    chrono::time_point<chrono::steady_clock> loopstart = timestart;
+    chrono::time_point<chrono::steady_clock> loopstart = timestart + looptime;
+    std::this_thread::sleep_until(loopstart);
     while (true) {
         set_logtime(logtimes.sleep);
         comm->handle_messages();
