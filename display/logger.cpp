@@ -11,7 +11,7 @@ Logger::Logger(string filename, bool log_newline)
     : disable(false), headerSent(false), newline(log_newline), savetofile(false),
       filename(filename), header(""), outstr(""),  lognum(0), skipcntr(0) {
     if (filename.size() > 0) {
-        outFile.open(filename);
+        outFile.open(filename, std::ios::trunc);
         if (outFile.is_open()) {
             savetofile = true;
         }
@@ -46,10 +46,10 @@ void Logger::log(string name, float x) {
 void Logger::log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x) {
     if (disable) return;
     outstr << "[ ";
-    int numcols {x.cols()}, numrows {x.rows()};
-    for (int i = 0; i < numrows; ++i) {
+    long numcols {x.cols()}, numrows {x.rows()};
+    for (long i = 0; i < numrows; ++i) {
         if (numcols > 1 && numrows > 1) outstr << "[";
-        for (int j = 0; j < numcols; ++j) {
+        for (long j = 0; j < numcols; ++j) {
             outstr << std::setw(W) << x(i, j) << " ";
         }
         if (numcols > 1 && numrows > 1) outstr << "]";
@@ -142,6 +142,7 @@ WalkerSettings::WalkerSettings(string filename) {
 }
 
 const char *WalkerSettings::cstr(const char * const groupname, const char * const fieldname) const {
+    if (!settings_node) return nullptr;
     rapidxml::xml_node<> *node = settings_node->first_node(groupname);
     if (node) {
         node = node->first_node(fieldname);
@@ -152,6 +153,7 @@ const char *WalkerSettings::cstr(const char * const groupname, const char * cons
 }
 
 const char *WalkerSettings::cstr(const char * const fieldname) const {
+    if (!settings_node) return nullptr;
     rapidxml::xml_node<> *node = settings_node->first_node(fieldname);
     if (node) return node->value();
     std::cout<<"Couldn't load "<<fieldname<<std::endl;

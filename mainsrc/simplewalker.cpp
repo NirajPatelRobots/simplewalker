@@ -15,11 +15,11 @@ namespace chrono = std::chrono;
 const static int MSG_WAIT_TIME_US {1000}; //wait this long before skipipng
 
 void set_state_msg(RobotStateMsg *msg, const RobotState &state, chrono::duration<float> timestamp) {
+    msg->timestamp_us = chrono::duration_cast<chrono::microseconds>(timestamp).count();
     for (int i = 0; i < N; ++i) {
         float *float_out = msg->pos + i;
         *float_out = state.vect[i];
     }
-    msg->timestamp_us = chrono::duration_cast<chrono::microseconds>(timestamp).count();
 }
 
 void start_control_communication(Communicator &comm, ControlStateMsg *controlstate, RobotStateMsg *sendstate) {
@@ -38,7 +38,6 @@ void start_control_communication(Communicator &comm, ControlStateMsg *controlsta
 
 int main() {
     WalkerSettings settings("settings/settings.xml"); //settings
-    
     
     unique_ptr<ControlStateMsg> controlstate(new ControlStateMsg);
     unique_ptr<RobotStateMsg> sendstate(new RobotStateMsg);
@@ -63,10 +62,8 @@ int main() {
     bool ERR_msg_late = false;
     int num_msgs = 0;
     shared_ptr<ConvenientLogger> logger{std::static_pointer_cast<ConvenientLogger>(stdlogger)};
-    //Logger savelog("data/statelog.csv"); TODO BUG
+    //ConvenientLogger savelog("data/statelog.log"); //TODO BUG
     Logtimes logtimes;
-
-    state.angvel() << 0, 0, M_PI / 5.0;
     
     comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
                         sizeof(RobotStateMsg), (const char *)sendstate.get());
@@ -113,8 +110,10 @@ int main() {
         if (settings.b("Logger", "log_state")) logger->obj_log(EKF->state);
         if (settings.b("Logger", "log_R")) logger->log("R", state.R);
         if (settings.b("Logger", "log_state_pred")) logger->obj_log("Predicted ", EKF->state_pred);
-        //savelog.log(EKF->state);
+        //savelog.obj_log(EKF->state);
+        //savelog.obj_log(*sensors);
         if (logger->print(settings.f("Logger", "skip_every"))) {
+            //savelog.print();
             set_logtime(logtimes.log);
         }
 

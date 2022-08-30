@@ -5,13 +5,9 @@ March 2022 blame Niraj
 #include "logger.hpp"
 
 RobotState::RobotState()
-: vect(VectorXf::Zero(N)), R(R_), RT(RT_) {
-    Vector3f unit_axis_init {1, 0, 0};
-    float angle_init {M_PI_2};
-    axis() = unit_axis_init * angle_init;
-    R_cached_axis = axis();
-    R_ = Eigen::AngleAxisf(angle_init, unit_axis_init).toRotationMatrix();
-    RT_ = R_.transpose();
+: R_(DEFAULT_ROTATION), vect(VectorXf::Zero(N)), R(R_), RT(RT_) {
+    setAxisFromR_();
+    updateRotationMatrix_(0, Vector3f(1, 0, 0));
 }
 
 void RobotState::calculate(void) {
@@ -19,19 +15,19 @@ void RobotState::calculate(void) {
     Vector3f delta_axis = axis() - R_cached_axis;
     float delta_angle = delta_axis.norm();
     if (delta_angle > rot_angle_update_thresh) {
+        cached_rotation_count = 0;
         updateRotationMatrix_(delta_angle, delta_axis / delta_angle);
-        stabilizeRotation_();
+        setAxisFromR_();
     } else ++cached_rotation_count;
 }
 
 void RobotState::updateRotationMatrix_(float delta_angle, const Vector3f &axis_normalized) {
-    cached_rotation_count = 0;
     R_ = Eigen::AngleAxisf(delta_angle, axis_normalized) * R;
     RT_ = R.transpose();
     R_cached_axis = axis();
 }
 
-void RobotState::stabilizeRotation_(void) {
+void RobotState::setAxisFromR_(void) {
     Eigen::AngleAxisf angle_axis{R};
     axis() = angle_axis.axis() * angle_axis.angle();
     R_cached_axis = axis();

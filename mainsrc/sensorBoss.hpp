@@ -7,6 +7,7 @@ TODO:
     try covariance asDiagonal
     sensor bias/health estimate
     active covariance report
+    data_is_valid()
 */
 #ifndef SENSORBOSS_HPP
 #define SENSORBOSS_HPP
@@ -27,13 +28,19 @@ public:
     const MatrixXf &jacobian;
 
     SensorBoss(const float *msgsensordata, float accel_stddev, float gyro_stddev);
+    // predict() sets prediction and jacobian
     void predict(const RobotState &state_pred, const RobotState &last_state, float dt);
     //if initialized from a data stream instead of an updating vector, incrementdata increments to the next data
     void incrementdata(int numtoskip); //numtoskip is how many extra floats to skip forward when incrementing the buffer
     void calibrate(); // use this data to estimate calibration
 
+    bool data_is_valid(void) const;
     //get elements
     const Vector3f accel() const;
     const Vector3f gyro() const;
+    const Vector3f accel_pred() const;
+    const Vector3f gyro_pred() const;
 };
+
+const Vector3f IMU_GRAVITY(0, 9.81, 0); // gravity on IMU in world frame
 #endif

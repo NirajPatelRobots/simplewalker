@@ -3,7 +3,10 @@ March 2022
 TODO:
     legs
     velocity damping
+    BUG: rotation wrong
 */
+#ifndef STATEESTIMATION_HPP
+#define STATEESTIMATION_HPP
 #include "robot_state.hpp"
 #include "sensorBoss.hpp"
 
@@ -23,3 +26,5 @@ public:
     void predict(void);
     void correct(void);
 };
+
+#endif

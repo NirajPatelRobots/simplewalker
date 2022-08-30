@@ -16,6 +16,7 @@ Can output:
 
 class ConvenientLogger : public Logger {
 public:
+    explicit ConvenientLogger(const string name) : Logger(name, true) {}
     void obj_log(std::string name, const RobotState &x);
     void obj_log(const RobotState &x) {obj_log("", x);}
     void obj_log(std::string name, const SensorBoss &x);
@@ -32,6 +33,8 @@ void ConvenientLogger::obj_log(std::string name, const RobotState &x) {
 void ConvenientLogger::obj_log(std::string name, const SensorBoss &x) {
     Logger::log(name + " accel", x.accel());
     Logger::log(name + " gyro", x.gyro());
+    Logger::log(name + " accel_pred", x.accel_pred());
+    Logger::log(name + " gyro_pred", x.gyro_pred());
 }
 
 #endif

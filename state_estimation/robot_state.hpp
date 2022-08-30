@@ -2,6 +2,7 @@
 TODO:
     stabilizeRotation characterize drift
     copy assignment operator
+    acceleration
 March 2022 blame Niraj*/
 #ifndef ROBOT_STATE_HPP
 #define ROBOT_STATE_HPP
@@ -10,6 +11,7 @@ using Eigen::MatrixXf, Eigen::VectorXf;
 typedef Eigen::VectorBlock<Eigen::VectorXf, 3> Block3f;
 
 const int N = 12;
+const Matrix3f DEFAULT_ROTATION {{1, 0, 0}, {0, 0, -1}, {0, 1, 0}};
 
 class RobotState {
     /* State Information for simplewalker.
@@ -22,7 +24,7 @@ class RobotState {
     Matrix3f R_, RT_;
     Vector3f R_cached_axis;  // the axis vector representation of R. 
     void updateRotationMatrix_(float delta_angle, const Vector3f &axis_normalized);
-    void stabilizeRotation_(void);
+    void setAxisFromR_(void);
 public:
     enum index {IDX_POS = 0, IDX_AXIS = 3, IDX_VEL = 6, IDX_ANGVEL = 9};
     VectorXf vect;

@@ -8,9 +8,8 @@ Can output:
     Can output to stdout or file
     
 TODO:
-    BUG: log to file
+    BUG: log to file causes crash
     BUG: not always the right width
-    can output to file
     Fancy macro or something so logging doesn't happen?
     Binary logger is child class?
     binary logger knows where data is
