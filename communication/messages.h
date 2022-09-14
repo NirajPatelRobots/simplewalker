@@ -3,7 +3,7 @@ TODO: values accessible in multiple ways. bitfields for errcode and command?
 */
 #ifndef SIMPLEWALKER_MESSAGES_H
 #define SIMPLEWALKER_MESSAGES_H
-#include <stdint.h>
+#include "walkertypes.h"
 
 //everything in SI units and radians unless stated otherwise
 

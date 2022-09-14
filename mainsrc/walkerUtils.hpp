@@ -15,6 +15,7 @@ TODO:
 #include <memory>
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include "walkertypes.h"
 using Eigen::Matrix3f, Eigen::Vector3f, std::cout, std::endl, std::string;
 using std::unique_ptr, std::shared_ptr, std::make_unique, std::make_shared;
 

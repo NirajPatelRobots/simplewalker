@@ -24,12 +24,12 @@ void StateEstimator::predict(void) {
     state_pred.angvel() = state.angvel();
     state_pred.calculate();
     cov_pred = motion_jac * cov * motion_jac.transpose() + motion_noise;
-    //set sens_pred and sens_jac from state_pred (sensor model)
+    //set sensor prediction and jacobian from state_pred (sensor model)
     sensors.predict(state_pred, state, dt);
 }
 
 void StateEstimator::correct(void) {
-    Eigen::Matrix<float, M, 1> innovation = sensors.data - sensors.prediction; //TODO experiment w allocation
+    Eigen::Matrix<float, M, 1> innovation = sensors.data_vect - sensors.prediction; //TODO experiment w allocation
     Eigen::Matrix<float, M, M> innovation_cov = sensors.jacobian * cov_pred * sensors.jacobian.transpose() + sensors.covariance;
     Eigen::Matrix<float, N, M> filter_gain = cov_pred * sensors.jacobian.transpose() * innovation_cov.inverse();
     Eigen::Matrix<float, N, N> cov_scale = Eigen::Matrix<float, N, N>::Identity() - filter_gain * sensors.jacobian;

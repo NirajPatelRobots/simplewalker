@@ -8,6 +8,7 @@ TODO:
     sensor bias/health estimate
     active covariance report
     data_is_valid()
+    incrementdata() takes new pointer as input
 */
 #ifndef SENSORBOSS_HPP
 #define SENSORBOSS_HPP
@@ -16,16 +17,17 @@ const int M = 6;
 
 class SensorBoss {
 protected:
-    Eigen::Vector<float, M> sens_pred;
+    Eigen::Vector<float, M> vect_pred;
     //Eigen::DiagonalMatrix<float, M> //TODO UNDERSTAND DIAGONAL
     MatrixXf cov;
     MatrixXf jac;
 public:
     const static size_t IDX_ACCEL, IDX_GYRO;
-    Eigen::Map<const VectorXf> data;
+    Eigen::Map<const VectorXf> data_vect;
     const Eigen::Vector<float, M> &prediction;
     const MatrixXf &covariance;
     const MatrixXf &jacobian;
+    const SensorData *raw_data, *data_pred;
 
     SensorBoss(const float *msgsensordata, float accel_stddev, float gyro_stddev);
     // predict() sets prediction and jacobian

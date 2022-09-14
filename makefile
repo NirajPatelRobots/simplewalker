@@ -1,6 +1,6 @@
 eigen = -I ../eigen-3.4.0
 rapidxml = -I ../rapidxml
-incLocal = -I./mainsrc -I./communication -I./state_estimation -I./test -I./physics -I./display
+incLocal = -I./mainsrc -I./communication -I./state_estimation -I./test -I./physics -I./display -I./sensors
 build = ./build/
 CFLAGS = -std=c++17 -Wall -Wextra -O
 objnames = state_estimation.o robot_state.o sensorBoss.o logger.o leg_kinematics.o walkerUtils.o
@@ -10,7 +10,7 @@ simplewalker: $(build)simplewalker.o $(build)maincomp_comm.o $(objects)
 	g++ $(incLocal) $(rapidxml) -o $(build)$@ $^ -lwiringPi -lpthread
 
 test_localization: $(build)test_localization.o $(objects)
-	g++ -I/state_estimation -I/mainsrc -I/physics $(eigen) $^ -o $(build)$@
+	g++ -I/state_estimation -I/mainsrc -I/physics -I/sensors $(eigen) $^ -o $(build)$@
 
 unittests: $(build)unittests.o $(objects)
 	g++ $(incLocal) $^ -o $(build)$@

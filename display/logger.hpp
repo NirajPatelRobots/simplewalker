@@ -8,8 +8,8 @@ Can output:
     Can output to stdout or file
     
 TODO:
-    BUG: log to file causes crash
     BUG: not always the right width
+    Fix error if print() not called again before more logs
     Fancy macro or something so logging doesn't happen?
     Binary logger is child class?
     binary logger knows where data is
@@ -62,11 +62,14 @@ protected:
     std::vector<unsigned> fieldEndIndexes;
     void make_field(string name);
     void print_line(void);
+    void write_file_line_text(string text);
+    void finish_log_field(void);
 public:
     Logger(string filename = "", bool log_newline = false);  //default file is stdout
-    ~Logger();
     void log(string name, float x);
+    void log(string name, const float x[], int length);
     void log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x);
+    void log(string name, const SensorData &x);
     void log(const Logtimes &logtimes);
     void log(string name, const WalkerSettings &settings);
     void log(string groupname, string name, const WalkerSettings &settings);

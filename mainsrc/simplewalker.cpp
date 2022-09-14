@@ -2,6 +2,7 @@
 
 TODO:
     BUG: Sometimes, correlated with receiving message late first, state estimation takes 30 ms. 
+    organize file logged data
 */
 #include "maincomp_comm.hpp"
 #include "state_estimation.hpp"
@@ -62,7 +63,7 @@ int main() {
     bool ERR_msg_late = false;
     int num_msgs = 0;
     shared_ptr<ConvenientLogger> logger{std::static_pointer_cast<ConvenientLogger>(stdlogger)};
-    //ConvenientLogger savelog("data/statelog.log"); //TODO BUG
+    ConvenientLogger savelog("data/statelog.log");
     Logtimes logtimes;
     
     comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
@@ -110,10 +111,11 @@ int main() {
         if (settings.b("Logger", "log_state")) logger->obj_log(EKF->state);
         if (settings.b("Logger", "log_R")) logger->log("R", state.R);
         if (settings.b("Logger", "log_state_pred")) logger->obj_log("Predicted ", EKF->state_pred);
-        //savelog.obj_log(EKF->state);
-        //savelog.obj_log(*sensors);
+        savelog.log(logtimes);
+        savelog.obj_log(EKF->state);
+        savelog.obj_log(*sensors);
+        savelog.print(settings.f("Logger", "skip_every"));
         if (logger->print(settings.f("Logger", "skip_every"))) {
-            //savelog.print();
             set_logtime(logtimes.log);
         }
 

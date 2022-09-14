@@ -15,11 +15,8 @@ Logger::Logger(string filename, bool log_newline)
         if (outFile.is_open()) {
             savetofile = true;
         }
+        outFile.close();
     }
-}
-
-Logger::~Logger() {
-    outFile.close();
 }
 
 void Logger::make_field(string name) {
@@ -30,6 +27,13 @@ void Logger::make_field(string name) {
     }
 }
 
+void Logger::finish_log_field(void) {
+    while (outstr.str().size() < fieldEndIndexes.at(lognum)) {
+        outstr << " ";
+    }
+    lognum++;
+}
+
 void Logger::log(string name, float x) {
     if (disable) return;
     //outstr += std::format("{%9f} |, ", x);
@@ -37,10 +41,22 @@ void Logger::log(string name, float x) {
     if (!headerSent) {
         make_field(name);
     }
-    while (outstr.str().size() < fieldEndIndexes.at(lognum)) {
-        outstr << " ";
+    finish_log_field();
+}
+
+void Logger::log(string name, const float x[], int length) {
+    if (disable) return;
+    outstr << "[ ";
+    for (long i = 0; i < length; ++i) {
+        outstr << std::setw(W) << x[i] << " ";
     }
-    lognum++;
+    outstr << "], ";
+    if (!headerSent) {
+        std::stringstream namestr{};
+        namestr << name << " [" << length << "]";
+        make_field(namestr.str());
+    }
+    finish_log_field();
 }
 
 void Logger::log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x) {
@@ -60,10 +76,12 @@ void Logger::log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x) {
         namestr << name << " (" << x.rows() << "x" << x.cols() << ")";
         make_field(namestr.str());
     }
-    while (outstr.str().size() < fieldEndIndexes.at(lognum)) {
-        outstr << " ";
-    }
-    lognum++;
+    finish_log_field();
+}
+
+void Logger::log(string name, const SensorData &x) {
+    log(name + "accel", x.accel, 3);
+    log(name + "gyro", x.gyro, 3);
 }
 
 void Logger::log(const Logtimes &logtimes) {
@@ -99,17 +117,25 @@ bool Logger::print(unsigned skipevery) {
     return retval;
 }
 
+void Logger::write_file_line_text(string text) {
+    outFile.open(filename, std::ios::app);
+    if (outFile.is_open()) {
+        outFile << text << std::endl;
+    }
+    outFile.close();
+}
+
 void Logger::print_line(void) {
     if (!headerSent) {
         if (savetofile) {
-            outFile << header << std::endl;
+            write_file_line_text(header);
         } else {
             std::cout << header << std::endl;
         }
         headerSent = true;
     }
     if (savetofile) {
-        outFile << outstr.str() << std::endl;
+        write_file_line_text(outstr.str());
     } else {
         std::cout << outstr.str() << "\r";
         if (newline) {std::cout << "\n";}

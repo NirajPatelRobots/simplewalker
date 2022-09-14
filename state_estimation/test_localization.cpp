@@ -9,6 +9,7 @@ March 2022 */
 #include "messages.h"
 #include <chrono>
 #include <fstream>
+#include <random>
 namespace chrono = std::chrono;
 
 class LocalizationTester {
@@ -20,11 +21,14 @@ public:
     RobotState &state;
     RobotState &state_pred;
     ConvenientLogger logger;
+    std::default_random_engine random_generator;
+    std::normal_distribution<float> normal_distribution;
 
     string name;
     Eigen::Map<Vector3f> accel_sensor, gyro_sensor;
     chrono::nanoseconds prediction_time, correction_time;
     int step;
+    float accel_noise_mag, gyro_noise_mag;
 
     LocalizationTester(const string testname) :
         walkerSettings("settings/settings.xml"),
@@ -38,6 +42,7 @@ public:
                                walkerSettings.f("State_Estimation", "angvel_stddev"))),
         state(EKF->state), state_pred(EKF->state_pred),
         logger("data/localization_test_" + testname + ".log"),
+        random_generator(0), normal_distribution(0, 1),
         name(testname), accel_sensor(controlstate->accel), gyro_sensor(controlstate->gyro),
         prediction_time(0), correction_time(0), step(0) {
         for (unsigned i = 0; i < sizeof(ControlStateMsg); ++i) {
@@ -59,7 +64,8 @@ public:
         logger.log("timestamp", timestamp);
         logger.obj_log("state", state);
         logger.obj_log("state_pred", state_pred);
-        logger.obj_log("sensors", *sensors);
+        logger.log("sensors", *sensors->raw_data);
+        logger.log("sensors_pred", *sensors->data_pred);
         logger.log("R", state.R);
         logger.print();
     }
@@ -69,6 +75,16 @@ public:
             << correction_time.count() / step <<" ns"<< endl << "Final state: "<< state.vect.transpose()<< endl
             << state.R << endl;
     }
+
+    void set_sensor_with_noise(const Vector3f &accel_clean, const Vector3f &gyro_clean) {
+        accel_sensor = accel_clean;
+        gyro_sensor = gyro_clean;
+        for (int i = 0; i < 3; ++i) {
+            accel_sensor(i) += accel_noise_mag / sqrtf(3) * normal_distribution(random_generator);
+            gyro_sensor(i) += gyro_noise_mag / sqrtf(3) * normal_distribution(random_generator);
+        }
+    }
+
 };
 
 
@@ -79,14 +95,17 @@ int test_localization_stationary(float duration, float accel_noise, float gyro_n
     unique_ptr<LocalizationTester> tester(new LocalizationTester("stationary"));
     RobotState &state = tester->state;
     float timestep = tester->EKF->dt;
-    tester->accel_sensor = DEFAULT_ROTATION.transpose() * IMU_GRAVITY;
-    cout<<"Simulating staying still. Start at "<<state.vect.transpose()<<endl<<state.R<<endl;
+    tester->accel_noise_mag = accel_noise;
+    tester->gyro_noise_mag = gyro_noise;
+    Vector3f accel_sensor_true = DEFAULT_ROTATION.transpose() * IMU_GRAVITY;
+    cout<<"Simulating staying still for "<<duration<<" s. Start at "<<state.vect.transpose()<<endl<<state.R<<endl;
+    cout<<"Accel noise: " << accel_noise << " gyro noise: " << gyro_noise << endl;
 
     int num_steps = static_cast<int>(duration / timestep);
 
     for (int i = 0; i < num_steps; i++) {
-        // TODO noise
         tester->log_step(i * timestep);
+        tester->set_sensor_with_noise(accel_sensor_true, Vector3f::Zero());
         tester->do_state_estimation();
     }
     tester->print_results();
@@ -135,7 +154,9 @@ int main() {
     float wobble_mag = 0.0;
     float wobble_freq_scale = 3.0;
     int revolutions = 3;
-    test_localization_stationary(5.0, 0.0, 0.0);
+    float accel_noise = 0.1;
+    float gyro_noise = 1e-4;
+    test_localization_stationary(10.0, accel_noise, gyro_noise);
     test_localization_orbit(path_rad, path_freq, wobble_mag, wobble_freq_scale, revolutions);
     cout<<"Done Testing Localization"<<endl;
     return 0;
