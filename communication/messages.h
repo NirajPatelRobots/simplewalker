@@ -44,6 +44,12 @@ struct ControlStateMsg { // sends current motor control and sensor state from th
 };
 const uint16_t ControlStateMsgID = 0x0C01;
 
+struct ControlStateMsg_sns {
+    uint16_t ID;
+    uint16_t errcode;
+    struct SensorData sensor_data;
+};
+
 struct RobotStateMsg {
     uint16_t ID;
     uint16_t errcode;

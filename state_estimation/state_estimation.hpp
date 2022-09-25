@@ -16,15 +16,13 @@ class StateEstimator {
     MatrixXf sens_cov; //sensor covariance
     MatrixXf sens_jac; //d(sensor)/d(state)
     MatrixXf motion_jac; //d(new state)/d(state)
-    SensorBoss &sensors;
 public:
-    StateEstimator(float timestep, SensorBoss &sensorBoss,
-                   float pos_stddev, float axis_stddev, float vel_stddev, float angvel_stddev);
+    StateEstimator(float timestep, float pos_stddev, float axis_stddev, float vel_stddev, float angvel_stddev);
     RobotState state, state_pred;
     const MatrixXf& state_covariance;
     const float dt;
     void predict(void);
-    void correct(void);
+    void correct(const SensorBoss &sensors);
 };
 
 #endif

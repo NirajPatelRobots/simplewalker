@@ -1,9 +1,9 @@
 #include "state_estimation.hpp"
 
 
-StateEstimator::StateEstimator(float timestep, SensorBoss &sensorBoss,
+StateEstimator::StateEstimator(float timestep,
                                 float pos_stddev, float axis_stddev, float vel_stddev, float angvel_stddev)
-    : sensors(sensorBoss), state(), state_pred(), state_covariance(cov), dt(timestep) {
+    : state(), state_pred(), state_covariance(cov), dt(timestep) {
     cov = 0.01 * MatrixXf::Identity(N, N);
     motion_noise = MatrixXf::Identity(N, N) * dt;
     motion_noise.block<3,3>(RobotState::IDX_POS, RobotState::IDX_POS) *= pow(pos_stddev, 2);
@@ -24,12 +24,10 @@ void StateEstimator::predict(void) {
     state_pred.angvel() = state.angvel();
     state_pred.calculate();
     cov_pred = motion_jac * cov * motion_jac.transpose() + motion_noise;
-    //set sensor prediction and jacobian from state_pred (sensor model)
-    sensors.predict(state_pred, state, dt);
 }
 
-void StateEstimator::correct(void) {
-    Eigen::Matrix<float, M, 1> innovation = sensors.data_vect - sensors.prediction; //TODO experiment w allocation
+void StateEstimator::correct(const SensorBoss &sensors) {
+    SensorVector innovation = sensors.data_vect - sensors.prediction; // TODO experiment w allocation dynamic matrices
     Eigen::Matrix<float, M, M> innovation_cov = sensors.jacobian * cov_pred * sensors.jacobian.transpose() + sensors.covariance;
     Eigen::Matrix<float, N, M> filter_gain = cov_pred * sensors.jacobian.transpose() * innovation_cov.inverse();
     Eigen::Matrix<float, N, N> cov_scale = Eigen::Matrix<float, N, N>::Identity() - filter_gain * sensors.jacobian;

@@ -80,6 +80,7 @@ void Logger::log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x) {
 }
 
 void Logger::log(string name, const SensorData &x) {
+    log(name + "utime", x.timestamp_us);
     log(name + "accel", x.accel, 3);
     log(name + "gyro", x.gyro, 3);
 }
@@ -89,6 +90,7 @@ void Logger::log(const Logtimes &logtimes) {
     log("correct", logtimes.correct);
     log("comm_rec", logtimes.commreceive);
     log("comm_send", logtimes.commsend);
+    log("sensorboss", logtimes.sensorboss);
     log("log", logtimes.log);
     log("sleep", logtimes.sleep);
 }
@@ -107,7 +109,7 @@ bool Logger::print(unsigned skipevery) {
         print_line();
         retval = true;
     }
-    if (skipcntr++ > skipevery) {
+    if (++skipcntr > skipevery) {
         skipcntr = 0;
         disable = false;
     } else {
@@ -187,26 +189,48 @@ const char *WalkerSettings::cstr(const char * const fieldname) const {
 }
 
 float WalkerSettings::f(const char * const fieldname) const {
+    if (!settings_node) return 0.0;
     return std::atof( cstr(fieldname));
 }
 float WalkerSettings::f(const char * const groupname, const char * const fieldname) const {
+    if (!settings_node) return 0.0;
     return std::atof( cstr(groupname, fieldname));
 }
 
 int WalkerSettings::i(const char * const fieldname) const {
+    if (!settings_node) return 0;
     return std::atoi( cstr(fieldname));
 }
 int WalkerSettings::i(const char * const groupname, const char * const fieldname) const {
+    if (!settings_node) return 0;
     return std::atoi( cstr(groupname, fieldname));
 }
 
 bool WalkerSettings::b(const char * const fieldname) const {
-    const char * value = cstr(fieldname);
-    return (value && std::strlen(value) > 0 && string("false").compare(value) != 0 && string("0").compare(value) != 0);
+    const char * text = cstr(fieldname);
+    return (text && std::strlen(text) > 0 && string("false").compare(text) != 0 && string("0").compare(text) != 0);
 }
 bool WalkerSettings::b(const char * const groupname, const char * const fieldname) const {
-    const char * value = cstr(groupname, fieldname);
-    return (value && std::strlen(value) > 0 && string("false").compare(value) != 0 && string("0").compare(value) != 0);
+    const char * text = cstr(groupname, fieldname);
+    return (text && std::strlen(text) > 0 && string("false").compare(text) != 0 && string("0").compare(text) != 0);
+}
+
+std::vector<float> strtovf(const char * text) {
+    std::vector<float> out;
+    if (!text) {return out;}
+    char *after;
+    while (std::strlen(text) > 0) {
+        out.push_back(std::strtof(text, &after));
+        text = after;
+    }
+    return out;
+}
+
+std::vector<float> WalkerSettings::vf(const char * const fieldname) const {
+    return strtovf(cstr(fieldname));
+}
+std::vector<float> WalkerSettings::vf(const char * const groupname, const char * const fieldname) const {
+    return strtovf(cstr(groupname, fieldname));
 }
 
 

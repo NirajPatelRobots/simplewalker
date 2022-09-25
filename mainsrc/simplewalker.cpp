@@ -23,12 +23,12 @@ void set_state_msg(RobotStateMsg *msg, const RobotState &state, chrono::duration
     }
 }
 
-void start_control_communication(Communicator &comm, ControlStateMsg *controlstate, RobotStateMsg *sendstate) {
+void start_control_communication(Communicator &comm, ControlStateMsg_sns *controlstate, RobotStateMsg *sendstate) {
     controlstate->ID = 0;
     sendstate->ID = RobotStateMsgID;
     sendstate->errcode = 0;
     for (int i = 0; i < 6; ++i) {sendstate->leg_pos[i] = 0; sendstate->leg_vel[i] = 0;}
-    std::cout<<"Waiting for controller messages..."<<std::endl;
+    std::cout<<"Waiting for controller messages...\r";
     int num_msgs = 0;
     while (num_msgs < 3) {
         comm.handle_messages();
@@ -40,18 +40,19 @@ void start_control_communication(Communicator &comm, ControlStateMsg *controlsta
 int main() {
     WalkerSettings settings("settings/settings.xml"); //settings
     
-    unique_ptr<ControlStateMsg> controlstate(new ControlStateMsg);
+    unique_ptr<ControlStateMsg_sns> controlstate(new ControlStateMsg_sns);
     unique_ptr<RobotStateMsg> sendstate(new RobotStateMsg);
 
     unique_ptr<Communicator> comm(new Communicator(ControlStateMsgID, sizeof(ControlStateMsg),
                       ControlTargetMsgID, sizeof(ControlTargetMsg)));
 
-    unique_ptr<SensorBoss> sensors(new SensorBoss(controlstate->accel,
-                        settings.f("SensorBoss", "accel_stddev"), settings.f("SensorBoss", "gyro_stddev")));
+    unique_ptr<SensorBoss> sensors(new SensorBoss(settings.f("SensorBoss", "accel_stddev"),
+                                                  settings.f("SensorBoss", "gyro_stddev")));
+    sensors->set_bias(settings.vf("SensorBoss", "accel_bias"), settings.vf("SensorBoss", "gyro_bias"));
     float timestep = settings.f("General", "main_timestep");
     const bool prediction_only = settings.b("State_Estimation", "prediction_only");
     if (prediction_only) std::cout<<"\tPrediction Only, Ignoring Sensors"<<std::endl;
-    unique_ptr<StateEstimator> EKF(new StateEstimator(timestep, *sensors, 
+    unique_ptr<StateEstimator> EKF(new StateEstimator(timestep,
                                    settings.f("State_Estimation", "pos_stddev"), 
                                    settings.f("State_Estimation", "axis_stddev"),
                                    settings.f("State_Estimation", "vel_stddev"),
@@ -71,7 +72,7 @@ int main() {
     if (settings.b("General", "state_send")) comm->try_connect();
     start_control_communication(*comm, controlstate.get(), sendstate.get());
 
-    std::cout<<"\tStart main loop, T = "<< looptime.count() << " ms" << std::endl;
+    std::cout<<"    Start main loop, T = "<< looptime.count() << " ms     " << std::endl;
     chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
     chrono::time_point<chrono::steady_clock> loopstart = timestart + looptime;
     std::this_thread::sleep_until(loopstart);
@@ -93,21 +94,27 @@ int main() {
             ERR_msg_late = false;
         }
         set_logtime(logtimes.commreceive);
-        set_state_msg(sendstate.get(), EKF->state, loopstart - timestart);
-        comm->broadcast_message(settings.f("General", "broadcast_rate_div"));
-        set_logtime(logtimes.commsend);
 
         EKF->predict();
         set_logtime(logtimes.predict);
+        sensors->update_sensors(&controlstate->sensor_data);
+        sensors->predict(EKF->state_pred, state, EKF->dt);
+        set_logtime(logtimes.sensorboss);
         if (prediction_only) {
             state.vect = EKF->state_pred.vect;
             state.calculate();
         } else {
-            EKF->correct();
+            EKF->correct(*sensors);
         }
         set_logtime(logtimes.correct);
+        set_state_msg(sendstate.get(), EKF->state, loopstart - timestart);
+        comm->broadcast_message(settings.f("General", "broadcast_rate_div"));
+        set_logtime(logtimes.commsend);
+
         if (settings.b("Logger", "log_times")) logger->log(logtimes);
-        if (settings.b("Logger", "log_sensor")) logger->obj_log(*sensors);
+        if (settings.b("Logger", "log_controlstate")) logger->log("controlstate", (float*)controlstate.get(), sizeof(ControlStateMsg) / sizeof(float));
+        if (settings.b("Logger", "log_sensor")) logger->log(sensors->data);
+        if (settings.b("Logger", "log_sensor_pred")) logger->log(sensors->data_pred);
         if (settings.b("Logger", "log_state")) logger->obj_log(EKF->state);
         if (settings.b("Logger", "log_R")) logger->log("R", state.R);
         if (settings.b("Logger", "log_state_pred")) logger->obj_log("Predicted ", EKF->state_pred);

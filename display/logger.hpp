@@ -14,7 +14,7 @@ TODO:
     Binary logger is child class?
     binary logger knows where data is
     multiple lines to text file
-    settings fieldname with no groupname
+    settings fieldname with no groupname finds lowest level fieldname
     add/remove prefix from logger name for surrounding code blocks so we can tell logs come from that block
 */
 #ifndef SIMPLEWALKER_LOGGER
@@ -30,7 +30,7 @@ TODO:
 
 class WalkerSettings {
     rapidxml::xml_document<> doc;
-    rapidxml::xml_node<> *settings_node = NULL;
+    rapidxml::xml_node<> *settings_node = nullptr;
     std::vector<char> text;
 public:
     WalkerSettings(string filename);
@@ -42,11 +42,13 @@ public:
     int i(const char * const groupname, const char * const fieldname) const;
     bool b(const char * const fieldname) const;
     bool b(const char * const groupname, const char * const fieldname) const;
+    std::vector<float> vf(const char * const fieldname) const;
+    std::vector<float> vf(const char * const groupname, const char * const fieldname) const;
 };
 
 
 struct Logtimes {
-    float predict, correct, commreceive, commsend, log, sleep;
+    float predict, correct, commreceive, commsend, sensorboss, log, sleep;
 };
 
 void start_logtiming(std::chrono::time_point<std::chrono::steady_clock> time); //starts timing, logtime is relative to this
@@ -70,6 +72,7 @@ public:
     void log(string name, const float x[], int length);
     void log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x);
     void log(string name, const SensorData &x);
+    void log(const SensorData &x) {log("", x);}
     void log(const Logtimes &logtimes);
     void log(string name, const WalkerSettings &settings);
     void log(string groupname, string name, const WalkerSettings &settings);
