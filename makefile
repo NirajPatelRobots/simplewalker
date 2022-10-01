@@ -9,14 +9,17 @@ objects := $(addprefix $(build),$(objnames))
 simplewalker: $(build)simplewalker.o $(build)maincomp_comm.o $(objects)
 	g++ $(incLocal) $(rapidxml) -o $(build)$@ $^ -lwiringPi -lpthread
 
+collect_sensor_cal_data: $(build)collect_sensor_cal_data.o $(build)maincomp_comm.o $(objects)
+	g++  -I/mainsrc -I./display $(rapidxml) -o $(build)$@ $^ -lwiringPi
+
 test_localization: $(build)test_localization.o $(objects)
 	g++ -I/state_estimation -I/mainsrc -I/physics -I/sensors $(eigen) $^ -o $(build)$@
 
-unittests: $(build)unittests.o $(objects)
+unittests: $(build)unittests.o $(build)test_utils.o $(objects)
 	g++ $(incLocal) $^ -o $(build)$@
 
 $(build)%.o : ./*/%.cpp
 	g++ -c $(incLocal) $(eigen) $(rapidxml) $^  $(CFLAGS) -o $@
 
 clean : 
-	rm -f $(build)*.o $(build)simplewalker $(build)test_localization $(build)unittests
+	rm -f $(build)*.o $(build)simplewalker $(build)test_localization $(build)unittests $(build)collect_sensor_cal_data

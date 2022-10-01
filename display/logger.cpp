@@ -46,14 +46,14 @@ void Logger::log(string name, float x) {
 
 void Logger::log(string name, const float x[], int length) {
     if (disable) return;
-    outstr << "[ ";
+    outstr << "( ";
     for (long i = 0; i < length; ++i) {
         outstr << std::setw(W) << x[i] << " ";
     }
-    outstr << "], ";
+    outstr << "), ";
     if (!headerSent) {
         std::stringstream namestr{};
-        namestr << name << " [" << length << "]";
+        namestr << name << " (" << length << ")";
         make_field(namestr.str());
     }
     finish_log_field();

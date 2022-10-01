@@ -26,7 +26,7 @@ class AnalyzedIMULog:
 
 
 def analyze_stationary_imu_log(time: np.ndarray, data: np.array, name: str = None) -> AnalyzedIMULog:
-    if time.size == 0:
+    if data.size == 0:
         raise IndexError
     result = AnalyzedIMULog(duration=np.max(time))
     if name is not None:
@@ -72,14 +72,17 @@ class SensorBiasCalculator:
 
     def analyze_log(self, log_name: str):
         try:
-            log = logReader.LoadedLog("data/" + log_name + ".log", ["timestamp"], [self.sensor_name])
-            self.analyzed.append(analyze_stationary_imu_log(log.timestamp, log.fields[sensor_name],
-                                                            log_name + '_' + self.sensor_name))
-        except ValueError:
-            log = logReader.LoadedLog("data/" + log_name + ".log", [], [self.sensor_name])
-            time = np.arange(0, stop=log.fields[sensor_name].shape[1])
-            self.analyzed.append(analyze_stationary_imu_log(time, log.fields[sensor_name],
-                                                            log_name + '.' + self.sensor_name))
+            log = logReader.LoadedLog("data/" + log_name + ".log", ["timestamp", self.sensor_name])
+            time = log.timestamp
+        except KeyError:
+            try:
+                log = logReader.LoadedLog("data/" + log_name + ".log", ["utime", self.sensor_name])
+                time = log.utime * 1e-6
+            except KeyError:
+                log = logReader.LoadedLog("data/" + log_name + ".log", [self.sensor_name])
+                time = np.arange(0, stop=log.fields[sensor_name].shape[1])
+        self.analyzed.append(analyze_stationary_imu_log(time, log.fields[sensor_name],
+                                                        log_name + '.' + self.sensor_name))
 
     def print_logs(self):
         print(len(self.analyzed), " analyzed logs:")
