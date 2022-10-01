@@ -1,8 +1,6 @@
 /* Code for testing state estimator
 TODO:
-    read in test parameters
-    use scalarStatistic
-    tests are classes inherited from LocalizationTester
+    test_localization_orbit
 March 2022 */
 #include "state_estimation.hpp"
 #include "convenientLogger.hpp"
@@ -26,7 +24,7 @@ public:
 
     string name;
     Eigen::Map<Vector3f> accel_sensor, gyro_sensor;
-    chrono::nanoseconds prediction_time, correction_time;
+    scalar_statistic prediction_time, correction_time;
     int step;
     float accel_noise_mag, gyro_noise_mag;
 
@@ -44,7 +42,7 @@ public:
         logger("data/localization_test_" + testname + ".log"),
         random_generator(0), normal_distribution(0, 1),
         name(testname), accel_sensor(sensor_data->accel), gyro_sensor(sensor_data->gyro),
-        prediction_time(0), correction_time(0), step(0) {
+        prediction_time(), correction_time(), step(0) {
         for (unsigned i = 0; i < sizeof(ControlStateMsg); ++i) {
             ((char *)sensor_data.get())[i] = 0;  // TODO ugly
         }
@@ -56,9 +54,9 @@ public:
         EKF->predict();
         sensors->predict(state_pred, state, EKF->dt);
         chrono::time_point<chrono::steady_clock> timebetween = chrono::steady_clock::now();
-        prediction_time = prediction_time + timebetween - timestart;
+        prediction_time.update(chrono::nanoseconds(timebetween - timestart).count());
         EKF->correct(*sensors);
-        correction_time += chrono::steady_clock::now() - timebetween;
+        correction_time.update(chrono::nanoseconds(chrono::steady_clock::now() - timebetween).count());
     }
 
     void log_step(float timestamp) {
@@ -73,10 +71,9 @@ public:
     }
 
     void print_results(void) {
-        int avg_pred_time = (step == 0) ? 0 : prediction_time.count() / step;
-        int avg_corr_time = (step == 0) ? 0 : correction_time.count() / step;
-        cout<< step <<" steps, prediction time: "<< avg_pred_time <<" ns, correction time: "
-            << avg_corr_time <<" ns"<< endl << "Final state: "<< state.vect.transpose()<< endl
+        cout<< step <<" steps, prediction time: "<< prediction_time.mean << " ns, std_dev: " << prediction_time.std_dev
+            << endl << "correction time: " << correction_time.mean <<" ns, std_dev: " << correction_time.std_dev << endl
+            << "Final state: "<< state.vect.transpose()<< endl
             << state.R << endl; 
     }
 
@@ -93,37 +90,37 @@ public:
 };
 
 
-int test_localization_stationary(float duration, float accel_noise, float gyro_noise) {
-    /*duration [s] how long simulated stationary for
-    accel_noise [m/s^2] std dev of accel noise
-    gyro_noise [m/s^2] std dev of gyro noise*/
-    unique_ptr<LocalizationTester> tester(make_unique<LocalizationTester>("stationary"));
-    RobotState &state = tester->state;
-    float timestep = tester->EKF->dt;
-    tester->accel_noise_mag = accel_noise;
-    tester->gyro_noise_mag = gyro_noise;
-    Vector3f accel_sensor_true = DEFAULT_ROTATION.transpose() * IMU_GRAVITY;
-    tester->log_step(-1.0);
-    cout<<"Simulating staying still for "<<duration<<" s. Start at "<<state.vect.transpose()<<endl;
-    cout<<"Accel noise: " << accel_noise << " [m/s^2] gyro noise: " << gyro_noise << " [rad/s]" << endl;
+class TestLocalization_Stationary : public LocalizationTester {
+public:
+    TestLocalization_Stationary(void) : LocalizationTester("stationary") {};
+    int run(const WalkerSettings &testSettings) {
+        if (testSettings.b("stationary", "skip")) return -1;
+        float duration = testSettings.f("stationary", "duration");
 
-    int num_steps = static_cast<int>(duration / timestep);
+        accel_noise_mag = testSettings.f("stationary", "accel_noise");
+        gyro_noise_mag = testSettings.f("stationary", "gyro_noise");
+        Vector3f accel_sensor_true = DEFAULT_ROTATION.transpose() * IMU_GRAVITY;
+        log_step(-1.0);
+        cout<<"Simulating staying still for "<<duration<<" s. Start at "<<state.vect.transpose()<<endl;
+        cout<<"Accel noise: " << accel_noise_mag << " [m/s^2] gyro noise: " << gyro_noise_mag << " [rad/s]" << endl;
 
-    for (int i = 0; i < num_steps; i++) {
-        tester->set_sensors_with_noise(accel_sensor_true, Vector3f::Zero(), i * timestep);
-        tester->do_state_estimation();
-        tester->log_step(i * timestep);
+        int num_steps = static_cast<int>(duration / EKF->dt);
+        for (int i = 0; i < num_steps; i++) {
+            set_sensors_with_noise(accel_sensor_true, Vector3f::Zero(), i * EKF->dt);
+            do_state_estimation();
+            log_step(i * EKF->dt);
+        }
+        print_results();
+        return 0;
     }
-    tester->print_results();
-    return 0;
-}
+};
 
-int test_localization_orbit(float path_rad, float path_freq, float wobble_mag, float wobble_freq_scale, int revolutions) {
-    /*path_rad [m],    circular path radius
-    path_freq [Hz],    path revolutions per second
-    wobble_mag [rad],  magnitude of alpha-beta wobble
-    wobble_freq_scale  frequence of wobble compared to path_freq 
-    revolutions        number of times to orbit
+int test_localization_orbit(const WalkerSettings &testSettings) {
+    if (testSettings.b("orbit", "skip")) return -1;
+    /*float path_rad = testSettings.f("orbit", "path_rad");
+    float path_freq = testSettings.f("orbit", "path_freq");
+    int revolutions = testSettings.i("orbit", "num_orbits")
+    float wobble_mag = testSettings.f("orbit", "wobble_mag");
 
     unique_ptr<LocalizationTester> tester(new LocalizationTester("Orbit"));
     float timestep = tester->EKF->dt;
@@ -155,15 +152,13 @@ int test_localization_orbit(float path_rad, float path_freq, float wobble_mag, f
 }
 
 int main() {
-    float path_rad = 0.03;
-    float path_freq = 1.0;
-    float wobble_mag = 0.0;
-    float wobble_freq_scale = 3.0;
-    int revolutions = 3;
-    float accel_noise = 0.1;
-    float gyro_noise = 1e-4;
-    test_localization_stationary(10.0, accel_noise, gyro_noise);
-    test_localization_orbit(path_rad, path_freq, wobble_mag, wobble_freq_scale, revolutions);
+    const WalkerSettings testSettings("settings/localize_test_settings.xml");
+    //test_localization_stationary(testSettings);
+    TestLocalization_Stationary *test_stationary = new TestLocalization_Stationary();
+    test_stationary->run(testSettings);
+    delete test_stationary;
+
+    test_localization_orbit(testSettings);
     cout<<"Done Testing Localization"<<endl;
     return 0;
 }
