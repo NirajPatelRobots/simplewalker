@@ -2,6 +2,7 @@
 TODO:
     combine start_control_communication with code in simplewalker.cpp, in communication message box
     sleep so don't overwhelm processor?
+    delete old calibration files so we don't get confused
 */
 #include "walkerUtils.hpp"
 #include "logger.hpp"
@@ -31,6 +32,7 @@ int main() {
     while (user_input != "done") {
         savelog = Logger("data/stationary_calibration_" + std::to_string(log_num) + ".log");
         int num_data_got = 0;
+        do {comm->handle_messages();} while (comm->read_message((char *)controlstate.get()) > 0); // flush incoming messages
         while (num_data_got < NUM_DATA_NEEDED) {
             comm->handle_messages();
             if (comm->read_message((char *)controlstate.get()) >= 0) {

@@ -29,10 +29,10 @@ class TestLoadedLog(unittest.TestCase):
                 for column_name in column_names:
                     vector_length = column_names[column_name]
                     if vector_length > 1:
-                        inFile.write("[")
+                        inFile.write("(")
                     inFile.write("0.0 " * vector_length)
                     if vector_length > 1:
-                        inFile.write("]")
+                        inFile.write(")")
                     inFile.write(",")
                 inFile.write("\n")
 

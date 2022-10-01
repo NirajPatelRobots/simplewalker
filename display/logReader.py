@@ -2,6 +2,7 @@
 September 2022
 TODO:
     way to return one at a time (generator?)
+    detect gaps in time
 """
 
 import numpy as np
@@ -22,7 +23,7 @@ class LoadedLog:
 
     @staticmethod
     def logged_str_to_array(text: str, shape: Tuple[int]) -> np.array:
-        return np.array(text.replace('[', '').replace(']', '').split(), dtype=float).reshape(shape)
+        return np.array(text.replace('(', '').replace(')', '').split(), dtype=float).reshape(shape)
 
     @staticmethod
     def parse_log_fields(filename: str) -> Dict[str, Tuple[int]]:
