@@ -11,6 +11,7 @@ TODO:
     BUG: not always the right width
     Fix error if print() not called again before more logs
     Fancy macro or something so logging doesn't happen?
+    logging to file is pretty slow
     Binary logger is child class?
     binary logger knows where data is
     multiple lines to text file
@@ -79,6 +80,7 @@ public:
 
     bool print(unsigned skipevery = 0);
     bool dontprint(unsigned skipevery = 0); //removes logging
+    string get_filename(void) {return filename;}
 };
 
 extern shared_ptr<Logger> stdlogger;

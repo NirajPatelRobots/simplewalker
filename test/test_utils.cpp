@@ -1,14 +1,30 @@
 #include "test_utils.hpp"
 namespace chrono = std::chrono;
 
-JacobianTest::JacobianTest(int jacobian_samples, int differential_samples, float max_differential_change)
+JacobianTest::JacobianTest(void)
     : jac_calc_func(NULL), true_ref_function(NULL),
-    num_Jac_samples(jacobian_samples), num_diff_samples(differential_samples), max_diff(max_differential_change),
-    failure_percent_thresh(0.05), input_mean(Vector3f::Zero()), input_max_change(Vector3f::Constant(M_PI)),
-    jacCalcTime_us(jacCalcTime_us_), refCalcTime_us(refCalcTime_us_),
+    num_Jac_samples(100), num_diff_samples(100), max_diff(0.01),
+    failure_frac_thresh(0.05), input_mean(Vector3f::Zero()), input_max_change(Vector3f::Constant(M_PI)),
+    logger(), jacCalcTime_us(jacCalcTime_us_), refCalcTime_us(refCalcTime_us_),
     output_error(output_error_), error_mag(error_mag_), error_angle(error_angle_)
     {
     initResults();
+}
+
+void JacobianTest::load_settings(const WalkerSettings &settings, string name) {
+    const char * groupname = name.c_str();
+    max_diff = settings.f(groupname, "max_diff");
+    string file_tag = settings.cstr(groupname, "log_file_tag");
+    if (file_tag.length() > 0) {
+        logger = Logger("data/jacobian_test_" + file_tag + ".log"); }
+    else
+        logger = Logger();
+    num_Jac_samples = settings.i(groupname, "num_Jac_samples");
+    num_diff_samples = settings.i(groupname, "num_diff_samples");
+    std::vector<float> input_mean_vec = settings.vf(groupname, "input_mean");
+    if (input_mean_vec.size() == 3)     input_mean = Eigen::Map<Array3f>(input_mean_vec.data());
+    input_max_change = Array3f::Constant(settings.f(groupname, "input_max_change_mag") / sqrt(3));
+    failure_frac_thresh = settings.f(groupname, "failure_frac_thresh");
 }
 
 void JacobianTest::initResults(void) {
@@ -27,13 +43,6 @@ void printInputAndResult(const Vector3f &input, const scalar_statistic &result) 
             << input.lpNorm<Eigen::Infinity>() / input.norm() <<std::endl;
 }
 
-void updateWorstInput(Vector3f &worst_input_save, const Vector3f &input, const scalar_statistic &result_stat) {
-    if (result_stat.is_max()) {
-        worst_input_save = input;
-        printInputAndResult(worst_input_save, result_stat);
-    }
-}
-
 int JacobianTest::run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Vector3f&),
                       void (*true_ref_function)(Vector3f&, const Vector3f&, const Vector3f&)){
     this->jac_calc_func = jac_calc_func;
@@ -41,45 +50,45 @@ int JacobianTest::run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Ve
     initResults();
     Matrix3f this_jac{Matrix3f::Identity()};
     Vector3f input, alt_input, diff, base_out{0, 0, 0}, approx_out, true_out{1, 0, 0};
+    
     for (int n_jac = 0; n_jac < num_Jac_samples; ++n_jac) {
         input = input_mean + Array3f::Random() * input_max_change;
         alt_input = input_mean + Array3f::Random() * input_max_change;
-            start_timing();
-        jac_calc_func(this_jac, input, alt_input);
-            jacCalcTime_us_.update(elapsed_time());
-            start_timing();
-        true_ref_function(base_out, input, alt_input);
-            refCalcTime_us_.update(elapsed_time());
+        calcAndTimeJac(this_jac, input, alt_input);
+        calcAndTimeTrue(base_out, input, alt_input);
         for (int n_dif = 0; n_dif < num_diff_samples; ++n_dif) {
             diff = Array3f::Random() * max_diff;
             approx_out = base_out + this_jac * diff;
-                start_timing();
-            true_ref_function(true_out, input + diff, alt_input);
-                refCalcTime_us_.update(elapsed_time());
-            error_mag_angle_results(true_out, approx_out, base_out);
-            updateWorstInput(worst_mag_input, input + diff, error_mag);
-            updateWorstInput(worst_angle_input, input + diff, error_angle);
-            updateFailures();
+            calcAndTimeTrue(true_out, input + diff, alt_input);
+            update_results(true_out, approx_out, base_out, input + diff);
         }
     }
+    logger = Logger();
     return failures;
 }
 
-void JacobianTest::updateFailures(void) {
-    if (error_mag.most_recent > failure_percent_thresh || error_angle.most_recent > failure_percent_thresh) 
-        {failures++;}
+
+void JacobianTest::calcAndTimeTrue(Vector3f &output, const Vector3f &input, const Vector3f &other_input) {
+    start_timing();
+    true_ref_function(output, input, other_input);
+    refCalcTime_us_.update(elapsed_time());
 }
 
-void JacobianTest::start_timing(void) {
-    starttime = chrono::steady_clock::now();
+void JacobianTest::calcAndTimeJac(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input) {
+    start_timing();
+    jac_calc_func(jacobian, input, other_input);
+    jacCalcTime_us_.update(elapsed_time());
 }
+
+void JacobianTest::start_timing(void) { starttime = chrono::steady_clock::now(); }
 
 unsigned JacobianTest::elapsed_time(void) {
     return chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - starttime).count();
 }
 
 void JacobianTest::print(std::string name, std::string shortname) {
-    std::cout<<name<<" Jacobian Test  | "<<refCalcTime_us.num_data<<" tries "<<failures<<" failures"<<std::endl
+    std::cout<<name <<" Jacobian Test"<< endl
+             <<output_error.num_data<<" tries "<< failures <<" failures (>" << failure_frac_thresh << ")" << endl
              <<"max_differential_change = "<< max_diff <<std::endl
              <<"Input mean: ["<<input_mean.transpose()<<"] input max change: ["<<input_max_change.transpose()<<"]"<<std::endl
              <<shortname<<" jac output error:"<<std::endl<< output_error
@@ -103,5 +112,30 @@ void JacobianTest::error_mag_angle_results(const Vector3f &true_out, const Vecto
     error_angle_.update(acos(approx_diff.dot(true_diff)));
 }
 
+void updateWorstInput(Vector3f &worst_input_save, const Vector3f &input, const scalar_statistic &result_stat) {
+    if (result_stat.is_max()) {
+        worst_input_save = input;
+        // printInputAndResult(worst_input_save, result_stat);
+    }
+}
 
+void JacobianTest::updateFailures(void) {
+    if (error_mag.most_recent > failure_frac_thresh || error_angle.most_recent > failure_frac_thresh) 
+        {failures++;}
+}
+
+void JacobianTest::update_results(const Vector3f true_out, const Vector3f approx_out,
+                                  const Vector3f base_out, const Vector3f input) {
+    error_mag_angle_results(true_out, approx_out, base_out);
+    updateWorstInput(worst_mag_input, input, error_mag);
+    updateWorstInput(worst_angle_input, input, error_angle);
+    updateFailures();
+    if (logger.get_filename().length() > 0) {
+        logger.log("input", input);
+        logger.log("base_out", base_out);
+        logger.log("true_out", true_out);
+        logger.log("approx_out", approx_out);
+        logger.print();
+    }
+}
 
