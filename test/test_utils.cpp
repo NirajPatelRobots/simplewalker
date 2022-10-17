@@ -19,11 +19,22 @@ void JacobianTest::load_settings(const WalkerSettings &settings, string name) {
         logger = Logger("data/jacobian_test_" + file_tag + ".log"); }
     else
         logger = Logger();
-    num_Jac_samples = settings.i(groupname, "num_Jac_samples");
-    num_diff_samples = settings.i(groupname, "num_diff_samples");
     std::vector<float> input_mean_vec = settings.vf(groupname, "input_mean");
     if (input_mean_vec.size() == 3)     input_mean = Eigen::Map<Array3f>(input_mean_vec.data());
+    else                                input_mean = Array3f::Zero();
+    if (settings.b(groupname, "alt_input_mean")) {
+        input_mean_vec = settings.vf(groupname, "alt_input_mean");
+    }
+    if (input_mean_vec.size() == 3)     alt_input_mean = Eigen::Map<Array3f>(input_mean_vec.data());
+    else                                alt_input_mean = input_mean;
+
     input_max_change = Array3f::Constant(settings.f(groupname, "input_max_change_mag") / sqrt(3));
+    if (settings.b(groupname, "alt_input_max_change_mag")) {
+        alt_input_max_change = Array3f::Constant(settings.f(groupname, "alt_input_max_change_mag") / sqrt(3));
+    }
+    else alt_input_max_change = input_max_change;
+    num_Jac_samples = settings.i(groupname, "num_Jac_samples");
+    num_diff_samples = settings.i(groupname, "num_diff_samples");
     failure_frac_thresh = settings.f(groupname, "failure_frac_thresh");
 }
 
@@ -34,7 +45,6 @@ void JacobianTest::initResults(void) {
     error_mag_ = scalar_statistic();
     error_angle_ = scalar_statistic();
     failures = 0;
-    //singleRunResults = VectorXf(num_Jac_samples * num_diff_samples);
 }
 
 void printInputAndResult(const Vector3f &input, const scalar_statistic &result) {
@@ -53,14 +63,14 @@ int JacobianTest::run(void (*jac_calc_func)(Matrix3f&, const Vector3f&, const Ve
     
     for (int n_jac = 0; n_jac < num_Jac_samples; ++n_jac) {
         input = input_mean + Array3f::Random() * input_max_change;
-        alt_input = input_mean + Array3f::Random() * input_max_change;
+        alt_input = alt_input_mean + Array3f::Random() * alt_input_max_change;
         calcAndTimeJac(this_jac, input, alt_input);
         calcAndTimeTrue(base_out, input, alt_input);
         for (int n_dif = 0; n_dif < num_diff_samples; ++n_dif) {
             diff = Array3f::Random() * max_diff;
             approx_out = base_out + this_jac * diff;
             calcAndTimeTrue(true_out, input + diff, alt_input);
-            update_results(true_out, approx_out, base_out, input + diff);
+            update_results(true_out, approx_out, base_out, alt_input, input, diff);
         }
     }
     logger = Logger();
@@ -91,6 +101,7 @@ void JacobianTest::print(std::string name, std::string shortname) {
              <<output_error.num_data<<" tries "<< failures <<" failures (>" << failure_frac_thresh << ")" << endl
              <<"max_differential_change = "<< max_diff <<std::endl
              <<"Input mean: ["<<input_mean.transpose()<<"] input max change: ["<<input_max_change.transpose()<<"]"<<std::endl
+             <<"Alt input mean: ["<<alt_input_mean.transpose()<<"] alt input max change: ["<<alt_input_max_change.transpose()<<"]"<<std::endl
              <<shortname<<" jac output error:"<<std::endl<< output_error
              <<shortname<<" jac fractional magnitude error:"<<std::endl<< error_mag
              <<shortname<<" jac error angle [rad]:"<<std::endl<< error_angle
@@ -125,13 +136,16 @@ void JacobianTest::updateFailures(void) {
 }
 
 void JacobianTest::update_results(const Vector3f true_out, const Vector3f approx_out,
-                                  const Vector3f base_out, const Vector3f input) {
+                                  const Vector3f base_out, const Vector3f alt_input,
+                                  const Vector3f input_base, const Vector3f input_diff) {
     error_mag_angle_results(true_out, approx_out, base_out);
-    updateWorstInput(worst_mag_input, input, error_mag);
-    updateWorstInput(worst_angle_input, input, error_angle);
+    updateWorstInput(worst_mag_input, input_base + input_diff, error_mag);
+    updateWorstInput(worst_angle_input, input_base + input_diff, error_angle);
     updateFailures();
     if (logger.get_filename().length() > 0) {
-        logger.log("input", input);
+        logger.log("input", input_base + input_diff);
+        logger.log("input_diff", input_diff);
+        logger.log("alt_input", alt_input);
         logger.log("base_out", base_out);
         logger.log("true_out", true_out);
         logger.log("approx_out", approx_out);

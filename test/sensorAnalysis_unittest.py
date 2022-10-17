@@ -2,6 +2,7 @@
 September 2022
 TODO:
     time solver
+    test loading logs (mock?)
 """
 
 import numpy as np
@@ -73,11 +74,11 @@ class TestSensorAnalysis(unittest.TestCase):
     def test_calc_sensor_bias_variable_logs(self):
         test_biases = [np.array([1., -2., 3.]), np.array([-3., 1., -4.])]
         num_logs = 6
-        test_mags = [0.0, 1.0]
-        for test_mag in test_mags:
+        test_disturbance_mags = [0.0, 1.0]
+        for test_disturbance_mag in test_disturbance_mags:
             for bias_num, test_bias in enumerate(test_biases):
                 test_means = np.ones((3, num_logs)) * test_bias.reshape(3, 1)
-                self.uncorrelated_disturb_data(test_means, test_mag)
+                self.uncorrelated_disturb_data(test_means, test_disturbance_mag)
                 with self.subTest(i=bias_num, msg="test_bias=" + str(test_bias)):
                     calc = SensorBiasCalculator("test_zero", 0.0)
                     calc.analyzed = [AnalyzedIMULog(mean=test_means[:, log_num]) for log_num in range(num_logs)]

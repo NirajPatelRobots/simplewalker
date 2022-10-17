@@ -3,6 +3,7 @@ September 2022
 TODO:
     way to return one at a time (generator?)
     detect gaps in time
+    FakelogReader for testing other code that uses logReader
 """
 
 import numpy as np
@@ -16,14 +17,16 @@ class LoadedLog:
     def __init__(self, filename: str = None, field_names: List[str] = None, loud: bool = False):
         self.loaded_filename = None
         self.loud = loud
+        self.fields = {}
         if filename is not None:
             self.load(filename, field_names)
         else:
-            self.reset_data([])
+            self.reset_data()
 
     @staticmethod
     def logged_str_to_array(text: str, shape: Tuple[int]) -> np.array:
-        return np.array(text.replace('(', '').replace(')', '').split(), dtype=float).reshape(shape)
+        clean_txt = ''.join([c for c in text if c not in "()[]"])
+        return np.array(clean_txt.split(), dtype=float).reshape(shape)
 
     @staticmethod
     def parse_log_fields(filename: str) -> Dict[str, Tuple[int]]:
@@ -43,7 +46,7 @@ class LoadedLog:
         return fields
 
     def load(self, filename: str, field_names: List[str]) -> None:
-        self.reset_data(field_names)
+        self.reset_data()
         log_fields = self.parse_log_fields(filename)
         if self.loud:
             print("Opened log", filename, "fields:", log_fields)
@@ -71,8 +74,26 @@ class LoadedLog:
         self.loaded_filename = filename
         self.shapes = log_fields
 
-    def reset_data(self, field_names: List[str]):
+    def reset_data(self):
+        for name in self.fields:
+            delattr(self, name)
         self.fields = {}
         self.shapes = {}
-        for name in field_names:
-            self.fields[name] = np.empty(0)
+
+    def add_temp_field(self, name: str, data: np.ndarray):
+        self.fields[name] = data
+        self.shapes[name] = data.shape[:-1] + (1,)
+        setattr(self, name, data)
+
+    def remove_entry(self, index: int):
+        for name in self.fields:
+            self.fields[name] = np.delete(self.fields[name], index, axis=-1)
+            setattr(self, name, self.fields[name])
+        return self
+
+    def __deepcopy__(self, memodict={}):
+        new_log = LoadedLog()
+        new_log.loaded_filename = self.loaded_filename
+        for name in self.fields:
+            new_log.add_temp_field(name, self.fields[name])
+        return new_log

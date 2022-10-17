@@ -47,21 +47,20 @@ class JacobianTest {
     void (*jac_calc_func)(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input);
     void (*true_ref_function)(Vector3f &output, const Vector3f &input, const Vector3f &other_input);
     scalar_statistic jacCalcTime_us_, refCalcTime_us_, output_error_, error_mag_, error_angle_;
-    VectorXf singleRunResults; // TODO: Do a linear regression on this to get error as fcn of all other results
     void start_timing(void);
     std::chrono::time_point<std::chrono::steady_clock> starttime;
     unsigned elapsed_time(void);
     void calcAndTimeTrue(Vector3f &output, const Vector3f &input, const Vector3f &other_input);
     void calcAndTimeJac(Matrix3f &jacobian, const Vector3f &input, const Vector3f &other_input);
-    void update_results(const Vector3f true_out, const Vector3f approx_out,
-                        const Vector3f base_out, const Vector3f input);
+    void update_results(const Vector3f true_out, const Vector3f approx_out, const Vector3f alt_input,
+                        const Vector3f base_out, const Vector3f input_base, const Vector3f input_diff);
     void error_mag_angle_results(const Vector3f &true_out, const Vector3f &approx_out, const Vector3f &base_out);
     void updateFailures(void);
     int failures;
 public:
     int num_Jac_samples, num_diff_samples;
     float max_diff, failure_frac_thresh;
-    Array3f input_mean, input_max_change;
+    Array3f input_mean, input_max_change, alt_input_mean, alt_input_max_change;
     Vector3f worst_mag_input, worst_angle_input;
     Logger logger;
     JacobianTest();

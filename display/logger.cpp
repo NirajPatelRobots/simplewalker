@@ -53,7 +53,7 @@ void Logger::log(string name, const float x[], int length) {
     outstr << "), ";
     if (!headerSent) {
         std::stringstream namestr{};
-        namestr << name << " (" << length << ")";
+        namestr << name << " [" << length << "]";
         make_field(namestr.str());
     }
     finish_log_field();

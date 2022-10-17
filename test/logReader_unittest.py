@@ -6,6 +6,7 @@ TODO:
 import unittest
 import os
 from logReader import LoadedLog
+import numpy as np
 from typing import List, Dict
 
 TEST_LOG_NAME = "data/logReader_unittest.log"
@@ -40,6 +41,8 @@ class TestLoadedLog(unittest.TestCase):
     def test_create_no_filename(self):
         log = LoadedLog()
         self.assertIsNone(log.loaded_filename)
+        self.assertEqual(0, len(log.fields))
+        self.assertEqual(0, len(log.shapes))
 
     def test_create_load(self):
         self.create_logfile()
@@ -87,6 +90,38 @@ class TestLoadedLog(unittest.TestCase):
         self.create_logfile()
         fields = LoadedLog.parse_log_fields(TEST_LOG_NAME)
         self.assertDictEqual({"timestamp": (1,), "accel": (3, 1), "gyro": (3, 1)}, fields)
+
+    def test_add_temp_field(self):
+        log = LoadedLog()
+        test_arr = np.array([[1, 2, 3], [4, 5, 6]])
+        log.add_temp_field("temporary", test_arr)
+        self.assertIsNotNone(log.temporary)
+        self.assertIs(log.fields["temporary"], log.temporary)
+        self.assertEqual((2, 1), log.shapes["temporary"])
+        self.assertTrue(np.all(test_arr == log.temporary))
+
+    def test_reset_data(self):
+        self.create_logfile(num_rows=10)
+        log = LoadedLog(TEST_LOG_NAME, ["timestamp", "accel", "gyro"])
+        self.assertIn("timestamp", log.fields)
+        log.reset_data()
+        with self.assertRaises(AttributeError):
+            log.timestamp
+        with self.assertRaises(KeyError):
+            log.fields["timestamp"]
+        with self.assertRaises(KeyError):
+            log.shapes["timestamp"]
+
+    def test_remove_entry(self):
+        test_length = 10
+        removal_idx = 4
+        self.create_logfile(num_rows=test_length+1)
+        log = LoadedLog(TEST_LOG_NAME, ["timestamp", "accel", "gyro"])
+        log.remove_entry(removal_idx)
+        self.assertEqual(test_length, log.timestamp.size)
+        self.assertEqual((3, test_length), log.fields["accel"].shape)
+        self.assertEqual((3, test_length), log.gyro.shape)
+        self.assertEqual(removal_idx + 1, log.timestamp[removal_idx])
 
     def test_bad_field(self):
         with self.assertRaises(KeyError) as cm:
