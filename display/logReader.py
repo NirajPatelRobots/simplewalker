@@ -3,7 +3,9 @@ September 2022
 TODO:
     way to return one at a time (generator?)
     detect gaps in time
-    FakelogReader for testing other code that uses logReader
+    optional load fields (pretty easy)
+    name of file without directory or .log
+    save (hard)
 """
 
 import numpy as np
@@ -14,12 +16,13 @@ from collections import OrderedDict
 
 
 class LoadedLog:
-    def __init__(self, filename: str = None, field_names: List[str] = None, loud: bool = False):
-        self.loaded_filename = None
+    def __init__(self, filename: str = None, log_field_names: List[str] = None,
+                 loud: bool = False, load_now: bool = True):
+        self.filename = filename
         self.loud = loud
         self.fields = {}
-        if filename is not None:
-            self.load(filename, field_names)
+        if load_now and self.filename is not None:
+            self.load(self.filename, log_field_names)
         else:
             self.reset_data()
 
@@ -30,6 +33,7 @@ class LoadedLog:
 
     @staticmethod
     def parse_log_fields(filename: str) -> Dict[str, Tuple[int]]:
+        """return the fields of a saved log as {name: np.shape} dict"""
         with open(filename, 'r') as inFile:
             reader = csv.reader(inFile)
             fieldnames = [f.strip(" |") for f in next(reader) if len(f) > 0]
@@ -71,7 +75,7 @@ class LoadedLog:
                                                            axis=-1)
         for name in self.fields:
             setattr(self, name, self.fields[name])
-        self.loaded_filename = filename
+        self.filename = filename
         self.shapes = log_fields
 
     def reset_data(self):
@@ -80,7 +84,7 @@ class LoadedLog:
         self.fields = {}
         self.shapes = {}
 
-    def add_temp_field(self, name: str, data: np.ndarray):
+    def add_field(self, name: str, data: np.ndarray):
         self.fields[name] = data
         self.shapes[name] = data.shape[:-1] + (1,)
         setattr(self, name, data)
@@ -91,9 +95,13 @@ class LoadedLog:
             setattr(self, name, self.fields[name])
         return self
 
+    def remove_field(self, field_name: str):
+        del self.fields[field_name]
+        delattr(self, field_name)
+
     def __deepcopy__(self, memodict={}):
         new_log = LoadedLog()
-        new_log.loaded_filename = self.loaded_filename
+        new_log.filename = self.filename
         for name in self.fields:
-            new_log.add_temp_field(name, self.fields[name])
+            new_log.add_field(name, self.fields[name])
         return new_log

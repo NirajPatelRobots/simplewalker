@@ -28,20 +28,20 @@ def angle_between(vec1: np.ndarray, vec2: np.ndarray) -> np.float64:
 
 def calc_error(results: LoadedLog) -> None:
     def clip_errors():
-        results.add_temp_field("clipped_abs_err_mag", np.clip(results.abs_err_mag, 0, 4 * np.mean(results.abs_err_mag)))
-        results.add_temp_field("clipped_frac_err_mag", np.clip(results.frac_err_mag, 0, 1))
-        results.add_temp_field("clipped_err_angle", np.clip(results.err_angle, 0,  4 * np.mean(results.err_angle)))
-    results.add_temp_field("true_output_change",  results.true_out - results.base_out)
+        results.add_field("clipped_abs_err_mag", np.clip(results.abs_err_mag, 0, 4 * np.mean(results.abs_err_mag)))
+        results.add_field("clipped_frac_err_mag", np.clip(results.frac_err_mag, 0, 0.2))
+        results.add_field("clipped_err_angle", np.clip(results.err_angle, 0, 4 * np.mean(results.err_angle)))
+    results.add_field("true_output_change", results.true_out - results.base_out)
     no_change_idxs = (np.linalg.norm(results.true_output_change, axis=0) < 1e-12)
     num_no_change = np.sum(no_change_idxs)
     if num_no_change > 0:
         print(num_no_change, "removed due to small true output change")
     results.remove_entry(no_change_idxs)
     approx_output_change = results.approx_out - results.base_out
-    results.add_temp_field("abs_err_mag",  reduce_to_1D(results.true_out - results.approx_out))
-    results.add_temp_field("frac_err_mag", results.abs_err_mag / reduce_to_1D(results.true_output_change))
-    results.add_temp_field("input_alt_angle", angle_between(results.input, results.alt_input))
-    results.add_temp_field("err_angle", angle_between(results.true_output_change, approx_output_change))
+    results.add_field("abs_err_mag", reduce_to_1D(results.true_out - results.approx_out))
+    results.add_field("frac_err_mag", results.abs_err_mag / reduce_to_1D(results.true_output_change))
+    results.add_field("input_alt_angle", angle_between(results.input, results.alt_input))
+    results.add_field("err_angle", angle_between(results.true_output_change, approx_output_change))
     clip_errors()
 
 
@@ -53,7 +53,7 @@ def plot_3D_error(log: LoadedLog, pos_name: str = None, color_name: str = None, 
     ax = fig.add_subplot(projection='3d')
     sc = ax.scatter(position[0, :], position[1, :], position[2, :], c=reduce_to_1D(log.fields[color_name]))
     fig.colorbar(sc)
-    plt.title(log.loaded_filename + " " + color_name + " over 3D " + pos_name)
+    plt.title(log.filename + " " + color_name + " over 3D " + pos_name)
     ax.set_xlabel(pos_name + "[0]")
     ax.set_ylabel(pos_name + "[1]")
     ax.set_zlabel(pos_name + "[2]")
@@ -70,9 +70,9 @@ def plot_1D_error(log: LoadedLog, x_name: str, y_name: str, figure_num: int = 2)
 
 def get_failing_results(results: LoadedLog, max_frac_error: float = None, max_angle_error: float = None) -> (LoadedLog, LoadedLog):
     fails = results.__deepcopy__()
-    fails.loaded_filename += "_fails"
+    fails.filename += "_fails"
     passes = results.__deepcopy__()
-    passes.loaded_filename += "_passes"
+    passes.filename += "_passes"
     max_frac_error = max_frac_error or 0.2
     max_angle_error = max_angle_error or 0.2
     print("Sorting failing results (fractional error >", max_frac_error, " or angle error > ", max_angle_error, ")")
@@ -121,10 +121,10 @@ if __name__ == "__main__":
         print_log_error(fails, "fails")
         print_mag_stats(fails, "input", "fails")
         print_mag_stats(passes, "input", "passes")
-        plot_1D_error(log, "input", "clipped_frac_err_mag")
-        plot_1D_error(log, "alt_input", "clipped_frac_err_mag", 4)
-        plot_3D_error(fails, "input", "clipped_frac_err_mag")
-        plot_3D_error(fails, "input", "input_alt_angle", 3)
+        plot_1D_error(log, "true_out", "clipped_frac_err_mag")
+        plot_1D_error(log, "input_alt_angle", "clipped_frac_err_mag", 4)
+        plot_3D_error(passes, "input", "clipped_frac_err_mag")
+        plot_3D_error(passes, "input", "err_angle", 3)
         plt.show()
     else:
         print("Usage:", sys.argv[0], "log_file_name [--max-frac-error <float>] [--max-angle-error <float>]")

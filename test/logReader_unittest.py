@@ -40,21 +40,21 @@ class TestLoadedLog(unittest.TestCase):
 
     def test_create_no_filename(self):
         log = LoadedLog()
-        self.assertIsNone(log.loaded_filename)
+        self.assertIsNone(log.filename)
         self.assertEqual(0, len(log.fields))
         self.assertEqual(0, len(log.shapes))
 
     def test_create_load(self):
         self.create_logfile()
         log = LoadedLog(TEST_LOG_NAME, [])
-        self.assertEqual(TEST_LOG_NAME, log.loaded_filename)
+        self.assertEqual(TEST_LOG_NAME, log.filename)
 
     def test_load(self):
         log = LoadedLog()
         test_length = 10
         self.create_logfile(num_rows=test_length)
         log.load(TEST_LOG_NAME, ["timestamp", "accel", "gyro"])
-        self.assertEqual(TEST_LOG_NAME, log.loaded_filename)
+        self.assertEqual(TEST_LOG_NAME, log.filename)
         self.assertEqual(test_length, log.timestamp.size)
         self.assertEqual((3, test_length), log.accel.shape)
         self.assertEqual((3, test_length), log.gyro.shape)
@@ -91,10 +91,10 @@ class TestLoadedLog(unittest.TestCase):
         fields = LoadedLog.parse_log_fields(TEST_LOG_NAME)
         self.assertDictEqual({"timestamp": (1,), "accel": (3, 1), "gyro": (3, 1)}, fields)
 
-    def test_add_temp_field(self):
+    def test_add_field(self):
         log = LoadedLog()
         test_arr = np.array([[1, 2, 3], [4, 5, 6]])
-        log.add_temp_field("temporary", test_arr)
+        log.add_field("temporary", test_arr)
         self.assertIsNotNone(log.temporary)
         self.assertIs(log.fields["temporary"], log.temporary)
         self.assertEqual((2, 1), log.shapes["temporary"])
@@ -123,7 +123,18 @@ class TestLoadedLog(unittest.TestCase):
         self.assertEqual((3, test_length), log.gyro.shape)
         self.assertEqual(removal_idx + 1, log.timestamp[removal_idx])
 
-    def test_bad_field(self):
+    def test_remove_field(self):
+        log = LoadedLog()
+        log.add_field("test", np.arange(10))
+        self.assertIn("test", log.fields)
+        self.assertTrue(hasattr(log, "test"))
+        with self.assertRaises(KeyError):
+            log.remove_field("California")
+        log.remove_field("test")
+        self.assertNotIn("test", log.fields)
+        self.assertFalse(hasattr(log, "test"))
+
+    def test_load_nonexistent_field(self):
         with self.assertRaises(KeyError) as cm:
             self.create_logfile()
             LoadedLog(TEST_LOG_NAME, ["this_doesnt_exist"])
@@ -133,6 +144,7 @@ class TestLoadedLog(unittest.TestCase):
     def test_load_bad_file(self):
         with self.assertRaises(FileNotFoundError):
             LoadedLog("this_doesnt_exist", [])
+        LoadedLog("this_doesnt_exist", [], load_now=False)
 
 
 if __name__ == '__main__':
