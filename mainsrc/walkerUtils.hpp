@@ -4,6 +4,7 @@ TODO:
     vector_statistic
     scalar_statistic unit
     BUG: Jac_rotated_wrt_axis_angle
+    scalar_statistic std_dev could be nan
 */
 
 #ifndef WALKER_UTILS_H
@@ -41,7 +42,7 @@ struct scalar_statistic {
     unsigned num_data{0};
     unsigned num_bad{0};
     std::string unit{};
-    bool update(float new_val); 
+    bool update(float new_val);  // returns whether statistics were updated, false if invalid input
     bool is_max(void) const {return (most_recent == max);}
 };
 

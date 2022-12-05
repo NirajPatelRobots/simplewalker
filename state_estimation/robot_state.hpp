@@ -3,6 +3,9 @@ TODO:
     stabilizeRotation characterize drift
     copy assignment operator
     acceleration
+    get state element std_dev from covariance
+    timestamp
+    separate state_t simple struct?
 March 2022 blame Niraj*/
 #ifndef ROBOT_STATE_HPP
 #define ROBOT_STATE_HPP

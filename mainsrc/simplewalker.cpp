@@ -1,14 +1,11 @@
 /* Simplewalker main program
 
 TODO:
-    BUG: Sometimes, correlated with receiving message late first, state estimation takes 30 ms. 
     organize file logged data
 */
 #include "maincomp_comm.hpp"
 #include "state_estimation.hpp"
 #include "convenientLogger.hpp"
-#include <iostream>
-#include <memory>
 #include <chrono>
 #include <thread>
 

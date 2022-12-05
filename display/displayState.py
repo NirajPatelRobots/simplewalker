@@ -1,6 +1,8 @@
 """ Display the state of simplewalker on desktop base computer
 July 2022
 TODO:
+    3D position
+    stationary reference points
 """
 import numpy as np
 from xml.etree import ElementTree

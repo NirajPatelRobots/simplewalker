@@ -1,6 +1,7 @@
 """ Print the state of simplewalker on desktop base computer. Receives from simplewalker over wifi.
 June 2022
 TODO:
+    set from log
 """
 
 import socket
@@ -46,6 +47,10 @@ class RemoteRobotState:
                 index += 1
             setattr(self, elementname, element)
         return True
+
+    def set_from_log(self):
+        pass # TODO
+
 
     def __repr__(self) -> str:
         return "pos:" + str(self.pos) + " axis:" + str(self.axis) \

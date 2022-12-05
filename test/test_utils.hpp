@@ -5,6 +5,7 @@ TODO:
     Verify Matrices are inverses
     use process clock for timing
     JacobianTest subclass of inputoutput_vector_compare
+    set input magnitude
 
 Niraj, May 2022*/
 #include <iostream>

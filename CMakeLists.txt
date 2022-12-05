@@ -18,6 +18,9 @@ endforeach()
 message("Source files ${src_files}")
 message("Source dirs ${src_dirs}")
 
+# TODO: compile shared objects together
+# TODO: don't redo object building
+
 # simplewalker main
 include_directories(${src_dirs})
 include_directories(../eigen-3.4.0)
@@ -27,20 +30,28 @@ include_directories(/usr/include/eigen3)
 add_executable(simplewalker ${src_files} ${src_comm} mainsrc/simplewalker.cpp)
 target_link_libraries(simplewalker wiringPi)
 
-
-
 # collect_sensor_cal_data
 include_directories(${src_dirs})
 add_executable(collect_sensor_cal_data ${src_files} ${src_comm} sensors/collect_sensor_cal_data.cpp)
 target_link_libraries(collect_sensor_cal_data wiringPi)
 
 
-# collect_sensor_cal_data
+# test_localization
 include_directories(${src_dirs})
 add_executable(test_localization ${src_files} state_estimation/test_localization.cpp)
 
 
 # unittests
-include_directories(${src_dirs})
-add_executable(unittests ${src_files} test/unittests.cpp test/test_utils.cpp)
+add_subdirectory(/usr/src/googletest build)
+enable_testing()
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
 
+
+add_executable(unittests ${src_files} test/unittests.cpp test/test_utils.cpp) # TODO use googletest
+#TODO split unitttests into multiple files
+
+add_executable(unittest_basic_communication test/unittest_basic_communication.cpp)
+target_link_libraries(unittest_basic_communication gtest gtest_main gmock)
+
+include(GoogleTest)
+gtest_discover_tests(unittest_basic_communication)
