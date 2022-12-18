@@ -1,6 +1,5 @@
-/* Test parts of simplewalker code to prove functionality
+/* Test jacobians in simplewalker code to prove functionality
 TODO:
-    make separate unittests for separate files
 Niraj, June 2022 */
 #include <memory>
 #include <iostream>
@@ -34,9 +33,9 @@ void unit_jac_true_ref(Vector3f &output, const Vector3f &input, const Vector3f&)
 
 int main(void) {
     unique_ptr<JacobianTest> jacobianTest {std::make_unique<JacobianTest>()};
-    WalkerSettings testSettings("settings/unit_test_settings.xml");
+    WalkerSettings testSettings("settings/jacobian_test_settings.xml");
 
-    if (!testSettings.b("forward_kinematics_jac", "skip")) {    
+    if (!testSettings.b("forward_kinematics_jac", "skip")) {
         jacobianTest->load_settings(testSettings, "forward_kinematics_jac");
         jacobianTest->run(fk_jac_forTest, fk_jac_true_ref);
         jacobianTest->print("Forward Kinematics", "fk");

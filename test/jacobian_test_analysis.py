@@ -8,7 +8,7 @@ TODO:
 """
 
 import numpy as np
-from logReader import LoadedLog
+from display.logReader import LoadedLog
 import matplotlib.pyplot as plt
 import sys
 

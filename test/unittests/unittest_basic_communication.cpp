@@ -16,6 +16,8 @@ struct test_struct_1 {
     bool has_electricity;
 };
 const int test_ID_1 = 140;
+const int size_1 = sizeof(test_struct_1) / sizeof(char);
+
 struct test_struct_2 {
     float static_feedback;
     int false_readings;
@@ -63,7 +65,10 @@ TEST_F(BasicCommunicationTest, InboxIsEmpty) {
 TEST_F(BasicCommunicationTest, InboxReceiveMessage) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
     test_struct_1 test_message{.dynamic_feedback = 4.5, .num_animals = 8, .has_electricity=true};
-    test_inbox_1.set_message(test_message);
+    deque<char> test_data{};
+    for (size_t i=0; i < size_1; i++)
+        test_data.push_back(*(((char*)&test_message) + i));
+    test_inbox_1.set_message(test_data.begin(), test_data.end());
     ASSERT_EQ(1, test_inbox_1.num_available());
     EXPECT_EQ(0, test_inbox_1.get_newest(received_message));
 
@@ -76,8 +81,8 @@ TEST_F(BasicCommunicationTest, InboxReceiveMessage) {
 TEST_F(BasicCommunicationTest, InboxReceiveMultipleMessages) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
     test_struct_1 test_message{.dynamic_feedback = 4.5, .num_animals = 8, .has_electricity=true};
-    test_inbox_1.set_message(test_struct_1{});   // first, empty message
-    test_inbox_1.set_message(test_message);
+    test_inbox_1.set(test_struct_1{});   // first, empty message
+    test_inbox_1.set(test_message);
     ASSERT_EQ(2, test_inbox_1.num_available());
 
     EXPECT_EQ(1, test_inbox_1.get_newest(received_message));
@@ -94,18 +99,11 @@ TEST_F(BasicCommunicationTest, InboxReceiveMultipleMessages) {
 TEST_F(BasicCommunicationTest, InboxClear) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
     test_struct_1 test_message{.dynamic_feedback = 4.5, .num_animals = 8, .has_electricity=true};
-    test_inbox_1.set_message(test_struct_1{});
-    test_inbox_1.set_message(test_message);
+    test_inbox_1.set(test_struct_1{});
+    test_inbox_1.set(test_message);
     ASSERT_EQ(2, test_inbox_1.num_available());
     test_inbox_1.clear();
     EXPECT_EQ(0, test_inbox_1.num_available());
-}
-
-TEST_F(BasicCommunicationTest, InboxReceiveWrongMessage) {
-    MessageInbox<test_struct_2> test_inbox_2(test_ID_1, *loopback_comm);  // wrong message, right ID
-    test_struct_1 wrong_message{.dynamic_feedback = 4.5, .num_animals = 8, .has_electricity=true};
-    EXPECT_THROW(test_inbox_2.set_message(wrong_message);, std::bad_any_cast);
-    EXPECT_EQ(0, test_inbox_2.num_available());
 }
 
 TEST_F(BasicCommunicationTest, CreateOutbox) {

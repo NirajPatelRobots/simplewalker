@@ -31,7 +31,7 @@ const Vector3f LEFT_DIR{0,1,0};
 const Vector3f FORWARD_DIR{1,0,0};
 const Vector3f UP_DIR{0,0,1};
 const Vector3f HORIZONTAL_DIR = LEFT_DIR + FORWARD_DIR;
-const Vector3f RIGHTSCALE{-1., 1., 1.}; // multiply vectors by RIGHTSCALE to change right with left
+const Eigen::Array3f RIGHTSCALE{1., -1., 1.}; // multiply arrays by RIGHTSCALE to change right with left
 
 
 struct scalar_statistic {
