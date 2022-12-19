@@ -49,6 +49,7 @@ TEST_F(BasicCommunicationTest, CreateInbox) {
     EXPECT_EQ(test_ID_1, loopback_comm->get_inboxes().at(0)->msgID);
     EXPECT_EQ(sizeof(test_struct_1), test_inbox_1.msg_len);
     EXPECT_EQ(sizeof(test_struct_1), loopback_comm->get_inboxes().at(0)->msg_len);
+    EXPECT_EQ(test_inbox_1.msg_len, test_inbox_1.SIZE);
 }
 
 TEST_F(BasicCommunicationTest, InboxIsEmpty) {
@@ -108,6 +109,9 @@ TEST_F(BasicCommunicationTest, InboxClear) {
 
 TEST_F(BasicCommunicationTest, CreateOutbox) {
     MessageOutbox<test_struct_1> test_outbox_1(test_ID_1, *loopback_comm);
+    EXPECT_EQ(0.0, test_outbox_1.message.dynamic_feedback);
+    EXPECT_EQ(0, test_outbox_1.message.num_animals);
+    EXPECT_FALSE(test_outbox_1.message.has_electricity);
     test_outbox_1.message.dynamic_feedback = 1000.23;
     EXPECT_EQ(0, loopback_comm->get_inboxes().size());
     EXPECT_EQ(sizeof(test_struct_1), test_outbox_1.msg_len);

@@ -3,24 +3,25 @@ MessageBox are boxes that hold generic messages, to be used by generic communica
 Communicator is interface class, subclassed into different communications methods
 October 2022
 TODO:
+    there's gotta be a better (safer?) way to do this char setting stuff
+    decide between msg_len and SIZE
 */
 #include <deque>
 #include <string>
 #include <any>
-
 #include <iostream>
+using std::deque, std::string, std::to_string;
 
 class Communicator;
 
 class MessageBoxInterface {
-protected:
-    Communicator &comm;
 public:
+    Communicator &comm;
     MessageBoxInterface(int16_t _msgID, size_t _msg_len, Communicator &communicator) :
         comm(communicator), msgID(_msgID), msg_len(_msg_len) {}
     const int16_t msgID;
     const size_t msg_len;
-    virtual void set_message(const std::any &in_data) = 0;
+    virtual void set_message(deque<char>::iterator data_start, deque<char>::iterator data_end) = 0;
     virtual ~MessageBoxInterface() = default;
 };
 
@@ -41,12 +42,15 @@ public:
         if (id_is_registered(new_inbox->msgID)) {throw std::invalid_argument("message ID already registered");}
         inboxes.push_back(new_inbox);
     }
-    const std::deque<MessageBoxInterface *> &get_inboxes() const {return inboxes;}
+    const deque<MessageBoxInterface *> &get_inboxes() const {return inboxes;}
     bool id_is_registered(int query_id) {
         for (auto inbox : inboxes) {if (inbox->msgID == query_id) return true;} return false;
     }
+    MessageBoxInterface *get_inbox(int query_id) {
+        for (auto inbox : inboxes) {if (inbox->msgID == query_id) return inbox;} return nullptr;
+    }
     virtual void receive_messages() = 0;
-    virtual int send(const MessageBoxInterface &outbox, std::any message) = 0; //return 0 on success
+    virtual int send(const MessageBoxInterface &outbox, char *data_start) = 0; //return 0 on success
     virtual ~Communicator() = default;
 };
 
@@ -54,11 +58,12 @@ public:
 template <typename T>
 class MessageInbox : public MessageBoxInterface {
 protected:
-    std::deque<T> messages;
+    deque<T> messages;
 public:
     MessageInbox(int16_t _msgID, Communicator &communicator)
-        : MessageBoxInterface(_msgID, sizeof(T), communicator), messages()  {comm.add_inbox(this);}
-    // sets message_out if a message is available. Returns the number of messages available after the set, return < 0 is failure
+        : MessageBoxInterface(_msgID, SIZE, communicator), messages()  {comm.add_inbox(this);}
+    /* sets message_out if a message is available.
+    Returns the number of messages available after the set, return < 0 is failure */
     int get_newest(T &message_out) {
         if (num_available() > 0) {
             message_out = messages.back();
@@ -68,12 +73,21 @@ public:
         return -1;
     }
     // receive a new message. usually be called by communicator. can throw std::bad_any_cast
-    void set_message(const std::any &in_data) override {
-        messages.push_back(std::any_cast<T>(in_data));  // TODO: catch std::bad_any_cast
+    void set_message(deque<char>::iterator data_start, deque<char>::iterator data_end) override {
+        if (data_end - data_start != SIZE)
+            throw std::logic_error("INBOX ERROR: size=" + to_string(SIZE) + " data size=" + to_string(data_end - data_start));
+        messages.emplace_back();
+        for (int i = 0; i<SIZE; i++) {
+            ((char*)&messages.back())[i] = *(data_start + i);
+        }
+    }
+    void set(const T& message) {
+        messages.push_back(message);
     }
     void clear() {while (!messages.empty()) messages.pop_back();}
     int num_available() {return messages.size();}
     ~MessageInbox() override = default;
+    inline const static int SIZE = sizeof(T) / sizeof(char);
 };
 
 
@@ -82,24 +96,34 @@ class MessageOutbox : public MessageBoxInterface {
 public:
     T message;
     MessageOutbox(const int16_t _msgID, Communicator &communicator)
-            : MessageBoxInterface(_msgID, sizeof(T), communicator), message({}) {}
-    int send() {return comm.send(*this, message);}
+            : MessageBoxInterface(_msgID, SIZE, communicator), message({}) {}
+    int send() {return comm.send(*this, (char*)&message);}
     // set_message is included for inheritance, but better to just directly set MessageOutbox.message
-    void set_message(const std::any &in_data) override {
-        message = std::any_cast<T>(in_data);  // TODO: catch std::bad_any_cast
+    void set_message(deque<char>::iterator data_start, deque<char>::iterator data_end) override {
+        if (data_end - data_start != SIZE)
+            throw std::logic_error("OUTBOX ERROR: size=" + to_string(SIZE) + " data size=" + to_string(data_end - data_start));
+        for (int i = 0; i<SIZE; i++) {
+            ((char*)&message)[i] = *(data_start + i);
+        }
     }
     ~MessageOutbox() override = default;
+    inline const static int SIZE = sizeof(T) / sizeof(char);
 };
 
 
 class LoopbackCommunicator : public Communicator {
 public:
     explicit LoopbackCommunicator(std::string name) : Communicator(name) {}
-    int send(const MessageBoxInterface &outbox, std::any message) override {
-        for (auto inbox : inboxes) if (inbox->msgID == outbox.msgID) {
-            inbox->set_message(message);
+    int send(const MessageBoxInterface &outbox, char *data_start) override {
+        deque<char> data{};
+        for (size_t i=0; i < outbox.msg_len; i++)
+            data.push_back(*(data_start+i));
+        MessageBoxInterface *inbox = get_inbox(outbox.msgID);
+        if (!inbox) return 1;
+        if (inbox->msg_len == outbox.msg_len) {
+            inbox->set_message(data.begin(), data.end());
         }
-        return 0;
+        return 0;  // success
     }
     void receive_messages() override {}
     ~LoopbackCommunicator() override = default;

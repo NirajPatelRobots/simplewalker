@@ -2,8 +2,10 @@
 
 TODO:
     organize file logged data
+    cmd line argument for settings filepath
 */
-#include "maincomp_comm.hpp"
+#include "comm_serial.hpp"
+#include "messages.h"
 #include "state_estimation.hpp"
 #include "convenientLogger.hpp"
 #include <chrono>
@@ -20,28 +22,22 @@ void set_state_msg(RobotStateMsg *msg, const RobotState &state, chrono::duration
     }
 }
 
-void start_control_communication(Communicator &comm, ControlStateMsg_sns *controlstate, RobotStateMsg *sendstate) {
-    controlstate->ID = 0;
-    sendstate->ID = RobotStateMsgID;
-    sendstate->errcode = 0;
-    for (int i = 0; i < 6; ++i) {sendstate->leg_pos[i] = 0; sendstate->leg_vel[i] = 0;}
-    std::cout<<"Waiting for controller messages...\r";
-    int num_msgs = 0;
-    while (num_msgs < 3) {
-        comm.handle_messages();
-        if (comm.read_message((char *)controlstate) >= 0)  ++num_msgs;
+void start_control_communication(MessageInbox<ControlStateMsg_sns> &controlInbox) {
+    std::cout<<"Waiting for controller messages...\r" << std::flush;
+    while (controlInbox.num_available() < 3) {
+        controlInbox.comm.receive_messages();
     }
+    controlInbox.clear();
 }
 
 
 int main() {
     WalkerSettings settings("settings/settings.xml"); //settings
-    
-    unique_ptr<ControlStateMsg_sns> controlstate(new ControlStateMsg_sns);
-    unique_ptr<RobotStateMsg> sendstate(new RobotStateMsg);
 
-    unique_ptr<Communicator> comm(new Communicator(ControlStateMsgID, sizeof(ControlStateMsg),
-                      ControlTargetMsgID, sizeof(ControlTargetMsg)));
+    unique_ptr<SerialCommunicator> controller_comm(new SerialCommunicator(string("Controller_serial")));
+    MessageInbox<ControlStateMsg_sns> controlInbox(ControlStateMsgID, *controller_comm);
+    unique_ptr<ControlStateMsg_sns> controlState{new ControlStateMsg_sns({})};
+    //MessageInbox<RobotStateMsg> sendstate(RobotStateMsgID, base_comm.get());
 
     unique_ptr<SensorBoss> sensors(new SensorBoss(settings.f("SensorBoss", "accel_stddev"),
                                                   settings.f("SensorBoss", "gyro_stddev")));
@@ -59,15 +55,14 @@ int main() {
     chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
     chrono::time_point<chrono::steady_clock> latereadtime;
     bool ERR_msg_late = false;
-    int num_msgs = 0;
     shared_ptr<ConvenientLogger> logger{std::static_pointer_cast<ConvenientLogger>(stdlogger)};
     ConvenientLogger savelog("data/statelog.log");
-    Logtimes logtimes;
+    Logtimes logtimes{};
     
-    comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
-                        sizeof(RobotStateMsg), (const char *)sendstate.get());
-    if (settings.b("General", "state_send")) comm->try_connect();
-    start_control_communication(*comm, controlstate.get(), sendstate.get());
+//    comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
+//                        sizeof(RobotStateMsg), (const char *)sendstate.get());
+//    if (settings.b("General", "state_send")) comm->try_connect();
+    start_control_communication(controlInbox);
 
     std::cout<<"    Start main loop, T = "<< looptime.count() << " ms     " << std::endl;
     chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
@@ -75,9 +70,9 @@ int main() {
     std::this_thread::sleep_until(loopstart);
     while (true) {
         set_logtime(logtimes.sleep);
-        comm->handle_messages();
-        while ((num_msgs = comm->read_message((char *)controlstate.get())) < 0 ) {
-            comm->handle_messages();
+        controller_comm->receive_messages();
+        while (controlInbox.get_newest(*controlState) < 0) {
+            controller_comm->receive_messages();
             latereadtime = chrono::steady_clock::now();
             ERR_msg_late = true;
             if (latereadtime - loopstart > msgwaittime) {
@@ -94,7 +89,7 @@ int main() {
 
         EKF->predict();
         set_logtime(logtimes.predict);
-        sensors->update_sensors(&controlstate->sensor_data);
+        sensors->update_sensors(&controlState->sensor_data);
         sensors->predict(EKF->state_pred, state, EKF->dt);
         set_logtime(logtimes.sensorboss);
         if (prediction_only) {
@@ -104,12 +99,12 @@ int main() {
             EKF->correct(*sensors);
         }
         set_logtime(logtimes.correct);
-        set_state_msg(sendstate.get(), EKF->state, loopstart - timestart);
-        comm->broadcast_message(settings.f("General", "broadcast_rate_div"));
+        //set_state_msg(sendstate.get(), EKF->state, loopstart - timestart);
+        //comm->broadcast_message(settings.f("General", "broadcast_rate_div"));
         set_logtime(logtimes.commsend);
 
         if (settings.b("Logger", "log_times")) logger->log(logtimes);
-        if (settings.b("Logger", "log_controlstate")) logger->log("controlstate", (float*)controlstate.get(), sizeof(ControlStateMsg) / sizeof(float));
+        if (settings.b("Logger", "log_controlstate")) logger->log("controlstate", (float*)controlState.get(), sizeof(ControlStateMsg) / sizeof(float));
         if (settings.b("Logger", "log_sensor")) logger->log(sensors->data);
         if (settings.b("Logger", "log_sensor_pred")) logger->log(sensors->data_pred);
         if (settings.b("Logger", "log_state")) logger->obj_log(EKF->state);
