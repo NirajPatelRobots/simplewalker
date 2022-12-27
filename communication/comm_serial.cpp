@@ -40,7 +40,7 @@ void SerialCommunicator::receive_messages() {
     }
 }
 
-int SerialCommunicator::send(const MessageBoxInterface &outbox, char *data_start) {
+int SerialCommunicator::send(const MessageBoxInterface &outbox, const char *data_start) {
     for (unsigned i = 0; i < outbox.msg_len; i++) {
         serialPutchar(serialfile, data_start[i]);
     }

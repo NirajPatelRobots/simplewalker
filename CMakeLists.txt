@@ -10,6 +10,7 @@ set(src_dirs mainsrc communication display physics sensors state_estimation test
 
 
 set(src_comm "communication/comm_serial.cpp")
+set(src_comm_ext "communication/comm_tcp.cpp")
 set(src_files "")
 foreach(src_name ${src_names})
     set(src_files ${src_files} ${src_name}.cpp)
@@ -29,7 +30,7 @@ include_directories(../rapidxml)
 include_directories(../WiringPi/wiringPi)
 include_directories(/usr/include/rapidxml)
 include_directories(/usr/include/eigen3)
-add_executable(simplewalker ${src_files} ${src_comm} mainsrc/simplewalker.cpp)
+add_executable(simplewalker ${src_files} ${src_comm} ${src_comm_ext} mainsrc/simplewalker.cpp)
 target_link_libraries(simplewalker wiringPi)
 
 # collect_sensor_cal_data

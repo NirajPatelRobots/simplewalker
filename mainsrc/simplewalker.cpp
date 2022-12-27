@@ -3,8 +3,10 @@
 TODO:
     organize file logged data
     cmd line argument for settings filepath
+    state send possible random disconnect error
 */
 #include "comm_serial.hpp"
+#include "comm_tcp.hpp"
 #include "messages.h"
 #include "state_estimation.hpp"
 #include "convenientLogger.hpp"
@@ -35,9 +37,10 @@ int main() {
     WalkerSettings settings("settings/settings.xml"); //settings
 
     unique_ptr<SerialCommunicator> controller_comm(new SerialCommunicator(string("Controller_serial")));
+    unique_ptr<TCPCommunicator> base_comm(new TCPCommunicator(string("Base_TCP")));
     MessageInbox<ControlStateMsg_sns> controlInbox(ControlStateMsgID, *controller_comm);
     unique_ptr<ControlStateMsg_sns> controlState{new ControlStateMsg_sns({})};
-    //MessageInbox<RobotStateMsg> sendstate(RobotStateMsgID, base_comm.get());
+    MessageOutbox<RobotStateMsg> stateOutbox(RobotStateMsgID, *base_comm);
 
     unique_ptr<SensorBoss> sensors(new SensorBoss(settings.f("SensorBoss", "accel_stddev"),
                                                   settings.f("SensorBoss", "gyro_stddev")));
@@ -58,10 +61,9 @@ int main() {
     shared_ptr<ConvenientLogger> logger{std::static_pointer_cast<ConvenientLogger>(stdlogger)};
     ConvenientLogger savelog("data/statelog.log");
     Logtimes logtimes{};
-    
-//    comm->start_server(settings.f("General", "state_send_port"), RobotStateMsgID,
-//                        sizeof(RobotStateMsg), (const char *)sendstate.get());
-//    if (settings.b("General", "state_send")) comm->try_connect();
+
+    base_comm->start_server(settings.f("General", "state_send_port"));
+    if (settings.b("General", "state_send")) base_comm->try_connect();
     start_control_communication(controlInbox);
 
     std::cout<<"    Start main loop, T = "<< looptime.count() << " ms     " << std::endl;
@@ -99,8 +101,10 @@ int main() {
             EKF->correct(*sensors);
         }
         set_logtime(logtimes.correct);
-        //set_state_msg(sendstate.get(), EKF->state, loopstart - timestart);
-        //comm->broadcast_message(settings.f("General", "broadcast_rate_div"));
+        if ((loopstart - timestart).count() % ((int)settings.f("General", "broadcast_rate_div") * 100) < 100) {
+            set_state_msg(&stateOutbox.message, EKF->state, loopstart - timestart);
+            stateOutbox.send();
+        }
         set_logtime(logtimes.commsend);
 
         if (settings.b("Logger", "log_times")) logger->log(logtimes);

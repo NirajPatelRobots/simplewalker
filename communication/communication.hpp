@@ -4,11 +4,19 @@ Communicator is interface class, subclassed into different communications method
 October 2022
 TODO:
     there's gotta be a better (safer?) way to do this char setting stuff
+        char* for data_start in MessageBoxInterface?
+    Maybe split MessageBoxInterface into interface classes for inbox and outbox
     decide between msg_len and SIZE
+    detect late message
+    custom exception
+    skip every so many sends
+    MessageInbox start by receiving a few messages function with printout (replace start_control_communication)
 */
+#ifndef SIMPLEWALKER_COMM_HPP
+#define SIMPLEWALKER_COMM_HPP
+
 #include <deque>
 #include <string>
-#include <any>
 #include <iostream>
 using std::deque, std::string, std::to_string;
 
@@ -34,7 +42,7 @@ protected:
     std::string name_;
 public:
     const unsigned int &num_bad_bytes_in, &num_bad_bytes_out;
-    std::string &name;
+    const std::string &name;
     explicit Communicator(std::string &_name)
             : num_bad_bytes_in_(0), num_bad_bytes_out_(0), inboxes(), name_(_name),
               num_bad_bytes_in(num_bad_bytes_in_), num_bad_bytes_out(num_bad_bytes_out_), name(name_) {}
@@ -50,7 +58,7 @@ public:
         for (auto inbox : inboxes) {if (inbox->msgID == query_id) return inbox;} return nullptr;
     }
     virtual void receive_messages() = 0;
-    virtual int send(const MessageBoxInterface &outbox, char *data_start) = 0; //return 0 on success
+    virtual int send(const MessageBoxInterface &outbox, const char *data_start) = 0; //return 0 on success
     virtual ~Communicator() = default;
 };
 
@@ -72,7 +80,7 @@ public:
         }
         return -1;
     }
-    // receive a new message. usually be called by communicator. can throw std::bad_any_cast
+    // receive a new message. usually be called by communicator. can throw std::logic_error
     void set_message(deque<char>::iterator data_start, deque<char>::iterator data_end) override {
         if (data_end - data_start != SIZE)
             throw std::logic_error("INBOX ERROR: size=" + to_string(SIZE) + " data size=" + to_string(data_end - data_start));
@@ -114,7 +122,7 @@ public:
 class LoopbackCommunicator : public Communicator {
 public:
     explicit LoopbackCommunicator(std::string name) : Communicator(name) {}
-    int send(const MessageBoxInterface &outbox, char *data_start) override {
+    int send(const MessageBoxInterface &outbox, const char *data_start) override {
         deque<char> data{};
         for (size_t i=0; i < outbox.msg_len; i++)
             data.push_back(*(data_start+i));
@@ -129,3 +137,4 @@ public:
     ~LoopbackCommunicator() override = default;
 };
 
+#endif
