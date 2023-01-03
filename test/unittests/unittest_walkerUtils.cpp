@@ -11,23 +11,23 @@ class JacobianRotatedAxisTest : public ::testing::Test {
 public:
     Vector3f axis, input, expected_output, output;
     Matrix3f Jacobian;
-    void calc_Jacobian() {Jac_rotated_wrt_axis_angle(Jacobian, axis, input);}
+    void calc_Jacobian() { Jac_rotated_wrt_axis_angle(Jacobian, axis, axis_angle_to_R(axis), input);}
 };
 
 TEST_F(JacobianRotatedAxisTest, TestZeroInput) {
     input = Vector3f::Zero();
-    calc_Jacobian();
     for (float x=- - 3; x < 3.1; x += 1) {
         for (float y = -3; y < 3.1; y += 1) {
             for (float z = -3; z < 3.1; z += 1) {
                 axis = Vector3f{{x, y, z}};
-                Jac_rotated_wrt_axis_angle(Jacobian, axis, input); //calc_Jacobian();
+                calc_Jacobian();
                 EXPECT_LT(Jacobian.norm(), 0.001);
             }
         }
     }
 }
 
+//Fail due to BUG in Jac_rotated_wrt_axis_angle
 TEST_F(JacobianRotatedAxisTest, TestZeroAxis) {
     axis = Vector3f::Zero();
     calc_Jacobian();
@@ -35,7 +35,7 @@ TEST_F(JacobianRotatedAxisTest, TestZeroAxis) {
         for (float y = -3; y < 3.1; y += 1) {
             for (float z = -3; z < 3.1; z += 1) {
                 input = Vector3f{{x, y, z}};
-                Jac_rotated_wrt_axis_angle(Jacobian, axis, input); //calc_Jacobian();
+                calc_Jacobian();
                 ASSERT_LT(Jacobian.norm(), 0.001);
             }
         }

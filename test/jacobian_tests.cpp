@@ -14,7 +14,7 @@ void fk_jac_true_ref(Vector3f &output, const Vector3f &input, const Vector3f&) {
 }
 
 void axis_jac_forTest(Matrix3f &jacobian, const Vector3f &input, const Vector3f&other_input) {
-    Jac_rotated_wrt_axis_angle(jacobian, input, other_input);
+    Jac_rotated_wrt_axis_angle(jacobian, input, axis_angle_to_R(input), other_input);
 }
 void axis_angle_jac_true_ref(Vector3f &output, const Vector3f &axis_angle, const Vector3f&vector) {
     float angle = axis_angle.norm();
@@ -31,7 +31,7 @@ void unit_jac_true_ref(Vector3f &output, const Vector3f &input, const Vector3f&)
 }
 
 
-int main(void) {
+int main() {
     unique_ptr<JacobianTest> jacobianTest {std::make_unique<JacobianTest>()};
     WalkerSettings testSettings("settings/jacobian_test_settings.xml");
 

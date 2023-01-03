@@ -31,11 +31,13 @@ void SensorBoss::predict(const RobotState &state_pred, const RobotState &last_st
     Vector3f accel_pred = (state_pred.vel() - last_state.vel()) / dt + IMU_GRAVITY;
     vect_pred_.segment<3>(IDX_ACCEL) = state_pred.RT * accel_pred;
     jac.block<3,3>(IDX_ACCEL, RobotState::IDX_VEL) = state_pred.RT / dt;
-    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_ACCEL, RobotState::IDX_AXIS), state_pred.axis(), accel_pred);
+    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_ACCEL, RobotState::IDX_AXIS), state_pred.axis(),
+                               state_pred.R, accel_pred);
 
     vect_pred_.segment<3>(IDX_GYRO) = state_pred.RT * state_pred.angvel();
     jac.block<3,3>(IDX_GYRO, RobotState::IDX_ANGVEL) = state_pred.RT;
-    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_GYRO, RobotState::IDX_AXIS), state_pred.axis(), state_pred.angvel());
+    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_GYRO, RobotState::IDX_AXIS), state_pred.axis(),
+                               state_pred.R, state_pred.angvel());
 
     data_pred_.timestamp_us = data_.timestamp_us + (uint32_t)(dt * 1e6);
 }

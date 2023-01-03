@@ -23,18 +23,24 @@ std::ostream& operator<<(std::ostream& os, const scalar_statistic& data) {
 }
 
 // rotation
-void Jac_rotated_wrt_axis_angle(Eigen::Ref<Matrix3f> Jacobian, const Vector3f &axis, const Vector3f &vec) {
-    // Buckle up cowboys because this is a whole mess of an equation
-    // TODO BUG
-    float angle = axis.norm();
-    Vector3f first_part{(cosf(angle) - sinf(angle)/angle) * axis.cross(vec) * powf(angle, -2)
-                        - sinf(angle) * vec
-                        + axis.dot(vec) * powf(angle, -2) * (sinf(angle) + 2*(cosf(angle)-1) / angle) * axis};
-    Matrix3f raised_vec {{0, -vec(2), vec(1)}, {vec(2), 0, -vec(0)}, {-vec(1), vec(0), 0}};
-    Jacobian = (first_part * axis.transpose() - sinf(angle) * raised_vec
-                +(1 - cosf(angle)) / angle * (axis * vec.transpose() + axis.dot(vec) * Matrix3f::Identity())) / angle;
+void Jac_rotated_wrt_axis_angle(Eigen::Ref<Matrix3f> Jacobian, const Vector3f &axis_angle,
+                                       const Matrix3f &R, const Vector3f &unrotated_vector) {
+    // from A compact formula for the derivative of a 3-D rotation in exponential coordinates
+    // Guillermo Gallego, Anthony Yezzi 2014
+    float angle = axis_angle.norm();
+    Jacobian = - R * raised_cross_matrix(unrotated_vector) / (angle * angle)
+               * (axis_angle * axis_angle.transpose()
+                  + (R.transpose() - Matrix3f::Identity()) * raised_cross_matrix(axis_angle));
 }
 
+Matrix3f axis_angle_to_R(const Vector3f &axis_angle) {
+    float angle = axis_angle.norm();
+    return Eigen::AngleAxisf(angle, axis_angle / angle).toRotationMatrix();
+}
+
+Matrix3f raised_cross_matrix(const Vector3f &vec) {
+    return Matrix3f{{0, -vec(2), vec(1)}, {vec(2), 0, -vec(0)}, {-vec(1), vec(0), 0}};
+}
 
 void jacobian_unitvec_wrt_vec(Matrix3f &jacobian, const Vector3f &vec) {
     float norm = vec.norm();
