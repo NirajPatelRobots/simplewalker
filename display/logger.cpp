@@ -9,8 +9,8 @@ shared_ptr<Logger> stdlogger = make_shared<Logger>();
 
 Logger::Logger(string filename, bool log_newline)
     : disable(false), headerSent(false), newline(log_newline), savetofile(false),
-      filename(filename), header(""), outstr(""),  lognum(0), skipcntr(0) {
-    if (filename.size() > 0) {
+      filename(filename), header(""), outstr(""),  lognum(0), skipcntr(0), fieldEndIndexes() {
+    if (!filename.empty()) {
         outFile.open(filename, std::ios::trunc);
         if (outFile.is_open()) {
             savetofile = true;
@@ -27,7 +27,7 @@ void Logger::make_field(string name) {
     }
 }
 
-void Logger::finish_log_field(void) {
+void Logger::finish_log_field() {
     while (outstr.str().size() < fieldEndIndexes.at(lognum)) {
         outstr << " ";
     }

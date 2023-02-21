@@ -3,7 +3,8 @@ March 2022
 TODO:
     legs
     velocity damping
-    BUG: rotation wrong
+    move prediction to dynamics
+    set_motion_noise
 */
 #ifndef STATEESTIMATION_HPP
 #define STATEESTIMATION_HPP
@@ -21,8 +22,8 @@ public:
     RobotState state, state_pred;
     const MatrixXf& state_covariance;
     const float dt;
-    void predict(void);
+    void predict();
     void correct(const SensorBoss &sensors);
-};
+ };
 
 #endif
