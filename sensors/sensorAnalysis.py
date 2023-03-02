@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import logReader
 from scipy.optimize import minimize
+import os
 
 @dataclass
 class AnalyzedIMULog:
@@ -69,7 +70,7 @@ class SensorBiasCalculator:
         self.result = minimize(calc_residual, np.zeros(3), args=(log_means, self.expected_magnitude),
                                jac=True, tol=self.solver_tolerance)
         if not self.result.success:
-            raise RuntimeError("Solver couldn't solve bias for " + sensor_name)
+            raise RuntimeError("Solver couldn't solve bias for " + self.sensor_name)
         self.bias = self.result.x
         return self.bias
 
@@ -87,6 +88,11 @@ class SensorBiasCalculator:
         print(self.sensor_name, "Bias:", self.bias, "unbiased means:")
         for log in self.analyzed:
             print(log.mean - self.bias, "mag =", np.linalg.norm(log.mean - self.bias))
+
+    @staticmethod
+    def stationary_log_names() -> List[str]:
+        return [f.replace(".log", "") for f in os.listdir("data/")
+                if f.startswith("stationary_calibration_") and f.endswith(".log")]
 
 
 def load_sensor_log(log_name: str, sensor_name: str) -> logReader.LoadedLog:
@@ -106,10 +112,9 @@ def load_sensor_log(log_name: str, sensor_name: str) -> logReader.LoadedLog:
 if __name__ == '__main__':
     for sensor_name, expected_mag, tolerance in [("accel", 9.81, 1e-3), ("gyro", 0., 1e-14)]:
         calc = SensorBiasCalculator(sensor_name, expected_mag, tolerance)
-        for log_name in sys.argv[1:]:
+        for log_name in SensorBiasCalculator.stationary_log_names():
             calc.analyze_log(load_sensor_log(log_name, sensor_name))
         calc.print_logs()
         calc.calc_sensor_bias()
         calc.print_results()
         print("\n")
-

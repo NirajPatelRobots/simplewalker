@@ -39,7 +39,7 @@ class LoadedLog:
             fieldnames = [f.strip(" |") for f in next(reader) if len(f) > 0]
         fields = OrderedDict()
         for name in fieldnames:
-            match = re.match(r"(.+)\((.+)\)", name)
+            match = re.match(r"(.+)[\[\(](.+)[\]\)]", name)
             if match is None:
                 fields[name] = (1,)
             else:
