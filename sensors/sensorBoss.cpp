@@ -18,6 +18,26 @@ void SensorBoss::update_sensors(const SensorData *raw_data) {
     data_vect_ = Eigen::Map<const SensorVector>(vect_start(raw_data)) - bias;
 }
 
+void SensorBoss::predict(const RobotState &state_pred, float dt) {
+    Vector3f imu_accel_pred_world = IMU_ORIENTATION * (state_pred.acceleration + GRAVITY_ACCEL);
+    vect_pred_.segment<3>(IDX_ACCEL) = state_pred.RT * imu_accel_pred_world;
+    // accel is not in state vector, so accelerometer is a fcn of velocity in state equations
+    jac.block<3,3>(IDX_ACCEL, RobotState::IDX_VEL) = state_pred.RT * IMU_ORIENTATION / dt;
+    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_ACCEL, RobotState::IDX_AXIS), -state_pred.axis(),
+                               state_pred.RT, imu_accel_pred_world);
+
+    vect_pred_.segment<3>(IDX_GYRO) = state_pred.RT * IMU_ORIENTATION * state_pred.angvel();
+    jac.block<3,3>(IDX_GYRO, RobotState::IDX_ANGVEL) = state_pred.RT * IMU_ORIENTATION;
+    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_GYRO, RobotState::IDX_AXIS), -state_pred.axis(),
+                               state_pred.RT, IMU_ORIENTATION * state_pred.angvel());
+
+    data_pred_.timestamp_us = state_pred.timestamp_us;
+}
+
+bool SensorBoss::data_is_valid(void) const {
+    return true;    //TODO
+}
+
 void SensorBoss::set_bias(std::vector<float> accel_bias, std::vector<float> gyro_bias) {
     if (accel_bias.size() == 3)
         bias.segment<3>(IDX_ACCEL) = Eigen::Map<Vector3f>(accel_bias.data());
@@ -27,23 +47,13 @@ void SensorBoss::set_bias(std::vector<float> accel_bias, std::vector<float> gyro
     else std::cerr << "Could not set sensor gyro bias" << endl;
 }
 
-void SensorBoss::predict(const RobotState &state_pred, const RobotState &last_state, float dt) {
-    Vector3f accel_pred = (state_pred.vel() - last_state.vel()) / dt + IMU_GRAVITY;
-    vect_pred_.segment<3>(IDX_ACCEL) = state_pred.RT * accel_pred;
-    jac.block<3,3>(IDX_ACCEL, RobotState::IDX_VEL) = state_pred.RT / dt;
-    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_ACCEL, RobotState::IDX_AXIS), state_pred.axis(),
-                               state_pred.R, accel_pred);
-
-    vect_pred_.segment<3>(IDX_GYRO) = state_pred.RT * state_pred.angvel();
-    jac.block<3,3>(IDX_GYRO, RobotState::IDX_ANGVEL) = state_pred.RT;
-    Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_GYRO, RobotState::IDX_AXIS), state_pred.axis(),
-                               state_pred.R, state_pred.angvel());
-
-    data_pred_.timestamp_us = data_.timestamp_us + (uint32_t)(dt * 1e6);
-}
-
-bool SensorBoss::data_is_valid(void) const {
-    return true;    //TODO
+bool SensorBoss::set_IMU_orientation(const std::vector<float> &orientation) {
+    if (orientation.size() == 9) {
+        IMU_ORIENTATION = Eigen::Map<const Matrix3f>(orientation.data());
+        return true;
+    }
+    std::cerr << "Could not set IMU Rotation matrix from vector with size " << orientation.size() << endl;
+    return false;
 }
 
 const Vector3f SensorBoss::accel() const {return data_vect.segment<3>(IDX_ACCEL);}

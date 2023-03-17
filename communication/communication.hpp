@@ -10,7 +10,6 @@ TODO:
     detect late message
     custom exception
     skip every so many sends
-    MessageInbox start by receiving a few messages function with printout (replace start_control_communication)
 */
 #ifndef SIMPLEWALKER_COMM_HPP
 #define SIMPLEWALKER_COMM_HPP
@@ -30,6 +29,8 @@ public:
     const int16_t msgID;
     const size_t msg_len;
     virtual void set_message(deque<char>::iterator data_start, deque<char>::iterator data_end) = 0;
+    virtual void clear() = 0;
+    virtual int num_available() { return 0;}
     virtual ~MessageBoxInterface() = default;
 };
 
@@ -46,6 +47,7 @@ public:
     explicit Communicator(std::string &_name)
             : num_bad_bytes_in_(0), num_bad_bytes_out_(0), inboxes(), name_(_name),
               num_bad_bytes_in(num_bad_bytes_in_), num_bad_bytes_out(num_bad_bytes_out_), name(name_) {}
+
     void add_inbox(MessageBoxInterface *new_inbox) {
         if (id_is_registered(new_inbox->msgID)) {throw std::invalid_argument("message ID already registered");}
         inboxes.push_back(new_inbox);
@@ -57,8 +59,27 @@ public:
     MessageBoxInterface *get_inbox(int query_id) {
         for (auto inbox : inboxes) {if (inbox->msgID == query_id) return inbox;} return nullptr;
     }
+
     virtual void receive_messages() = 0;
     virtual int send(const MessageBoxInterface &outbox, const char *data_start) = 0; //return 0 on success
+    void clear_all_messages() {
+        for (auto inbox : inboxes) inbox->clear();
+    }
+    void flush_message_queue(int num_to_discard = 3, bool print_wait_message = false) {
+        if (print_wait_message)
+            std::cout<<"Waiting for " << name_ << " messages...\r" << std::flush;
+        int messages_received = 0;
+        clear_all_messages();
+        while (messages_received < num_to_discard) {
+            receive_messages();
+            for (auto inbox : inboxes) {
+                messages_received += inbox->num_available();
+            }
+            clear_all_messages();
+        }
+        if (print_wait_message)
+            std::cout<<"                                                         \r" << std::flush;
+    }
     virtual ~Communicator() = default;
 };
 
@@ -92,8 +113,8 @@ public:
     void set(const T& message) {
         messages.push_back(message);
     }
-    void clear() {while (!messages.empty()) messages.pop_back();}
-    int num_available() {return messages.size();}
+    void clear() override {while (!messages.empty()) messages.pop_back();}
+    int num_available() override {return messages.size();}
     ~MessageInbox() override = default;
     inline const static int SIZE = sizeof(T) / sizeof(char);
 };
@@ -114,6 +135,7 @@ public:
             ((char*)&message)[i] = *(data_start + i);
         }
     }
+    void clear() override {message = T();}
     ~MessageOutbox() override = default;
     inline const static int SIZE = sizeof(T) / sizeof(char);
 };

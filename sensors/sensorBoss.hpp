@@ -22,6 +22,7 @@ protected:
     SensorVector bias;
     MatrixXf cov;
     MatrixXf jac;
+    Matrix3f IMU_ORIENTATION{Matrix3f::Identity()}; // imu_measurement = RT * IMU_ORIENTATION * measurement_in_world_frame
     //Eigen::DiagonalMatrix<float, M> cov//TODO UNDERSTAND DIAGONAL
 public:
     const static size_t IDX_ACCEL, IDX_GYRO;
@@ -32,10 +33,11 @@ public:
 
     SensorBoss(float accel_stddev, float gyro_stddev);
     void update_sensors(const SensorData *raw_data);
-    void set_bias(std::vector<float> accel_bias, std::vector<float> gyro_bias);
     // predict() sets prediction and jacobian from state_pred (sensor model)
-    void predict(const RobotState &state_pred, const RobotState &last_state, float dt);
-    bool data_is_valid(void) const;
+    void predict(const RobotState &state_pred, float dt);
+    bool data_is_valid() const;
+    void set_bias(std::vector<float> accel_bias, std::vector<float> gyro_bias);
+    bool set_IMU_orientation(const std::vector<float> &orientation);
     //get elements
     const Vector3f accel() const;
     const Vector3f gyro() const;
@@ -46,5 +48,4 @@ public:
 float *vect_start(SensorData *data);
 const float *vect_start(const SensorData *data);
 
-const Vector3f IMU_GRAVITY(0, 9.81, 0); // gravity on IMU in world frame
 #endif

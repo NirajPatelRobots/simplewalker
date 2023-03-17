@@ -32,7 +32,7 @@ const Vector3f FORWARD_DIR{1,0,0};
 const Vector3f UP_DIR{0,0,1};
 const Vector3f HORIZONTAL_DIR = LEFT_DIR + FORWARD_DIR;
 const Eigen::Array3f RIGHTSCALE{1., -1., 1.}; // multiply arrays by RIGHTSCALE to change right with left
-
+const Vector3f GRAVITY_ACCEL{-9.81 * UP_DIR};
 
 struct scalar_statistic {
     float mean{0};
@@ -65,10 +65,12 @@ axis_angle is the vector whose direction is the axis of rotation.
     the robot_state axis_angle is from body to world frame. That corresponds to unrotated_vector in body coordinates.
     if you want the jacobian of a vector in body frame wrt the world to body axis_angle,
         then axis_angle should be the - of the body to world axis_angle in robot_state.
+        and R should be robot_state.RT, the world to body rotation.
     the magnitude of axis_angle is the angle of rotation.
 unrotated_vector is the vector before rotation. 
 sets 3x3 Jacobian  */
-void Jac_rotated_wrt_axis_angle(Eigen::Ref<Matrix3f> Jacobian, const Vector3f &axis_angle, const Matrix3f &R, const Vector3f &unrotated_vector);
+void Jac_rotated_wrt_axis_angle(Eigen::Ref<Matrix3f> Jacobian, const Vector3f &axis_angle, const Matrix3f &R,
+                                const Vector3f &unrotated_vector);
 
 /* Given a vector, calculate its unit vector and the jacobian of the unit vector wrt the vector*/
 void jacobian_unitvec_wrt_vec(Matrix3f &jacobian, const Vector3f &vec);

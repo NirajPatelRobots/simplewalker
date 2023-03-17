@@ -1,6 +1,8 @@
 /* Code for testing state estimator
 TODO:
     true_state in LocalizationTester
+    test tilt (angle ramp input)
+    figure out where rotation should go (split out world_accel)
     move parts of tests into parent LocalizationTester
 March 2022 */
 #include "state_estimation.hpp"
@@ -24,10 +26,11 @@ public:
     std::normal_distribution<float> normal_distribution;
 
     string name;
-    Eigen::Map<Vector3f> accel_sensor, gyro_sensor;
     scalar_statistic prediction_time, correction_time;
     int step;
     float accel_noise_mag, gyro_noise_mag;
+    Matrix3f IMU_orientation; // matches IMU_GRAVITY
+    const Vector3f IMU_GRAVITY{0, 9.81, 0}; // gravity on IMU in world frame, defines orientation
 
     LocalizationTester(const string &testname) :
         walkerSettings("settings/settings.xml"),
@@ -41,19 +44,23 @@ public:
                                         walkerSettings.f("State_Estimation", "angvel_stddev"))),
         state(EKF->state), state_pred(EKF->state_pred),
         logger(make_unique<ConvenientLogger>("data/localization_test_" + testname + ".log")),
-        random_generator(0), normal_distribution(0, 1),
-        name(testname), accel_sensor(sensor_data->accel), gyro_sensor(sensor_data->gyro),
-        prediction_time(), correction_time(), step(0) {
-        for (unsigned i = 0; i < sizeof(SensorData); ++i) {
-            ((char *)sensor_data.get())[i] = 0;  // TODO ugly
-        }
+        random_generator(0), normal_distribution(0, 1), name(testname),
+        prediction_time(), correction_time(), step(0)
+        {
+        EKF->set_damping_deceleration(walkerSettings.f("State_Estimation", "damping_deceleration"));
+        Eigen::Map<SensorVector>(vect_start(sensor_data.get())) = SensorVector::Zero();
+        std::vector<float> IMU_orientation_raw({1., 0., 0.,
+                                                0., 0., 1.,
+                                                0., -1., 0.});
+        IMU_orientation = Eigen::Map<Matrix3f>(IMU_orientation_raw.data());
+        sensors->set_IMU_orientation(IMU_orientation_raw);
     }
 
     void do_state_estimation() {
         ++step;
         chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
         EKF->predict();
-        sensors->predict(state_pred, state, EKF->dt);
+        sensors->predict(state_pred, EKF->dt);
         chrono::time_point<chrono::steady_clock> timebetween = chrono::steady_clock::now();
         prediction_time.update(chrono::nanoseconds(timebetween - timestart).count());
         EKF->correct(*sensors);
@@ -68,6 +75,7 @@ public:
         logger->log("sensors_pred ", sensors->data_pred);
         logger->log("R", state.R);
         logger->log("R_pred", state_pred.R);
+        logger->log("State Covariance", EKF->state_covariance);
         logger->print();
     }
 
@@ -79,13 +87,13 @@ public:
     }
 
     void set_sensors_with_noise(const Vector3f &accel_clean, const Vector3f &gyro_clean, float timestamp) {
-        accel_sensor = accel_clean;
-        gyro_sensor = gyro_clean;
+        Eigen::Map<Vector3f>(sensor_data->accel) = accel_clean;
+        Eigen::Map<Vector3f>(sensor_data->gyro) = gyro_clean;
         for (int i = 0; i < 3; ++i) {
-            accel_sensor(i) += accel_noise_mag / sqrtf(3) * normal_distribution(random_generator);
-            gyro_sensor(i) += gyro_noise_mag / sqrtf(3) * normal_distribution(random_generator);
+            sensor_data->accel[i] += accel_noise_mag / sqrtf(3) * normal_distribution(random_generator);
+            sensor_data->gyro[i] += gyro_noise_mag / sqrtf(3) * normal_distribution(random_generator);
         }
-        sensor_data->timestamp_us = timestamp * 1e6;
+        sensor_data->timestamp_us = timestamp * 1000000;
         sensors->update_sensors(sensor_data.get());
     }
 };
@@ -129,14 +137,16 @@ public:
         accel_noise_mag = testSettings.f("start_moving", "accel_noise");
         gyro_noise_mag = testSettings.f("start_moving", "gyro_noise");
         Vector3f direction;
-        direction << Eigen::Map<Vector3f>(testSettings.vf("start_moving", "direction").data());
+        direction = Eigen::Map<Vector3f>(testSettings.vf("start_moving", "direction").data());
         direction /= direction.norm();
-        Vector3f accel_stationary = DEFAULT_ROTATION.transpose() * IMU_GRAVITY;
-        Vector3f accel_sensor_true = accel_stationary + target_velocity / ramp_duration * direction;
+        const Vector3f accel_stationary = DEFAULT_ROTATION.transpose() * IMU_GRAVITY;
+        Vector3f accel_sensor_true = accel_stationary
+                + DEFAULT_ROTATION.transpose() * IMU_orientation * target_velocity / ramp_duration * direction;
 
         log_step(-1.0);
         cout<< "Simulating Starting movement. Ramp to velocity of " << target_velocity << " m/s over "
-            << ramp_duration << " s, then hold for " << hold_duration <<" s. Start at "<<state.vect.transpose()<<endl;
+            << ramp_duration << " s, then hold for " << hold_duration <<" s. Direction: " << direction.transpose()
+            << endl << "Start at "<<state.vect.transpose()<<endl;
         cout<< "Accel noise: " << accel_noise_mag << " [m/s^2] gyro noise: " << gyro_noise_mag << " [rad/s]" << endl;
 
         int num_ramp_steps = static_cast<int>(ramp_duration / EKF->dt);
@@ -176,25 +186,26 @@ public:
         direction << Eigen::Map<Vector3f>(testSettings.vf("swing", "direction").data());
         direction /= direction.norm();
         float swing_angular_freq = 2 * M_PI / period;
+        Vector3f axis_direction = direction.cross(UP_DIR);
         state.vel() = swing_height * max_angle * swing_angular_freq * direction;
+//        state.angvel() = DEFAULT_ROTATION.transpose() * axis_direction * max_angle * swing_angular_freq;
 
         log_step(-1.0);
         cout<< "Simulating swinging back and forth " << num_swings <<" times, " << period <<" s each." << endl
         << "Swing is suspended from a height of " << swing_height << " [m]. Maximum angle is " << max_angle
-        << " [rad]" << endl << "Start at " << state.vect.transpose() << endl;
+        << " [rad] Direction is " << direction.transpose() << endl << "Start at " << state.vect.transpose() << endl;
         cout<< "Accel noise: " << accel_noise_mag << " [m/s^2] gyro noise: " << gyro_noise_mag << " [rad/s]" << endl;
 
-        Vector3f axis_direction = direction.cross(UP_DIR);
         int num_steps = static_cast<int>(num_swings * period / EKF->dt);
         for (int i = 0; i < num_steps; i++) {
             float t = i * EKF->dt;
             float swing_angle = max_angle * sin(swing_angular_freq * t);
             float swing_angle_rate = max_angle * swing_angular_freq * cos(swing_angular_freq * t);
-            Vector3f gyro_sensor_true =  DEFAULT_ROTATION.transpose() * axis_direction * swing_angle_rate;
-            // these forces are actually "specific forces", force per mass
-            Vector3f swing_cord_force = swing_angle_rate * swing_angle_rate * swing_height * UP_DIR;
-            Vector3f force_gravity = Eigen::AngleAxisf(-swing_angle, axis_direction) * IMU_GRAVITY; //UP_DIR * -9.81;
-            Vector3f accel_sensor_true =  DEFAULT_ROTATION.transpose() * (swing_cord_force + force_gravity);
+            Vector3f gyro_sensor_true =  DEFAULT_ROTATION.transpose() * IMU_orientation * axis_direction * swing_angle_rate;
+            // actually "specific force", force per mass in world frame
+            Vector3f swing_cord_force = Eigen::AngleAxisf(swing_angle, axis_direction)
+                                        * (swing_angle_rate * swing_angle_rate * swing_height * UP_DIR);
+            Vector3f accel_sensor_true =  DEFAULT_ROTATION.transpose() * IMU_orientation * (swing_cord_force + GRAVITY_ACCEL);
 
             set_sensors_with_noise(accel_sensor_true, gyro_sensor_true, i * EKF->dt);
             do_state_estimation();
@@ -217,13 +228,14 @@ public:
         gyro_noise_mag = testSettings.f("orbit", "gyro_noise");
 
         float timestep = EKF->dt;
-        cout << "Simulating circular path of radius " << 100 * path_rad << " cm\n";
-        cout << revolutions << " revolutions at " << path_freq << " rev/s\n";
+        cout << "Simulating circular path of radius " << 100 * path_rad << " cm" << endl
+             << revolutions << " revolutions at " << path_freq << " rev/s" << endl
+             << "Start at " << state.vect.transpose() << endl;
 
         float angvel_mag = path_freq * 2 * M_PI;
         float accel_mag = pow(angvel_mag, 2) * path_rad;
-        // start moving in +x direction in a circle at y = -path_rad
-        Vector3f accel_sensor_true = DEFAULT_ROTATION.transpose() * IMU_GRAVITY;
+        // start moving in +x direction in a circle from y = 0 to y = 2*path_rad
+        Vector3f accel_sensor_world = GRAVITY_ACCEL;
         Vector3f gyro_sensor_true = Vector3f::Zero();
         gyro_sensor_true(2) = angvel_mag;
         EKF->state.vel() = Vector3f(angvel_mag * path_rad, 0.0, 0.0);
@@ -232,10 +244,11 @@ public:
         float angle = 0;
 
         for (int i = 0; i < num_steps; i++) {
-            accel_sensor_true(0) = -accel_mag * sin(angle);
-            accel_sensor_true(1) = -accel_mag * cos(angle);
+            accel_sensor_world(FORWARD_IDX) = -accel_mag * sin(angle);
+            accel_sensor_world(LEFT_IDX) = accel_mag * cos(angle);
 
-            set_sensors_with_noise(accel_sensor_true, Vector3f::Zero(), i * EKF->dt);
+            set_sensors_with_noise(DEFAULT_ROTATION.transpose() * IMU_orientation * accel_sensor_world,
+                                   Vector3f::Zero(), i * EKF->dt);
             do_state_estimation();
             log_step(i * EKF->dt);
             angle += angvel_mag * timestep;

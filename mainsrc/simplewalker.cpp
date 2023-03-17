@@ -24,14 +24,6 @@ void set_state_msg(RobotStateMsg *msg, const RobotState &state, chrono::duration
     }
 }
 
-void start_control_communication(MessageInbox<ControlStateMsg_sns> &controlInbox) {
-    std::cout<<"Waiting for controller messages...\r" << std::flush;
-    while (controlInbox.num_available() < 3) {
-        controlInbox.comm.receive_messages();
-    }
-    controlInbox.clear();
-}
-
 
 int main() {
     WalkerSettings settings("settings/settings.xml"); //settings
@@ -45,6 +37,7 @@ int main() {
     unique_ptr<SensorBoss> sensors(new SensorBoss(settings.f("SensorBoss", "accel_stddev"),
                                                   settings.f("SensorBoss", "gyro_stddev")));
     sensors->set_bias(settings.vf("SensorBoss", "accel_bias"), settings.vf("SensorBoss", "gyro_bias"));
+    sensors->set_IMU_orientation(settings.vf("SensorBoss", "IMU_orientation"));
     float timestep = settings.f("General", "main_timestep");
     const bool prediction_only = settings.b("State_Estimation", "prediction_only");
     if (prediction_only) std::cout<<"\tPrediction Only, Ignoring Sensors"<<std::endl;
@@ -53,6 +46,7 @@ int main() {
                                    settings.f("State_Estimation", "axis_stddev"),
                                    settings.f("State_Estimation", "vel_stddev"),
                                    settings.f("State_Estimation", "angvel_stddev")));
+    EKF->set_damping_deceleration(settings.f("State_Estimation", "damping_deceleration"));
     RobotState &state = EKF->state;
     chrono::milliseconds looptime(static_cast<int>(1000 * timestep));
     chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
@@ -64,7 +58,7 @@ int main() {
 
     base_comm->start_server(settings.f("General", "state_send_port"));
     if (settings.b("General", "state_send")) base_comm->try_connect();
-    start_control_communication(controlInbox);
+    controller_comm->flush_message_queue(3, true);
 
     std::cout<<"    Start main loop, T = "<< looptime.count() << " ms     " << std::endl;
     chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
@@ -92,7 +86,7 @@ int main() {
         EKF->predict();
         set_logtime(logtimes.predict);
         sensors->update_sensors(&controlState->sensor_data);
-        sensors->predict(EKF->state_pred, state, EKF->dt);
+        sensors->predict(EKF->state_pred, EKF->dt);
         set_logtime(logtimes.sensorboss);
         if (prediction_only) {
             state.vect = EKF->state_pred.vect;

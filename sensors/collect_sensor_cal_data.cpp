@@ -1,21 +1,12 @@
 /* collect the data for sensor calibration 
 TODO:
-    combine start_control_communication with code in simplewalker.cpp, in communication message box
-    sleep so don't overwhelm processor?
     delete old calibration files so we don't get confused (ansible?)
 */
-#include "walkerUtils.hpp"
 #include "logger.hpp"
 #include "comm_serial.hpp"
 #include "messages.h"
+#include <thread>
 
-void start_control_communication(MessageInbox<ControlStateMsg_sns> &controlInbox) {
-    std::cout<<"Waiting for controller messages...\r" << std::flush;
-    while (controlInbox.num_available() < 3) {
-        controlInbox.comm.receive_messages();
-    }
-    controlInbox.clear();
-}
 
 int main() {
     unique_ptr<SerialCommunicator> controller_comm(new SerialCommunicator(string("Controller_serial")));
@@ -26,13 +17,13 @@ int main() {
     int log_num{0};
     string user_input{""};
 
-    start_control_communication(controlInbox);
+    controller_comm->flush_message_queue(3, true);
     cout << "Start calibration. Keep still.    " << endl;
     while (user_input != "done") {
         savelog = Logger("data/stationary_calibration_" + std::to_string(log_num) + ".log");
         int num_data_got = 0;
-        do {controller_comm->receive_messages();}
-            while (controlInbox.get_newest(*controlState) > 0); // flush incoming messages
+        controller_comm->clear_buffer();
+        controller_comm->flush_message_queue();
         while (num_data_got < NUM_DATA_NEEDED) {
             controller_comm->receive_messages();
             if (controlInbox.get_newest(*controlState) >= 0) {
@@ -40,6 +31,7 @@ int main() {
                 savelog.print();
                 ++num_data_got;
             }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         cout << "Move to a different position and press enter, or type done to stop ";
         std::getline(std::cin, user_input);
