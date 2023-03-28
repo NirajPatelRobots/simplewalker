@@ -13,6 +13,7 @@ Requirements:
 - python 3.7
 - rapidxml
 - googletest 1.10
+- wiringPi (`apt-get install libwiringpi-dev` to build on ubuntu)
 
 ### Microcontroller Instructions
 1. To develop for pico on the Zero, go to https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf Chapter 1 "Quick Pico Setup"
