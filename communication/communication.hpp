@@ -42,10 +42,11 @@ protected:
     std::deque<MessageBoxInterface *> inboxes;
     std::string name_;
 public:
+    std::deque<int16_t> unexpected_IDs;
     const unsigned int &num_bad_bytes_in, &num_bad_bytes_out;
     const std::string &name;
     explicit Communicator(std::string &_name)
-            : num_bad_bytes_in_(0), num_bad_bytes_out_(0), inboxes(), name_(_name),
+            : num_bad_bytes_in_(0), num_bad_bytes_out_(0), inboxes(), name_(_name), unexpected_IDs(),
               num_bad_bytes_in(num_bad_bytes_in_), num_bad_bytes_out(num_bad_bytes_out_), name(name_) {}
 
     void add_inbox(MessageBoxInterface *new_inbox) {

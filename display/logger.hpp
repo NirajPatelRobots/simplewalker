@@ -25,6 +25,8 @@ TODO:
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <deque>
+#include <iomanip>
 #include "walkerUtils.hpp"
 #include "rapidxml.hpp"
 
@@ -57,6 +59,7 @@ void set_logtime(float &logtime); //sets this log time and starts counting from 
 
 class Logger {
 protected:
+    const int W = 9;
     bool disable, headerSent, newline, savetofile;
     std::ofstream outFile;
     std::string filename, header;
@@ -64,9 +67,9 @@ protected:
     unsigned lognum, skipcntr;
     std::vector<unsigned> fieldEndIndexes;
     void make_field(string name);
-    void print_line(void);
+    void print_line();
     void write_file_line_text(string text);
-    void finish_log_field(void);
+    void finish_log_field();
 public:
     Logger(string filename = "", bool log_newline = false);  //default file is stdout
     void log(string name, float x);
@@ -77,6 +80,16 @@ public:
     void log(const Logtimes &logtimes);
     void log(string name, const WalkerSettings &settings);
     void log(string groupname, string name, const WalkerSettings &settings);
+    template<typename T>
+    void log(const string &name, const std::deque<T> &x) {
+        if (disable) return;
+        outstr << "[ ";
+            for (const T &x_i : x) outstr << std::setw(9) << x_i << " ";
+        outstr << "], ";
+        if (!headerSent)
+            make_field(name + " [" + std::to_string(x.size()) + "]");
+        finish_log_field();
+    }
 
     bool print(unsigned skipevery = 0);
     bool dontprint(unsigned skipevery = 0); //removes logging

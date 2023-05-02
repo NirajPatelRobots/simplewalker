@@ -1,8 +1,6 @@
 #include "logger.hpp"
 
-#include <iomanip>
 
-const int W = 9;
 std::chrono::time_point<std::chrono::steady_clock> timerstart;
 
 shared_ptr<Logger> stdlogger = make_shared<Logger>();

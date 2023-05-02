@@ -1,5 +1,6 @@
 #include "comm_serial.hpp"
 #include <wiringSerial.h> // raspberry pi serial
+#include <algorithm>
 
 SerialCommunicator::SerialCommunicator(string _name) : Communicator(_name) {
     serialfile = serialOpen("/dev/ttyACM0", 115200);
@@ -16,6 +17,8 @@ MessageBoxInterface* SerialCommunicator::parse_buffer_inbox() {
     int16_t ID = ((int16_t)(instream[0] & 0xFF) + (int16_t)((instream[1] & 0xFF) << 8));
     MessageBoxInterface* inbox = get_inbox(ID);
     if (!inbox) {
+        if (std::find(unexpected_IDs.begin(), unexpected_IDs.end(), ID) == unexpected_IDs.end())
+            unexpected_IDs.push_back(ID);
         instream.pop_front();
         num_bad_bytes_in_++;
     }
