@@ -3,7 +3,7 @@ TODO: values accessible in multiple ways. bitfields for errcode and command?
 */
 #ifndef SIMPLEWALKER_MESSAGES_H
 #define SIMPLEWALKER_MESSAGES_H
-#include "walkertypes.h"
+#include "../mainsrc/walkertypes.h"
 
 //everything in SI units and radians unless stated otherwise
 
@@ -19,7 +19,7 @@ const uint16_t MotorTestCommandMsgID = 0x0D11;
 struct ControlTargetMsg { // target angle and velocity with leg torque from comp to micro
     uint16_t ID;
     uint16_t command; // can be defined
-    float angle_r[3]; //TODO: accesible through non-right and left 6-arrays?
+    float angle_r[3]; //TODO: accessible through non-right and left 6-arrays?
     float angle_l[3]; //these are targets, not actual
     float angvel_r[3];
     float angvel_l[3];
@@ -37,7 +37,7 @@ struct ControlStateMsg { // sends current motor control and sensor state from th
     uint32_t timestamp_us; //microseconds
     float accel[3];
     float gyro[3];
-    float angle_r[3]; //TODO: accesible through non-right and left 6-arrays?
+    float angle_r[3]; //TODO: accessible through non-right and left 6-arrays?
     float angle_l[3];
     float angvel_r[3];
     float angvel_l[3];

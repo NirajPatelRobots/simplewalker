@@ -27,8 +27,10 @@ Requirements:
     make
     ```
 
-3. Check the pico is connected, then load the built .uf2 file onto the pico
+3. Unplug the pico, then hold down the BOOTSEL button on the pico. 
+Plug in the pico and keep the button held down until the green light on the zero stabilizes. 
 
+4. Check the pico is connected, then load the built .uf2 file onto the pico:
     ```
     sudo picotool info -a
     sudo picotool load <name>.uf2 -v -x

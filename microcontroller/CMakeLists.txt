@@ -6,12 +6,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(PICO_ENABLE_CXX_EXCEPTIONS 1)
 pico_sdk_init()
 
+set(simplewalker_interboard_comm "../mainsrc/walkertypes.h" "../communication/messages.h")
+
 add_executable(controller_main
 controller_main.cpp
 mpu6050_i2c.c
 mpu6050.cpp
 pico_comm.cpp
-../communication/messages.h
+${simplewalker_interboard_comm}
 )
 # pull in common dependencies
 target_link_libraries(controller_main pico_stdlib hardware_i2c)
@@ -24,7 +26,8 @@ pico_add_extra_outputs(controller_main)
 add_executable(hardware_test
 hardwareTest.cpp
 motors.cpp
-sensorReader.cpp
+        ADC_reader.cpp
+        ${simplewalker_interboard_comm}
 )
 # pull in common dependencies
 target_link_libraries(hardware_test pico_stdlib hardware_pwm hardware_spi)
@@ -37,7 +40,8 @@ pico_add_extra_outputs(hardware_test)
 add_executable(test_motor
 testMotor.cpp
 motors.cpp
-sensorReader.cpp
+        ADC_reader.cpp
+        ${simplewalker_interboard_comm}
 )
 # pull in common dependencies
 target_link_libraries(test_motor pico_stdlib hardware_pwm hardware_spi)

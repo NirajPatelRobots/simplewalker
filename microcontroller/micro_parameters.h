@@ -7,3 +7,12 @@
 #define PARAM_ANGVEL 1.0
 #define PARAM_COUL 1.0
 #define IMU_TEMP_MAX 85.0
+/*return battery voltage (float).*/
+/* R_high = 329 kOhm R_low = 993 kOhm
+O-------/\/\/\/---o----/\/\/\/----O
+V_Batt  R_high  sensor  R_low   GND
+V_sens = V_Batt*R_low/(R_high+R_low)
+scale = V_ref/V_sens/max_sense = 3.3/0.249/1023 */
+const float ADC_BATTERY_VOLTAGE_SCALE = 0.0130;
+const int ADC_ANGLE_OFFSET = -512;
+const float ADC_ANGLE_SCALE = 0.02;
