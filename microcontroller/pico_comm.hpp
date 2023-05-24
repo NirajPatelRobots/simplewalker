@@ -3,9 +3,16 @@
 */
 
 #include "pico/stdlib.h"
+#include "../communication/communication.hpp"
 
-bool read_struct(char *buff, size_t length, uint16_t ID, int timeout);
-
-void send_struct(char *buff, size_t length);
-
-void pico_comm_init(void); // wraps stdio_init_all()
+class PicoCommunication : public Communicator {
+    deque<char> instream{};
+    MessageBoxInterface *parse_buffer_inbox();
+public:
+    int timeout_us{1000};
+    explicit PicoCommunication(string name); // wraps stdio_init_all()
+    PicoCommunication() : PicoCommunication("Pico Communication") {}
+    ~PicoCommunication() override = default; // cannot be cleaned up without disrupting communication
+    void receive_messages() override;
+    int send(const MessageBoxInterface &outbox, const char *data_start) override; //return 0 on success
+};

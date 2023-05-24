@@ -6,6 +6,8 @@ Niraj April 2022 */
 #include "../communication/messages.h"
 #include "micro_parameters.h"
 #include <stdio.h> //DEGUB DEBUG
+#include <memory>
+using std::shared_ptr, std::make_shared, std::unique_ptr, std::make_unique;
 
 
 bool handle_IMU(struct repeating_timer *t) {
@@ -14,15 +16,14 @@ bool handle_IMU(struct repeating_timer *t) {
 }
 
 int main() {
-    struct ControlStateMsg *state = new struct ControlStateMsg;
-    *state = {};
+    unique_ptr<PicoCommunication> comm{make_unique<PicoCommunication>()};
+    auto controlStateOutbox{make_unique<MessageOutbox<ControlStateMsg>>(ControlStateMsgID, *comm)};
+    struct ControlStateMsg *state = &controlStateOutbox->message;
     state->ID = ControlStateMsgID;
-    state->errcode = 0;
     MPU6050 *IMU = new MPU6050(state->accel, state->gyro);
     absolute_time_t looptarget;
     struct repeating_timer timer;
 
-    pico_comm_init();
     sleep_ms(100);
     IMU->reset();
     IMU->power(1, false, false, false);
@@ -36,15 +37,10 @@ int main() {
         state->timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
         state->errcode |= (CTRLSTERR_IMU + CTRLSTERR_TEMP)
                          * (IMU->chip_temp > IMU_TEMP_MAX);
-        send_struct((char *)state, sizeof(struct ControlStateMsg));
-        /*for (int i = 0; i < 12; i++) {
-            printf("%.2x|", (uint8_t)(((char *)state)[i]));
-        }
-        printf("   %f\n", state->accel[0]); */
+        controlStateOutbox->send();
         looptarget = delayed_by_us(looptarget, ADMIN_DT_US);
         sleep_until(looptarget);
     }
     delete IMU;
-    delete state;
     return 0;
 }

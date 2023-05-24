@@ -1,7 +1,8 @@
 # Simplewalker
 A two-legged walking robot
 ---
-A raspberry pi zero, the Main Computer, calculates state, balance and dynamics. A pi pico is the low level motor controller and sensor reader.
+A raspberry pi zero, the Main Computer, calculates state, balance and dynamics. 
+A pi pico is the low level motor controller and sensor reader.
 
 ## Download Instructions
 Download the repo to a raspberry pi zero (or another SBC).
@@ -14,6 +15,9 @@ Requirements:
 - rapidxml
 - googletest 1.10
 - wiringPi (`apt-get install libwiringpi-dev` to build on ubuntu)
+- MPU6050 pico code: https://github.com/NirajPatelRobots/pico-examples
+
+To develop for pico on a non-pi computer: https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf
 
 ### Microcontroller Instructions
 1. To develop for pico on the Zero, go to https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf Chapter 1 "Quick Pico Setup"
