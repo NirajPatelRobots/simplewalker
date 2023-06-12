@@ -7,7 +7,7 @@
 #define PARAM_ANGVEL 1.0
 #define PARAM_COUL 1.0
 #define IMU_TEMP_MAX 85.0
-/*return battery voltage (float).*/
+
 /* R_high = 329 kOhm R_low = 993 kOhm
 O-------/\/\/\/---o----/\/\/\/----O
 V_Batt  R_high  sensor  R_low   GND

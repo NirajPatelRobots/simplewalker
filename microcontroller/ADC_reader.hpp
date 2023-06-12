@@ -20,6 +20,7 @@ struct ADCChannel {
         raw_value = raw;
         scaled_value = gain * (raw + offset);
     }
+    float get_scaled_offset() { return gain * offset;}
 };
 
 class ADCReader {

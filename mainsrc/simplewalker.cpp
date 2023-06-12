@@ -30,8 +30,8 @@ int main() {
 
     unique_ptr<SerialCommunicator> controller_comm(new SerialCommunicator(string("Controller_serial")));
     unique_ptr<TCPCommunicator> base_comm(new TCPCommunicator(string("Base_TCP")));
-    MessageInbox<ControlStateMsg_sns> controlInbox(ControlStateMsgID, *controller_comm);
-    unique_ptr<ControlStateMsg_sns> controlState{new ControlStateMsg_sns({})};
+    MessageInbox<ControlStateMsg> controlInbox(ControlStateMsgID, *controller_comm);
+    unique_ptr<ControlStateMsg> controlState{new ControlStateMsg({})};
     MessageOutbox<RobotStateMsg> stateOutbox(RobotStateMsgID, *base_comm);
 
     unique_ptr<SensorBoss> sensors(new SensorBoss(settings.f("SensorBoss", "accel_stddev"),

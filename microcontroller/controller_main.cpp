@@ -18,9 +18,9 @@ bool handle_IMU(struct repeating_timer *t) {
 int main() {
     unique_ptr<PicoCommunication> comm{make_unique<PicoCommunication>()};
     auto controlStateOutbox{make_unique<MessageOutbox<ControlStateMsg>>(ControlStateMsgID, *comm)};
-    struct ControlStateMsg *state = &controlStateOutbox->message;
-    state->ID = ControlStateMsgID;
-    MPU6050 *IMU = new MPU6050(state->accel, state->gyro);
+    SensorData *sensorData = &controlStateOutbox->message.sensor_data;
+    controlStateOutbox->message.ID = ControlStateMsgID;
+    MPU6050 *IMU = new MPU6050(sensorData->accel, sensorData->gyro);
     absolute_time_t looptarget;
     struct repeating_timer timer;
 
@@ -34,8 +34,8 @@ int main() {
 
     looptarget = get_absolute_time();
     while (1) {
-        state->timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
-        state->errcode |= (CTRLSTERR_IMU + CTRLSTERR_TEMP)
+        sensorData->timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
+        controlStateOutbox->message.errcode |= (CTRLSTERR_IMU + CTRLSTERR_TEMP)
                          * (IMU->chip_temp > IMU_TEMP_MAX);
         controlStateOutbox->send();
         looptarget = delayed_by_us(looptarget, ADMIN_DT_US);
