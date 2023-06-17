@@ -5,8 +5,8 @@
     hip_out offset and scaling */
 
 
-uint Motors::pin_forward[NUM_MOTORS] = {13, 18, 8, 11, 16, 7};
-uint Motors::pin_reverse[NUM_MOTORS] = {15, 22, 10, 12, 16, 7};
+uint Motors::pin_forward[NUM_MOTORS] = {16, 18, 20, 14, 12, 13};
+uint Motors::pin_reverse[NUM_MOTORS] = {17, 19, 21, 15, 12, 13};
 
 Motors::Motors (void) {
     pwmwrap = 100;
@@ -39,7 +39,7 @@ void Motors::setMotor(Motornum num, float command) {
     } else if (num == left_hip_out) {
         pwm_set_gpio_level(pin_forward[left_hip_out], pwm_command + angle0offsetL);
     } else {
-        if (command > 0) {
+        if (pwm_command > 0) {
             pwm_set_both_levels(pwmslice_num[num], pwmwrap, pwmwrap-pwm_command);
         } else {
             pwm_set_both_levels(pwmslice_num[num], pwmwrap+pwm_command, pwmwrap);

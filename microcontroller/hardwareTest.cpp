@@ -14,7 +14,7 @@ int main() {
     shared_ptr<ADCChannel> right_hip_sensor = ADC.set_channel("right hip motor", 1, ADC_ANGLE_OFFSET, ADC_ANGLE_SCALE);
     ADC.connect_SPI();
     int waitms = 1000;
-    float magnitude{0.5}, angle{}, angle2{};
+    float magnitude{-0.5}, angle;
     unsigned int startTime, motorTime, ADCtime, multTime, sendTime = 0;
     while (1) {
         startTime = to_us_since_boot(get_absolute_time());
@@ -23,14 +23,11 @@ int main() {
         angle = ADC.read_ADC_scaled(1);
         ADC.read_ADC_scaled(0);
         ADCtime = to_us_since_boot(get_absolute_time()) - motorTime - startTime;
-        for (int i = 0; i < 1000000; i++) {
-            angle2 = angle * i;
-        }
+        magnitude = -magnitude;
         multTime = to_us_since_boot(get_absolute_time()) - ADCtime - motorTime - startTime;
-        printf("Battery: %.1f V, Angle: %.2f, time[us]: [Motor: %d, ADC: %d, Mult: %d, Send: %d]\n",
+        printf("Batt: %.1f V, Angle: %.2f, time[us]:(Motor: %d, ADC: %d, Mult: %d, Send: %d)\n",
                batteryVoltage->scaled_value, angle, motorTime, ADCtime, multTime, sendTime);
         sendTime = to_us_since_boot(get_absolute_time()) - multTime - ADCtime - motorTime - startTime;
         sleep_ms(waitms);
-        magnitude = -magnitude;
     }
 }
