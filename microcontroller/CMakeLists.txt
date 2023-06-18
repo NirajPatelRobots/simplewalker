@@ -11,13 +11,12 @@ set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 set(mpu6050_DIR ~/pico/pico-examples/i2c/mpu6050_i2c/)
 pico_sdk_init()
 
-set(simplewalker_interboard_comm "../mainsrc/walkertypes.h" "../communication/messages.h")
+set(simplewalker_interboard_comm "../mainsrc/walkertypes.h" "../communication/messages.h" "pico_comm.cpp")
 
 add_executable(controller_main
         controller_main.cpp
         ${mpu6050_DIR}/mpu6050_i2c.c
         ${mpu6050_DIR}/mpu6050.cpp
-        pico_comm.cpp
         ${simplewalker_interboard_comm}
 )
 # pull in common dependencies
@@ -31,7 +30,7 @@ pico_add_extra_outputs(controller_main)
 
 add_executable(hardware_test
         hardwareTest.cpp
-        motors.cpp
+        motor_output.cpp
         ADC_reader.cpp
         ${simplewalker_interboard_comm}
 )
@@ -45,7 +44,7 @@ pico_add_extra_outputs(hardware_test)
 
 add_executable(test_motor
         testMotor.cpp
-        motors.cpp
+        motor_output.cpp
         ADC_reader.cpp
         ${simplewalker_interboard_comm}
 )

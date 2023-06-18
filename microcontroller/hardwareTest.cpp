@@ -1,13 +1,13 @@
 //test motors.cpp and ADCReader.cpp
 #include "micro_parameters.h"
-#include "motors.hpp"
+#include "simplewalker_motors.hpp"
 #include "ADC_reader.hpp"
 #include <stdio.h>
 #include "pico/stdlib.h"
 
 int main() {
     stdio_init_all();
-    Motors motors;
+    Simplewalker_MotorOutput motorOutput;
     Motornum motorNum = right_hip;
     ADCReader ADC{};
     shared_ptr<ADCChannel> batteryVoltage = ADC.set_channel("batteryVoltage", 0, 0, ADC_BATTERY_VOLTAGE_SCALE);
@@ -18,7 +18,7 @@ int main() {
     unsigned int startTime, motorTime, ADCtime, multTime, sendTime = 0;
     while (1) {
         startTime = to_us_since_boot(get_absolute_time());
-        motors.setMotor(motorNum, magnitude);
+        motorOutput.set(motorNum, magnitude);
         motorTime = to_us_since_boot(get_absolute_time()) - startTime;
         angle = ADC.read_ADC_scaled(1);
         ADC.read_ADC_scaled(0);
