@@ -12,7 +12,6 @@ const int NUM_DCMOTORS = 4, NUM_SERVOMOTORS = 2, NUM_MOTORS = NUM_DCMOTORS + NUM
 uint pin_forward[NUM_DCMOTORS] = {16, 18, 20, 14};
 uint pin_reverse[NUM_DCMOTORS] = {17, 19, 21, 15};
 uint pin_servo[NUM_SERVOMOTORS] = {12, 13};
-uint servo_offset[NUM_SERVOMOTORS] = {0, 0};
 enum Motornum {
     right_hip,
     right_knee,
@@ -31,7 +30,7 @@ public:
             motors.push_back(std::make_unique<DCMotorOutput>(pin_forward[i], pin_reverse[i]));
         }
         for (int i = 0; i < NUM_SERVOMOTORS; ++i) {
-            motors.push_back(std::make_unique<ServoMotorOutput>(pin_servo[i], servo_offset[i]));
+            motors.push_back(std::make_unique<ServoMotorOutput>(pin_servo[i]));
         }
     }
     void set(Motornum num, float fraction) {

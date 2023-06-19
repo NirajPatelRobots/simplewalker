@@ -20,10 +20,9 @@ public:
 
 class ServoMotorOutput : public MotorOutput {
     const uint pin, pwmslice_num;
-    const int pwm_offset;
 public:
-    ServoMotorOutput(uint _pin, uint _pwm_offset = 0);
-    int set_output(float fraction) override; // ensures abs(fraction) <= 1
+    ServoMotorOutput(uint _pin);
+    int set_output(float fraction) override; // ensures 0 <= fraction <= 1
 };
 
 #endif

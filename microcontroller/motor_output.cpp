@@ -34,19 +34,19 @@ int DCMotorOutput::set_output(float fraction) {
 }
 
 
-ServoMotorOutput::ServoMotorOutput(uint _pin, uint _pwm_offset)
-    : pin(_pin), pwmslice_num(pwm_gpio_to_slice_num(_pin)), pwm_offset(_pwm_offset) {
+ServoMotorOutput::ServoMotorOutput(uint _pin)
+    : pin(_pin), pwmslice_num(pwm_gpio_to_slice_num(_pin)) {
     gpio_set_function(pin, GPIO_FUNC_PWM);
-    pwm_set_gpio_level(_pin, pwm_offset);
     pwm_set_wrap(pwmslice_num, PWM_WRAP);
     pwm_set_enabled(pwmslice_num, true);
     pwm_set_clkdiv_int_frac(pwmslice_num, 16, 0); //give the processor a break
+    pwm_set_gpio_level(pin, PWM_WRAP / 2);
 }
 
 int ServoMotorOutput::set_output(float fraction) {
     int pwm_command = (int)(fraction * PWM_WRAP / M_PI);
     if (pwm_command > PWM_WRAP) pwm_command = PWM_WRAP;
     if (pwm_command < 0) pwm_command = 0;
-    pwm_set_gpio_level(pin, pwm_command + pwm_offset);
+    pwm_set_gpio_level(pin, pwm_command);
     return pwm_command;
 }
