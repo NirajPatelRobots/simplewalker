@@ -42,18 +42,18 @@ pico_enable_stdio_uart(hardware_test 0)
 # create map/bin/hex/uf2 file etc.
 pico_add_extra_outputs(hardware_test)
 
-add_executable(test_motor
-        testMotor.cpp
+add_executable(calibrate_motor
+        calibrateMotor.cpp
         motor_output.cpp
         ADC_reader.cpp
         ${simplewalker_interboard_comm}
 )
 # pull in common dependencies
-target_link_libraries(test_motor pico_stdlib hardware_pwm hardware_spi)
+target_link_libraries(calibrate_motor pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
-pico_enable_stdio_usb(test_motor 1)
-pico_enable_stdio_uart(test_motor 0)
+pico_enable_stdio_usb(calibrate_motor 1)
+pico_enable_stdio_uart(calibrate_motor 0)
 # create map/bin/hex/uf2 file etc.
-pico_add_extra_outputs(test_motor)
+pico_add_extra_outputs(calibrate_motor)
 
 

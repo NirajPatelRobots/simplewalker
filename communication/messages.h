@@ -7,24 +7,34 @@ TODO: values accessible in multiple ways. bitfields for errcode and command?
 
 //everything in SI units and radians unless stated otherwise
 
-struct MotorTestCommandMsg { //send to microcontroller to run motor tests
+struct MotorCalibrationTriggerMsg { //send to microcontroller to run motor calibration
     uint16_t ID;
     uint16_t motorNum;
-    float amplitude; //amp and freq are arbitrary and relative
+    float amplitude;
     float frequency;
     float dt;
+    float max_displacement, min_displacement; // max and min ADC value [0,1]
+    uint16_t send_skip_iterations; // how many interations of counting without sending
+    uint16_t text_output; // bool whether to output human-readable stdout or MotorCalibrationStateMsg
 };
-const uint16_t MotorTestCommandMsgID = 0x0D11;
+const uint16_t MotorCalibrationTriggerMsgID = 0x0D11;
 
-struct ControlTargetMsg { // target angle and velocity with leg torque from comp to micro
+struct MotorCalibrationStateMsg { // sent by microcontroller during motor calibration
+    uint16_t ID;
+    uint32_t timestamp_us;
+    float angle;
+    float angvel;
+    float voltage;
+};
+const uint16_t MotorCalibrationStateMsgID = 0x0C11;
+
+struct ControlTargetMsg { // target angle and velocity with predicted leg torque from main comp to micro
     uint16_t ID;
     uint16_t command; // can be defined
-    float angle_r[3]; //TODO: accessible through non-right and left 6-arrays?
-    float angle_l[3]; //these are targets, not actual
-    float angvel_r[3];
-    float angvel_l[3];
-    float torque_r[3];
-    float torque_l[3];
+    uint32_t time_us; //pico clock time to start this command
+    float angle[6];
+    float angle_vel[6];
+    float torque[6];
 };
 const uint16_t ControlTargetMsgID = 0x0D01;
 
