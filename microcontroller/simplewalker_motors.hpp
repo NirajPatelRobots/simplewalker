@@ -21,6 +21,10 @@ enum Motornum {
     left_hip_out,
 };
 
+bool is_servo(Motornum num) {
+    return (num == right_hip_out || num == left_hip_out);
+}
+
 class Simplewalker_MotorOutput {
 public:
     std::vector<std::unique_ptr<MotorOutput>> motors;

@@ -10,6 +10,7 @@ class PicoCommunication : public Communicator {
     MessageBoxInterface *parse_buffer_inbox();
 public:
     int timeout_us{1000};
+    int max_bytes_per_receive{256};
     explicit PicoCommunication(string name); // wraps stdio_init_all()
     PicoCommunication() : PicoCommunication("Pico Communication") {}
     ~PicoCommunication() override = default; // cannot be cleaned up without disrupting communication

@@ -7,7 +7,7 @@ TODO:
     */
 
 
-#include "motor_output.hpp"
+#include "simplewalker_motors.hpp"
 #include "ADC_reader.hpp"
 #include "pico_comm.hpp"
 #include "micro_parameters.h"
@@ -88,11 +88,10 @@ public:
     MotorCalibrator()
         : comm(std::make_unique<PicoCommunication>()),
           batteryVoltage(ADC.set_channel("batteryVoltage", 0, 0, ADC_BATTERY_VOLTAGE_SCALE)),
-          //trigger_inbox(make_shared<MessageInbox<MotorCalibrationTriggerMsg>>(MotorCalibrationTriggerMsgID, *comm)),
+          trigger_inbox(make_shared<MessageInbox<MotorCalibrationTriggerMsg>>(MotorCalibrationTriggerMsgID, *comm)),
           state_outbox(make_shared<MessageOutbox<MotorCalibrationStateMsg>>(MotorCalibrationStateMsgID, *comm)),
           instructions(make_shared<MotorCalibrationTriggerMsg>()) {
         ADC.connect_SPI();
-        //comm->add_inbox(trigger_inbox.get());
         state_outbox->message.ID = MotorCalibrationStateMsgID;
         instructions->motorNum = 0;
         instructions->dt = 0.003;
@@ -102,17 +101,25 @@ public:
     }
 
     int calibrate_motor() {
-        float V, lastV = 0.0, angle, angVel = 0.0; //[V], [V], [rad], [rad/s]
+        float V, lastV = 0.0, angle = 0.0, angVel; //[V], [V], [rad], [rad/s]
         int i = 0;
         send_skip_iteration_counter = 0;
 
-        return_motor_to_start();
+        if (is_servo((Motornum)(instructions->motorNum))) {
+            printf("implement servo pins\n");
+            return -2;
+        } else {
+            motor = make_shared<DCMotorOutput>(pin_forward[instructions->motorNum],
+                                               pin_reverse[instructions->motorNum]);
+        }
+
+        //return_motor_to_start();
         absolute_time_t looptarget = get_absolute_time();
         ADC.set_channel("motor", instructions->motorNum + 1, 0, 1);
         bool input_finished;
         do {
             if (instructions->frequency <= 0.001) {
-                input_finished = (i > const_voltage_duration * instructions->dt);
+                input_finished = (i * instructions->dt > const_voltage_duration);
                 V = instructions->amplitude;
             }
             else
@@ -129,17 +136,20 @@ public:
             report_result(angle, angVel, lastV, instructions->dt * i);
             i++;
             lastV = V; // shift i+1 because causality. So V[i] affects angle[i]
-            looptarget = delayed_by_us(looptarget, ADMIN_DT_US);
+            looptarget = delayed_by_us(looptarget, (uint64_t)(instructions->dt * 1e6));
             sleep_until(looptarget);
         } while(!input_finished);
+        printf("finished calibration\n");
+        //safely_set_motor(0, angle);
+        // TODO reset voltage to 0
         return 0;
     }
 
     bool safely_set_motor(float fraction, float angle) {
         motor->set_output(fraction);
-        if (fabs(angle) > instructions->max_displacement || fabs(angle) < instructions->min_displacement) {
+        if (fabs(angle) > instructions->max_displacement || angle < instructions->min_displacement) {
             printf("Test went out of range and was terminated\n");
-            return_motor_to_start();
+            //return_motor_to_start();
             return false;
         }
         return true;
@@ -159,6 +169,7 @@ public:
     void return_motor_to_start() {
         float kp = 0.002;
         int numInRange = 0;
+        if (instructions->text_output) printf("Returning motor to start...\n");
         while (numInRange < 10) {
             float angle = ADC.read_ADC_scaled(instructions->motorNum+1);
             motor->set_output(-kp * angle);
@@ -192,17 +203,21 @@ public:
 int main() {
     MotorCalibrator calibrator{};
     while (1) {
-//        calibrator.comm->receive_messages();
-//        printf("num_bad_bytes_in %d\n", calibrator.comm->num_bad_bytes_in);
-//        if (calibrator.trigger_inbox->get_newest(*calibrator.instructions) >= 0) {
-//            printf("Calibrate motor\n");
-//            calibrator.calibrate_motor();
-//        } else {
+        calibrator.comm->receive_messages();
+        printf("num_bad_bytes_in %d\n", calibrator.comm->num_bad_bytes_in);
+        if (calibrator.trigger_inbox->get_newest(*calibrator.instructions) >= 0) {
+//            if (calibrator.instructions->text_output)
+            printf("Calibrate motor %d; freq=%f, amp=%f, dt=%f\n",
+                   calibrator.instructions->motorNum, calibrator.instructions->frequency,
+                   calibrator.instructions->amplitude, calibrator.instructions->dt);
+            sleep_ms(500);
+            calibrator.calibrate_motor();
+        } else {
             calibrator.instructions->dt = 0.5;
             float angle = calibrator.ADC.read_ADC_raw(calibrator.instructions->motorNum+1);
             float angVel = calibrator.calc_angvel(angle);
             calibrator.report_result(angle, angVel, 0, to_us_since_boot(get_absolute_time()) * 1e-6);
             sleep_ms(500);
-//        }
+        }
     }
 }

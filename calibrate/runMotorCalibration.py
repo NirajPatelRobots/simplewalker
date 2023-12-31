@@ -1,21 +1,26 @@
 # -*- coding: utf-8 -*-
 """
+Work with the motor controller to take data to calibrate the motor.
+The motor controller has to run calibrate_motor.
 TODO:
-    better loop timing
+    remove local version?
+    receive data from controller
 
-Created Jun 2021
+Created Jun 2021, reworked late 2023
 @author: Niraj
 """
 
-import motorControl
-import sensorReader
 import numpy as np
 import time
 from os.path import sep
+import types
 
 RUN_LOCAL = False # if RUN_LOCAL, then the computer running this code is controlling the motors. IF RUN_LOCAL is False, then this code sends and receives information from a microcontroller
 
-if not RUN_LOCAL:
+if RUN_LOCAL:
+    import motorControl
+    import sensorReader
+else:
     import serial
     import struct
 
@@ -111,37 +116,59 @@ def excitationVoltage(frequency_scale, amplitude_scale):
         V = np.concatenate((V, amp*np.ones(length), -amp*np.ones(2*length), amp*np.ones(length)))
     V = np.concatenate((V, np.zeros((length))))
     return V
-        
+
+
+def make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, send_skip_iterations,
+                                        max_displacement, min_displacement, text_output) -> bytes:
+    return struct.pack("<hhfffffhh", 0x0D11, motorNum, amp_scale, freq_scale, dt, max_displacement, min_displacement,
+                       send_skip_iterations, text_output)
+
+
+def parse_MotorCalibrationStateMessage(message:bytes):
+    fields = struct.unpack("<hhfff", message)  # fields[0] is ID, not useful
+    return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
+
 
 def main():
     """run the tests with a text UI"""
+    if not RUN_LOCAL:
+        ser = serial.Serial(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
+                            stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+        if ser.is_open:
+            print("Connected to", ser.name)
+        else:
+            print("Could not connect to", ser.name)
     print("Motor test. Choose one of:",
           "run ['frequency_scale', ['amplitude_scale', ['filename']]]",
           "motornum number (0: R motor 1, 1: R motor 2, 2: L motor 1, 3: L motor 2)",
+          "max_ADC (float [0,1]) or min_ADC (float [0,1])"
           "save [filename]",
           "code", sep = "\n ")
     freq_scale = 1.
     amp_scale = 1.
     motorNum = 0
+    max_ADC = 1024
+    min_ADC = 0.
     V = np.array([])
     angle = np.array([])
     dt = 0.03 # seconds
     filename = None
-    if not RUN_LOCAL:
-        ser = serial.Serial(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
-                            stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=0.2)
     
     while True:
         args = input(">>> ").split()
         command = args[0] if len(args) > 0 else "" #command is first, the rest of the args are available if needed
         command = command.strip().lower()
         if command == "":
-            continue
+            if not RUN_LOCAL:
+                line = ser.read_until().decode().strip()
+                while len(line) > 0:
+                    print(line)
+                    line = ser.read_until().decode().strip()
         elif command == "run":
             if len(args) > 1:
-                amp_scale = float(args[2])
+                freq_scale = float(args[1])
                 if len(args) > 2:
-                    freq_scale = float(args[1])
+                    amp_scale = float(args[2])
                     if len(args) > 3:
                         filename = args[3]
                     else:
@@ -149,13 +176,15 @@ def main():
             if RUN_LOCAL:
                 V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
             else:
-                send = struct.pack("<hhfff", 0x0D01, motorNum, amp_scale, freq_scale, dt)
+                message = make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, 0,
+                                                              max_ADC, min_ADC, True)
                 ser.reset_input_buffer()
-                ser.write(send)
-                line = ser.read_until()
+                ser.write(message)
+                print("sent:", message)
+                line = ser.read_until().decode().strip()
                 while len(line) > 0:
                     print(line)
-                    line = ser.read_until()
+                    line = ser.read_until().decode().strip()
         elif command == "motornum":
             try:
                 motorNum = int(args[1])
@@ -167,7 +196,16 @@ def main():
             if len(args) > 1:
                 dt = float(args[1])
             print("dt:", dt)
+        elif command == "max_ADC":
+            if len(args) > 1:
+                max_ADC = float(args[1])
+            print("max ADC value:", max_ADC)
+        elif command == "min_ADC":
+            if len(args) > 1:
+                min_ADC = float(args[1])
+            print("min ADC value:", min_ADC)
         elif command.startswith("exit"):
+            ser.close()
             break
         elif command == "code":
             while not command == "exit":
