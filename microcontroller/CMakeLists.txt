@@ -12,6 +12,8 @@ set(mpu6050_DIR ~/pico/pico-examples/i2c/mpu6050_i2c/)
 pico_sdk_init()
 
 set(simplewalker_interboard_comm "../mainsrc/walkertypes.h" "../communication/messages.h" "pico_comm.cpp")
+set(pico_motor_IO_src "motor_output.cpp" "ADC_reader.cpp" "motor_IO.cpp")
+
 
 add_executable(controller_main
         controller_main.cpp
@@ -30,8 +32,7 @@ pico_add_extra_outputs(controller_main)
 
 add_executable(hardware_test
         hardwareTest.cpp
-        motor_output.cpp
-        ADC_reader.cpp
+        ${pico_motor_IO_src}
         ${simplewalker_interboard_comm}
 )
 # pull in common dependencies
@@ -44,8 +45,7 @@ pico_add_extra_outputs(hardware_test)
 
 add_executable(calibrate_motor
         calibrateMotor.cpp
-        motor_output.cpp
-        ADC_reader.cpp
+        ${pico_motor_IO_src}
         ${simplewalker_interboard_comm}
 )
 # pull in common dependencies

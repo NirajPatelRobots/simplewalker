@@ -13,7 +13,7 @@ struct MotorCalibrationTriggerMsg { //send to microcontroller to run motor calib
     float amplitude;
     float frequency;
     float dt;
-    float max_displacement, min_displacement; // max and min ADC value [0,1]
+    float max_displacement, min_displacement; // max and min angle
     uint16_t send_skip_iterations; // how many interations of counting without sending
     uint16_t text_output; // bool whether to output human-readable stdout or MotorCalibrationStateMsg
 };

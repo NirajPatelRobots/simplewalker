@@ -14,6 +14,7 @@ import numpy as np
 import time
 from os.path import sep
 import types
+import re
 
 RUN_LOCAL = False # if RUN_LOCAL, then the computer running this code is controlling the motors. IF RUN_LOCAL is False, then this code sends and receives information from a microcontroller
 
@@ -77,9 +78,10 @@ def checkMotorPerformance(motorNum, dt, filename = None, frequency_scale = 1, am
     return V, angle
 
 
-def saveRun(filename, V, angle, motorNum, dt, test_type="motor"):
+def saveRun(filename, V_, angle_, motorNum, dt, test_type="motor"):
     with open("data" + sep + "m" +str(motorNum) + '_' + filename +".motortest", 'wb') as file:
-        np.savez(file, V = V, angle = angle, dt=dt, test_type=test_type)
+        np.savez(file, V = V_, angle = angle_, dt=dt, test_type=test_type)
+    print("saved V", V_.shape, "angle", angle_.shape)
 
 def loadRun(filename):
     try:
@@ -129,6 +131,37 @@ def parse_MotorCalibrationStateMessage(message:bytes):
     return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
 
 
+def print_from_micro(ser: serial.Serial, max_lines: int):
+    text = ""
+    regex = re.compile(r"(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+)$", flags=re.MULTILINE)
+    voltage, angle = ([], [])
+    last_time = 0
+    is_finished = False
+    for lines_read in range(max_lines):
+        text += ser.read(2048).decode().replace("\r", "")
+        while len(text) and "\n" in text:
+            regex_match = regex.match(text)
+            if regex_match:
+                text = text[regex_match.end()+1:]
+                line_data = regex_match.group().split(',')
+                print("got [time, voltage, angle, angvel]:", line_data)
+                voltage.append(float(regex_match.group(2)))
+                angle.append(float(regex_match.group(3)))
+                # this_time = float(regex_match.group(1))
+                # if this_time - last_time > 2:
+                #     voltage, angle = ([], [])
+                # last_time = this_time
+            else:
+                newlineplace = text.find('\n')
+                print("|Other text|>", text[:newlineplace], "<|Other text|")
+                is_finished = "finished calibration" in str(text[:newlineplace]) or "was terminated" in str(text[:newlineplace])
+                text = text[newlineplace+1:]
+        if is_finished:
+            break
+    print(text)
+    return np.array(voltage), np.array(angle)
+
+
 def main():
     """run the tests with a text UI"""
     if not RUN_LOCAL:
@@ -138,20 +171,21 @@ def main():
             print("Connected to", ser.name)
         else:
             print("Could not connect to", ser.name)
+            return
     print("Motor test. Choose one of:",
           "run ['frequency_scale', ['amplitude_scale', ['filename']]]",
           "motornum number (0: R motor 1, 1: R motor 2, 2: L motor 1, 3: L motor 2)",
-          "max_ADC (float [0,1]) or min_ADC (float [0,1])"
+          "max_angle (float) or min_angle (float)",
           "save [filename]",
           "code", sep = "\n ")
     freq_scale = 1.
     amp_scale = 1.
     motorNum = 0
-    max_ADC = 1024
-    min_ADC = 0.
+    max_angle = 1
+    min_angle = -1
     V = np.array([])
     angle = np.array([])
-    dt = 0.03 # seconds
+    dt = 0.01  # seconds
     filename = None
     
     while True:
@@ -160,10 +194,8 @@ def main():
         command = command.strip().lower()
         if command == "":
             if not RUN_LOCAL:
-                line = ser.read_until().decode().strip()
-                while len(line) > 0:
-                    print(line)
-                    line = ser.read_until().decode().strip()
+                ser.reset_input_buffer()
+                print_from_micro(ser, 6)
         elif command == "run":
             if len(args) > 1:
                 freq_scale = float(args[1])
@@ -177,14 +209,12 @@ def main():
                 V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
             else:
                 message = make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, 0,
-                                                              max_ADC, min_ADC, True)
+                                                              max_angle, min_angle, True)
                 ser.reset_input_buffer()
                 ser.write(message)
                 print("sent:", message)
-                line = ser.read_until().decode().strip()
-                while len(line) > 0:
-                    print(line)
-                    line = ser.read_until().decode().strip()
+                V, angle = print_from_micro(ser, 60)
+                print("got V", V.shape, "angle", angle.shape)
         elif command == "motornum":
             try:
                 motorNum = int(args[1])
@@ -196,14 +226,14 @@ def main():
             if len(args) > 1:
                 dt = float(args[1])
             print("dt:", dt)
-        elif command == "max_ADC":
+        elif command == "max_angle":
             if len(args) > 1:
-                max_ADC = float(args[1])
-            print("max ADC value:", max_ADC)
-        elif command == "min_ADC":
+                max_angle = float(args[1])
+            print("max angle:", max_angle)
+        elif command == "min_angle":
             if len(args) > 1:
-                min_ADC = float(args[1])
-            print("min ADC value:", min_ADC)
+                min_angle = float(args[1])
+            print("min angle:", min_angle)
         elif command.startswith("exit"):
             ser.close()
             break
