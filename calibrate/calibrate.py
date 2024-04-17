@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 TODO:
-    look into digital filter implementation
+    digital filter implementations
     delay in acceleration for causality? filter-related?
     better loop timing
-    whole leg
-    different dts
+    clean up and organize
+        organized model definition, remove param_array indexing
 
 Created Jun 2021
 @author: Niraj
@@ -26,15 +26,33 @@ def examineMotor(testdata, model = None, params = None):
     params is optional existing parameters which may be edited.
     Motor model d2(angle)/dt2 = param[V] * V + param[omega] * d(angle)/dt
     model is a list of strings naming additional model dynamics"""
+
+    def filter_and_derivative(testdata):
+        results = {m: np.empty(0) for m in ["V_f", "angle_f", "vel", "acc", "vel_f", "acc_f"]}
+        for this_data in testdata:
+            this_velocity = np.diff(this_data["angle"]) / dt
+            this_acc = np.diff(this_velocity) / dt
+            results["vel"] = np.concatenate((results["vel"], this_velocity, [0]))
+            results["acc"] = np.concatenate((results["acc"], this_acc, [0, 0]))
+            results["vel_f"] = np.concatenate((results["vel_f"], filter_data(this_velocity), [0]))
+            results["acc_f"] = np.concatenate((results["acc_f"], filter_data(this_acc), [0, 0]))
+            for m in ["V", "angle"]:
+                results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m])))
+        return results
+
     def make_independent_variable(results, model):
         """make array used for the independent variable in regression"""
         V_f = results["V_f"]
         vel_f = results["vel_f"]
         X = np.hstack((V_f.reshape(-1,1), vel_f.reshape(-1,1)))
         for mod in model:
-            if mod == "static_fric":
+            if mod == "const_fric":
                 static_direction = np.where(np.sign(vel_f) == np.sign(V_f), np.sign(vel_f), 0)
-                X = np.hstack((X, static_direction.reshape(-1,1)))
+                X = np.hstack((X, ((1 - slowness_factor_continuous(vel_f)) * static_direction).reshape(-1,1)))
+            if mod == "static_fric":
+                X = np.hstack((X, (slowness_factor_continuous(vel_f) * V_f).reshape(-1,1)))
+            if mod == "offset":
+                X = np.hstack((X, (1 - slowness_factor_continuous(vel_f)).reshape(-1,1)))
             elif mod == "Vsq":
                 X = np.hstack((X, (np.abs(V_f) * V_f).reshape(-1,1)))
             elif mod == "knee":
@@ -53,8 +71,9 @@ def examineMotor(testdata, model = None, params = None):
             results["outlier_thresh"] = 3 * std_dev
             outliers = np.abs(accel_error) > results["outlier_thresh"]
             acc_f_clean = np.where(outliers, 0., acc_f)
-            X_clean = np.where(outliers.reshape((-1,1)) * np.ones((1,2)), 0., X)
-            print("removed", np.sum(outliers), "outliers out of", results["N"], "(Error >", round(results["outlier_thresh"]), "m/s^2)")
+            X_clean = np.where(outliers.reshape((-1,1)) * np.ones((1,len(params))), 0., X)
+            print("removed", np.sum(outliers), "outliers out of", results["N"],
+                  "(Error >", round(results["outlier_thresh"], 1), "rad/s^2)")
             return determine_params(X_clean, acc_f_clean, results, model)
         else:
             return paramArr
@@ -66,10 +85,20 @@ def examineMotor(testdata, model = None, params = None):
         accel_predic = params["omega"] * results["vel_f"] + params["V"] * results["V_f"]
         i = 0
         for mod in model:
-            if mod == "static_fric":
+            if mod == "const_fric":
                 params["c"] = param_array[2+i]
+                slowness = slowness_factor_continuous(results["vel_f"])
                 static_direction = np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), np.sign(results["vel_f"]), 0)
-                accel_predic = accel_predic + params["c"] * static_direction
+                accel_predic = accel_predic + params["c"] * (1 - slowness) * static_direction
+                i += 1
+            if mod == "static_fric":
+                params["static_fric"] = param_array[2+i]
+                slowness = slowness_factor_continuous(results["vel_f"])
+                accel_predic = accel_predic + params["static_fric"] * slowness * results["V_f"]
+                i += 1
+            if mod == "offset":
+                params["offset"] = param_array[2+i]
+                accel_predic = accel_predic + (1 - slowness_factor_continuous(results["vel_f"])) * params["offset"]
                 i += 1
             elif mod == "Vsq":
                 params["Vsq"] = param_array[2+i]
@@ -93,21 +122,7 @@ def examineMotor(testdata, model = None, params = None):
         params = {}
     if model is None:
         model = []
-    modelinfo = ["V", "angle"]
-    if "knee" in model:
-        modelinfo.append("hip_angle")
-    if "hip" in model:
-        modelinfo.append("knee_angle")
-    results = {"velocity":np.empty((0)), "accel":np.empty((0))}
-    for m in modelinfo:
-        results[m+"_f"] = np.empty((0))
-    for i in range(len(testdata)):
-        results["velocity"] = np.concatenate((results["velocity"], np.diff(testdata[i]["angle"]), [0])) / dt
-        results["accel"] = np.concatenate((results["accel"], np.diff(results["velocity"]), [0])) / dt
-        for m in modelinfo:
-            results[m+"_f"] = np.concatenate((results[m+"_f"], filterData(testdata[i][m])))
-    results["vel_f"] = np.concatenate((np.diff(results["angle_f"]), [0])) / dt
-    results["acc_f"] = np.concatenate((np.diff(results["vel_f"]), [0])) / dt
+    results = filter_and_derivative(testdata)
     results["N"] = np.size(results["V_f"])
     results["t"] = np.linspace(0., results["N"]*dt, num=results["N"])
     
@@ -125,6 +140,7 @@ def graphMotorResults(testdata, params, results):
     avg_error = np.sum(np.abs(accel_error)) / results["N"]
     print("Average error =", round(avg_error, 3), "rad/s^2, Average acceleration", 
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
+    print("Regression R^2:", round(1 - np.sum(accel_error**2) / np.sum(results["acc_f"]**2), 3))
 
     # graph voltage, angle, velocity, and acceleration filtered and unfiltered over time
     if len(testdata) == 1:
@@ -142,12 +158,15 @@ def graphMotorResults(testdata, params, results):
         plt.grid()
         plt.subplot(413, sharex=ax)
         plt.ylabel("Velocity [rad/s]")
-        plt.plot(results["t"], results["velocity"], results["t"], results["vel_f"])
+        plt.plot(results["t"], results["vel"], '.', results["t"], results["vel_f"])
         plt.grid()
-        plt.subplot(414, sharex=ax)
+        ax = plt.subplot(414, sharex=ax)
         plt.ylabel("Acceleration [rad/s^2]")
         plt.xlabel("Time [s]")
-        plt.plot(results["t"], results["accel"], results["t"], results["acc_f"])
+        lines = plt.plot(results["t"], results["acc"], '.', results["t"], results["acc_f"],
+                         results["t"], results["accel_predic"])
+        plt.legend(lines, ["Raw", "Filtered", "Predicted"])
+        ax.set_ylim(np.min(results["acc_f"]) * 1.1, np.max(results["acc_f"]) * 1.1)
         plt.grid()
     
     # 3D graph acceleration against voltage and speed
@@ -178,8 +197,17 @@ def graphMotorResults(testdata, params, results):
     plt.xlabel("Angle [rad]")
     plt.ylabel("Acceleration error [rad/s^2]")
     plt.grid()
-    
+
     plt.figure(5)
+    plt.clf()
+    plt.plot(results["t"], np.abs(results["vel_f"]), results["t"],
+             slowness_factor_continuous(results["vel_f"]) * np.max(results["vel_f"]) * 0.5)
+    plt.title("Speed and Slowness Factor")
+    plt.xlabel("time [s]")
+    plt.ylabel("Speed [rad/s] and Slowness [arb. units]")
+    plt.grid()
+
+    plt.figure(6)
     plt.clf()
     lines = plt.plot(results["t"], results["acc_f"], results["t"], results["accel_predic"])
     plt.title("Acceleration Prediction")
@@ -201,17 +229,18 @@ def loadRun(filename):
             return dict(data)
     except:
         print("Load failed:", filename)
-        return np.array([]), np.array([])
 
-def filterData(data):
-    """filters data."""
-    # first order lowpass filter signals
-    filt_time = 4 # number of samples
-    b = [1., (filt_time - 1.)]
-    a = [filt_time]
-    zi = signal.lfilter_zi(b,a)
-    filtered, _ = signal.lfilter(b, a, data, zi=zi*data[0])
+def filter_data(data, filt_cutoff_samples = 12):
+    n_suspicious_filtered = filt_cutoff_samples * 6
+    padded_data = np.concatenate((data[0] * np.ones(n_suspicious_filtered), data))
+    filtered = signal.sosfilt(signal.butter(4, 1/filt_cutoff_samples, 'lowpass', output='sos'), padded_data)
+    filtered = filtered[n_suspicious_filtered:]
     return filtered
+
+# continuous number [0,1] where 1 means it's slow enough for static friction
+def slowness_factor_continuous(vel, speed_thresh = 0.06):
+    #return filter_data(np.where(np.abs(vel) < speed_thresh, (speed_thresh - np.abs(vel)) / speed_thresh, 0), 4)
+    return np.clip(np.arctan(filter_data(np.abs(vel) < speed_thresh, 4) * 20 - 10) / np.pi + 0.5, 0, 1)
     
 def saveParams(params, filename = "new"):
     with open("settings"+ sep + filename +".learnedparams", "wb") as file:
@@ -235,7 +264,7 @@ def main():
           "model [[no] model_name]",
           "code", sep = "\n ")
     testdata = []
-    model = [] # "static_fric"
+    model = ['static_fric', 'const_fric', 'offset']
     params = {}
     directory_path = getcwd() + "/data"
     test_type = ""

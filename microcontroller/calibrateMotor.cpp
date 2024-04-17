@@ -5,7 +5,6 @@ TODO:
     take time measurements for better timing
     remove voltage causality time shift, do that in analysis?
     error if can't return to start
-    reset excitationVoltage if can't return to start
     */
 
 
@@ -63,7 +62,7 @@ int excitationVoltage(float frequency_scale, float amplitude_scale, float *V) {
                 place = 0;
             }
         } else {
-            if (place < square_length)      *V = 0.0;
+            if (place < 4 * square_length)      *V = 0.0;
             else { //finally done
                 reset_state();
                 return 1;
@@ -86,6 +85,7 @@ public:
     shared_ptr<MotorCalibrationTriggerMsg> instructions;
     ExcitationVoltageGenerator excitationVoltageGenerator;
     const float const_voltage_duration{2};
+    const float start_angle{-1};
     int send_skip_iteration_counter;
 
     MotorCalibrator()
@@ -170,7 +170,7 @@ public:
         int numInRange{0}, total_tries{0};
         if (instructions->text_output) printf("Returning motor to start...\n");
         while (numInRange < 10 && ++total_tries <= 10 / instructions->dt) {
-            float angle = read_angle() + 0.25;
+            float angle = read_angle() - start_angle;
             float voltage = -kp * angle + (angle > 0 ? -1.5 : 1.5);
             motors_IO->set_motor_voltage(instructions->motorNum, voltage);
             if (fabs(angle) < 0.1) {
