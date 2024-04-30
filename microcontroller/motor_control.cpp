@@ -3,7 +3,11 @@
 
 bool MotorControlState::update(uint32_t time_us) {
     if (time_us <= start_time_us) return false;
-    angle += angvel * 1e6 * (time_us - start_time_us);
+    float dt_sec = 1e-6 * (time_us - start_time_us);
+    angle += angvel * dt_sec;
+    const float decay_factor{1.0f - (dt_sec / CONTROLLER_SPEED_UPDATE_DECAY)};
+    angvel = angvel * (decay_factor > 0.0f ? decay_factor : 0.0f);
+    start_time_us = time_us;
     return true;
 }
 
@@ -28,7 +32,7 @@ bool DCMotorController::calc_command(const MotorControlState &state, float &comm
     if (!target.update(state.start_time_us)) return false;
     float ang_accel_ref = K_P * (target.angle - state.angle) + K_V * (target.angvel - state.angvel);
     command = (ang_accel_ref - K_ANGVEL * state.angvel - target.torque
-               - K_COUL * (state.angvel > 0 ? 1.0 : -1.0))            / K_OUT;
+               - K_COUL * (state.angvel > 0 ? 1.0f : -1.0f))            / K_OUT;
     return true;
 }
 

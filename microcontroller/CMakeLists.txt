@@ -15,15 +15,29 @@ set(simplewalker_interboard_comm "../mainsrc/walkertypes.h" "../communication/me
 set(pico_motor_IO_src "motor_output.cpp" "ADC_reader.cpp" "motor_IO.cpp")
 
 
-add_executable(controller_main
-        controller_main.cpp
+add_executable(IMU_main
+        IMU_main.cpp
         ${mpu6050_DIR}/mpu6050_i2c.c
         ${mpu6050_DIR}/mpu6050.cpp
         ${simplewalker_interboard_comm}
 )
 # pull in common dependencies
-target_link_libraries(controller_main pico_stdlib hardware_i2c)
-target_include_directories(controller_main PUBLIC ${mpu6050_DIR})
+target_link_libraries(IMU_main pico_stdlib hardware_i2c)
+target_include_directories(IMU_main PUBLIC ${mpu6050_DIR})
+# enable usb output, disable uart output
+pico_enable_stdio_usb(IMU_main 1)
+pico_enable_stdio_uart(IMU_main 0)
+# create map/bin/hex/uf2 file etc.
+pico_add_extra_outputs(IMU_main)
+
+add_executable(controller_main
+        controller_main.cpp
+        motor_control.cpp
+        ${pico_motor_IO_src}
+        ${simplewalker_interboard_comm}
+        )
+# pull in common dependencies
+target_link_libraries(controller_main pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
 pico_enable_stdio_usb(controller_main 1)
 pico_enable_stdio_uart(controller_main 0)

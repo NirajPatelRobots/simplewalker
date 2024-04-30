@@ -8,9 +8,9 @@
 #include <memory>
 #include <vector>
 
-const int NUM_DCMOTORS = 4, NUM_SERVOMOTORS = 2, NUM_MOTORS = NUM_DCMOTORS + NUM_SERVOMOTORS;
+const int NUM_DCMOTORS = 4, NUM_SERVOMOTORS = 2;
 
-enum Motornum {
+enum class Motornum {
     right_hip,
     right_knee,
     left_hip,
@@ -20,7 +20,7 @@ enum Motornum {
 };
 
 bool is_servo(Motornum num) {
-    return (num == right_hip_out || num == left_hip_out);
+    return (num == Motornum::right_hip_out || num == Motornum::left_hip_out);
 }
 
 DCMotorPins right_hip_motor_pins{16, 17},
@@ -42,5 +42,7 @@ const std::vector<motorIOSettings> SIMPLEWALKER_MOTOR_IO_SETTINGS {
          2, MAX_MOTOR_VOLTAGE,
          &right_knee_motor_pins}
 };
+
+const int NUM_MOTORS = SIMPLEWALKER_MOTOR_IO_SETTINGS.size();
 
 #endif //SIMPLEWALKER_PICO_SIMPLEWALKER_MOTORS_HPP

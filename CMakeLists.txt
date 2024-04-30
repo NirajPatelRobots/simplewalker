@@ -38,6 +38,12 @@ add_executable(collect_sensor_cal_data ${src_files} ${src_comm} sensors/collect_
 target_link_libraries(collect_sensor_cal_data wiringPi)
 
 
+# measure motor angle manually
+add_executable(measure_motor_angle_manually ${src_comm} calibrate/measure_motor_angle_manually.cpp)
+target_link_libraries(measure_motor_angle_manually wiringPi)
+
+
+
 # test_localization
 include_directories(${src_dirs})
 add_executable(test_localization ${src_files} state_estimation/test_localization.cpp)

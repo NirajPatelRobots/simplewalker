@@ -31,10 +31,11 @@ const uint16_t MotorCalibrationStateMsgID = 0x0C11;
 struct ControlTargetMsg { // target angle and velocity with predicted leg torque from main comp to micro
     uint16_t ID;
     uint16_t command; // can be defined
-    uint32_t time_us; //pico clock time to start this command
-    float angle[6];
-    float angle_vel[6];
-    float torque[6];
+    uint32_t start_time_us; //controller timestamp at the start of this state
+    uint32_t information_time_us; // controller timestamp when the information for this state was sensed/decided
+    float angle[WALKER_COMM_NUM_MOTORS];
+    float angle_vel[WALKER_COMM_NUM_MOTORS];
+    float torque[WALKER_COMM_NUM_MOTORS];
 };
 const uint16_t ControlTargetMsgID = 0x0D01;
 
@@ -56,8 +57,8 @@ struct RobotStateMsg {
     float axis[3];
     float vel[3];
     float angvel[3];
-    float leg_pos[6];
-    float leg_vel[6];
+    float leg_pos[WALKER_COMM_NUM_MOTORS];
+    float leg_vel[WALKER_COMM_NUM_MOTORS];
 };
 const uint16_t RobotStateMsgID = 0x0E01;
 

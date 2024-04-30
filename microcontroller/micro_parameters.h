@@ -18,4 +18,7 @@ const int ADC_BATTERY_VOLTAGE_CHANNEL = 0;
 
 const float MAX_MOTOR_VOLTAGE = 5.0;
 
+// how quickly (in sec) the controller slows down when it isn't receiving messages (higher=takes longer to stop)
+const float CONTROLLER_SPEED_UPDATE_DECAY{1.0};
+
 #endif
