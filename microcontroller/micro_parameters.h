@@ -1,14 +1,18 @@
+#include <stdint.h>
+
 #ifndef SIMPLEWALKER_PICO_MICRO_PARAMETERS_H
 #define SIMPLEWALKER_PICO_MICRO_PARAMETERS_H
 #define CONTROL_DT_US 5000
 #define ADMIN_DT_US 30000
-#define IMU_DT_US 5000
 #define PARAM_KP_DEFAULT 1000.0 // how strongly it's pulled towards reference angle
 #define PARAM_KV_DEFAULT 0.0 // how strongly it's pulled by reference velocity
 #define PARAM_OUTPUT_DEFAULT 1.0
 #define PARAM_ANGVEL_DEFAULT 1.0
 #define PARAM_COUL_DEFAULT 1.0
 #define IMU_TEMP_MAX 85.0
+
+const uint8_t IMU_DT_MS = 5;
+const unsigned IMU_ERROR_CHECK_WAIT_MS = 3000;
 
 /* ADC value when V_bat = V_logic: 106
  * V_bat = scale * raw

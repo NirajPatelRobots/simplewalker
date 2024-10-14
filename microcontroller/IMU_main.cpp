@@ -5,42 +5,76 @@ Niraj April 2022 */
 #include "pico_comm.hpp"
 #include "../communication/messages.h"
 #include "micro_parameters.h"
-#include <stdio.h> //DEGUB DEBUG
+#include "pico/binary_info.h"
 #include <memory>
-using std::shared_ptr, std::make_shared, std::unique_ptr, std::make_unique;
+using std::unique_ptr, std::make_unique;
 
 
-bool handle_IMU(struct repeating_timer *t) {
-    ((MPU6050 *)(t->user_data))->read();
-    return true;
+const uint8_t IRQ_PIN = 6;
+const bool CHECK_OVER_SCALE = true;
+
+static unique_ptr<MPU6050> IMU;
+static unique_ptr<PicoCommunication> comm;
+static unique_ptr<MessageOutbox<IMUDataMsg>> IMUOutbox;
+volatile bool got_irq;
+
+
+uint16_t check_IMU_over_temp(MPU6050 *IMU) {
+    static bool is_asleep = false;
+    if (is_asleep) {
+        IMU->power(1, false, false, false); // wake up so we can read temp again
+        is_asleep = false;
+        return IMU_ERR_TEMP;
+    } if (IMU->chip_temp > IMU_TEMP_MAX) {
+        IMU->power(0, false, true, false);
+        is_asleep = true;
+        return IMU_ERR_TEMP;
+    }
+    return IMU_NO_ERR;
+}
+
+bool is_over_scale(const float data[3], float limit) {
+    for (int i = 0; i < 3; i++) {if (data[i] > limit) return true; }
+    return false;
+}
+
+void irq_callback(uint gpio, uint32_t events) {
+    static const uint32_t DLPF_delay_us = (uint32_t)(IMU->read_timing().accel_timing.delay * 1e3);
+    static const float accel_max = MPU6050_max_accel(MPU6050::Scale_0) * 0.95;
+    static const float gyro_max = MPU6050_max_gyro_rad(MPU6050::Scale_0) * 0.95;
+    IMUOutbox->message.timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time()) - DLPF_delay_us;
+    IMU->read();
+    IMUOutbox->message.errcode = check_IMU_over_temp(IMU.get());
+    if (CHECK_OVER_SCALE)
+        IMUOutbox->message.errcode += IMU_ERR_OVER_SCALE * (   is_over_scale(IMUOutbox->message.accel, accel_max)
+                                                            || is_over_scale(IMUOutbox->message.gyro,  gyro_max));
+    got_irq = true;
+    IMUOutbox->send();
 }
 
 int main() {
-    unique_ptr<PicoCommunication> comm{make_unique<PicoCommunication>()};
-    auto controlStateOutbox{make_unique<MessageOutbox<ControlStateMsg>>(ControlStateMsgID, *comm)};
-    SensorData *sensorData = &controlStateOutbox->message.sensor_data;
-    controlStateOutbox->message.ID = ControlStateMsgID;
-    MPU6050 *IMU = new MPU6050(sensorData->accel, sensorData->gyro);
-    absolute_time_t looptarget;
-    struct repeating_timer timer;
+    bi_decl(bi_1pin_with_name(IRQ_PIN, "IMU IRQ pin 1"));
+    comm = make_unique<PicoCommunication>();
+    IMUOutbox = make_unique<MessageOutbox<IMUDataMsg>>(IMUDataMsgID, *comm);
+    IMUOutbox->message.ID = IMUDataMsgID;
+    IMU = make_unique<MPU6050>(IMUOutbox->message.accel, IMUOutbox->message.gyro);
 
     sleep_ms(100);
     IMU->reset();
     IMU->power(1, false, false, false);
-    IMU->setscale_accel(1);
-    IMU->setscale_gyro(1);
+    IMU->set_timing(2, IMU_DT_MS - 1); // lowpass = 96 Hz
+    IMU->configure_interrupt(false, false, true, true, true);
     sleep_ms(100);
-    add_repeating_timer_us(-IMU_DT_US, handle_IMU, (void *)IMU, &timer);
+    gpio_set_irq_enabled_with_callback(IRQ_PIN, GPIO_IRQ_LEVEL_HIGH, true, &irq_callback);
 
-    looptarget = get_absolute_time();
-    while (1) {
-        sensorData->timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
-        controlStateOutbox->message.errcode |= (CTRLSTERR_IMU + CTRLSTERR_TEMP)
-                         * (IMU->chip_temp > IMU_TEMP_MAX);
-        controlStateOutbox->send();
-        looptarget = delayed_by_us(looptarget, ADMIN_DT_US);
-        sleep_until(looptarget);
+    while (true) {
+        got_irq = false;
+        sleep_ms(IMU_ERROR_CHECK_WAIT_MS);
+        if (!got_irq) {
+            IMUOutbox->message.errcode = IMU_ERR_NO_IRQ + check_IMU_over_temp(IMU.get())
+                                         + (IMU_ERR_NOT_CONNECTED * IMU->is_connected());
+            IMUOutbox->send();
+        }
     }
-    delete IMU;
     return 0;
 }

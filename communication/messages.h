@@ -39,15 +39,29 @@ struct ControlTargetMsg { // target angle and velocity with predicted leg torque
 };
 const uint16_t ControlTargetMsgID = 0x0D01;
 
+
 enum ControlStateError {CTRLSTERR_LOSTCOM = 1, CTRLSTERR_IMU = 0b10, CTRLSTERR_ADC = 0b100, 
                         CTRLSTERR_TEMP = 0b1000 };
-
 struct ControlStateMsg { // sends current motor control and sensor state from the microcontroller
     uint16_t ID;
     uint16_t errcode;
     struct SensorData sensor_data;
 };
 const uint16_t ControlStateMsgID = 0x0C01;
+
+
+struct IMUDataMsg {
+    uint16_t ID;
+    uint16_t errcode;
+    uint32_t timestamp_us;
+    float accel[3];
+    float gyro[3];
+};
+const uint16_t IMUDataMsgID = 0x0C10;
+const uint16_t IMUDataMsgID2 = 0x0C11;
+enum IMUDataMsgError {IMU_NO_ERR = 0, IMU_ERR_NOT_CONNECTED = 1, IMU_ERR_TEMP = 0b10,
+                      IMU_ERR_NO_IRQ = 0b100, IMU_ERR_OVER_SCALE = 0b1000};
+
 
 struct RobotStateMsg {
     uint16_t ID;

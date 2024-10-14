@@ -12,8 +12,7 @@ TODO:
     Fix error if print() not called again before more logs
     Fancy macro or something so logging doesn't happen?
     logging to file is pretty slow
-    Binary logger is child class?
-    binary logger knows where data is
+    Binary logger?
     multiple lines to text file
     settings fieldname with no groupname finds lowest level fieldname
     add/remove prefix from logger name for surrounding code blocks so we can tell logs come from that block
@@ -59,7 +58,7 @@ void set_logtime(float &logtime); //sets this log time and starts counting from 
 
 class Logger {
 protected:
-    const int W = 9;
+    int W = 9;
     bool disable, headerSent, newline, savetofile;
     std::ofstream outFile;
     std::string filename, header;
@@ -84,7 +83,7 @@ public:
     void log(const string &name, const std::deque<T> &x) {
         if (disable) return;
         outstr << "[ ";
-            for (const T &x_i : x) outstr << std::setw(9) << x_i << " ";
+            for (const T &x_i : x) outstr << std::setw(W) << x_i << " ";
         outstr << "], ";
         if (!headerSent)
             make_field(name + " [" + std::to_string(x.size()) + "]");
@@ -94,6 +93,7 @@ public:
     bool print(unsigned skipevery = 0);
     bool dontprint(unsigned skipevery = 0); //removes logging
     string get_filename(void) {return filename;}
+    inline bool is_saving_to_file(void) {return savetofile;}
 };
 
 extern shared_ptr<Logger> stdlogger;

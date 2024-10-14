@@ -35,7 +35,7 @@ target_link_libraries(simplewalker wiringPi)
 # collect_sensor_cal_data
 include_directories(${src_dirs})
 add_executable(collect_sensor_cal_data ${src_files} ${src_comm} sensors/collect_sensor_cal_data.cpp)
-target_link_libraries(collect_sensor_cal_data wiringPi)
+target_link_libraries(collect_sensor_cal_data wiringPi stdc++fs)
 
 
 # measure motor angle manually
