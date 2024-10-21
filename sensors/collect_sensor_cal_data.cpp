@@ -1,8 +1,8 @@
 /* collect the data for sensor calibration 
 TODO:
     detect when moved to different position
-    delete old calibration files so we don't get confused
-    check for IMU error
+    check for IMUDataMsg->errcode
+    temperature
 */
 #include "logger.hpp"
 #include "comm_serial.hpp"
@@ -18,19 +18,28 @@ int main() {
     auto IMUData = make_unique<IMUDataMsg>();
     Logger savelog;
     const int NUM_DATA_NEEDED = 1024;
+    const std::string STATIONARY_FILE_PREFIX = "stationary_calibration_";
     int log_num{0};
     string user_input{""};
     fs::path data_dir{"data"};
     if (!fs::exists(data_dir)) {
-        cout << "data/ directory not found. Run from simplewalker dir." << endl;
-        return 1;
+        data_dir = "../data";
+        if (!fs::exists(data_dir)) {
+            cout << "data/ directory not found. Run from simplewalker dir." << endl;
+            return 1;
+        }
     }
-    // TODO delete old calibration files so we don't get confused
+    for (const auto& entry : fs::directory_iterator(data_dir)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".log"
+            && entry.path().filename().string().find(STATIONARY_FILE_PREFIX) != std::string::npos) {
+            fs::remove(entry.path());
+        }
+    }
 
     controller_comm->flush_message_queue(3, true);
     cout << "Start calibration. Keep still.    " << endl;
     while (user_input != "done") {
-        savelog = Logger(data_dir / ("stationary_calibration_" + std::to_string(log_num) + ".log"));
+        savelog = Logger(data_dir / (STATIONARY_FILE_PREFIX + std::to_string(log_num) + ".log"));
         if (!savelog.is_saving_to_file()) {
             cout << "Couldn't create log file, exiting. Run from simplewalker dir." << endl;
             return 2;
@@ -41,6 +50,7 @@ int main() {
         while (num_data_got < NUM_DATA_NEEDED) {
             controller_comm->receive_messages();
             while (IMUInbox.get_newest(*IMUData) >= 0) {
+                savelog.log("utime", IMUData->timestamp_us);
                 savelog.log("accel", IMUData->accel, 3);
                 savelog.log("gyro", IMUData->gyro, 3);
                 savelog.print();
