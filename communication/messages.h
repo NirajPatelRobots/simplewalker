@@ -57,10 +57,24 @@ struct IMUDataMsg {
     float accel[3];
     float gyro[3];
 };
-const uint16_t IMUDataMsgID = 0x0C10;
-const uint16_t IMUDataMsgID2 = 0x0C11;
+const uint16_t IMUDataMsgID = 0x0C02;
+const uint16_t IMUDataMsgID2 = 0x0C03;
 enum IMUDataMsgError {IMU_NO_ERR = 0, IMU_ERR_NOT_CONNECTED = 1, IMU_ERR_TEMP = 0b10,
-                      IMU_ERR_NO_IRQ = 0b100, IMU_ERR_OVER_SCALE = 0b1000};
+                      IMU_ERR_NO_IRQ = 0b100, IMU_ERR_OVER_SCALE = 0b1000,
+                      IMU_ERR_SEM = 16, IMU_ERR_INFO_SEM = 32, IMU_ERR_OVERLOOP = 64};
+
+
+struct IMUInfoMsg {
+    uint16_t ID;
+    uint16_t errcode;
+    uint32_t timestamp_us;
+    uint32_t free_heap_bytes;
+    uint32_t run_time_us;
+    uint32_t info_run_time_us;
+    uint32_t debug_int;
+    float IMU_temp, debug_float;
+};
+const uint16_t IMUInfoMsgID = 0x0C00;
 
 
 struct RobotStateMsg {

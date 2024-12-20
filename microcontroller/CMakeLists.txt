@@ -10,27 +10,31 @@ set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time")
 pico_sdk_init()
 
-set(simplewalker_interboard_comm "../mainsrc/walkertypes.h" "../communication/messages.h" "pico_comm.cpp")
 set(pico_motor_IO_src "motor_output.cpp" "ADC_reader.cpp" "motor_IO.cpp")
+set(IMU_src "sensors/IMU_errcheck.cpp" "sensors/IMUContext.cpp")
 
 
-add_executable(IMU_main
-        IMU_main.cpp ${simplewalker_interboard_comm}
-)
-target_include_directories(IMU_main PUBLIC $ENV{MPU6050_SRC_DIR} $ENV{MPU6050_BUILD_DIR})
-target_link_directories(IMU_main PUBLIC $ENV{MPU6050_BUILD_DIR})
-target_link_libraries(IMU_main MPU6050_i2c_pico_cpp_lib pico_stdlib hardware_i2c)
-# enable usb output, disable uart output
-pico_enable_stdio_usb(IMU_main 1)
-pico_enable_stdio_uart(IMU_main 0)
-# create map/bin/hex/uf2 file etc.
-pico_add_extra_outputs(IMU_main)
+if (DEFINED ENV{MPU6050_SRC_DIR} AND DEFINED ENV{MPU6050_BUILD_DIR})
+    add_executable(IMU_main
+            IMU_main.cpp "pico_comm.cpp" ${IMU_src}
+    )
+    target_include_directories(IMU_main PUBLIC $ENV{MPU6050_SRC_DIR} $ENV{MPU6050_BUILD_DIR} $CMAKE_SRC_DIR sensors/*.h)
+    target_link_directories(IMU_main PUBLIC $ENV{MPU6050_BUILD_DIR})
+    target_link_libraries(IMU_main MPU6050_i2c_pico_cpp_lib pico_stdlib hardware_i2c)
+    # enable usb output, disable uart output
+    pico_enable_stdio_usb(IMU_main 1)
+    pico_enable_stdio_uart(IMU_main 0)
+    # create map/bin/hex/uf2 file etc.
+    pico_add_extra_outputs(IMU_main)
+else()
+    message("No MPU6050_SRC_DIR and MPU6050_BUILD_DIR defined")
+endif()
 
 add_executable(controller_main
         controller_main.cpp
         motor_control.cpp
         ${pico_motor_IO_src}
-        ${simplewalker_interboard_comm}
+        "pico_comm.cpp"
         )
 target_link_libraries(controller_main pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
@@ -42,7 +46,7 @@ pico_add_extra_outputs(controller_main)
 add_executable(hardware_test
         hardwareTest.cpp
         ${pico_motor_IO_src}
-        ${simplewalker_interboard_comm}
+        "pico_comm.cpp"
 )
 target_link_libraries(hardware_test pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
@@ -54,7 +58,7 @@ pico_add_extra_outputs(hardware_test)
 add_executable(calibrate_motor
         calibrateMotor.cpp
         ${pico_motor_IO_src}
-        ${simplewalker_interboard_comm}
+        "pico_comm.cpp"
 )
 target_link_libraries(calibrate_motor pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output

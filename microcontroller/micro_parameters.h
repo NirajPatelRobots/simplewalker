@@ -12,7 +12,11 @@
 #define IMU_TEMP_MAX 85.0
 
 const uint8_t IMU_DT_MS = 5;
-const unsigned IMU_ERROR_CHECK_WAIT_MS = 3000;
+const unsigned IMU_INTROSPECTION_LOOP_MS = 3000;
+// filter_cfg (Hz) accel = [260, 184, 94, 44, 21, 10, 5] gyro = [256, 188, 98, 42, 20, 10, 5]
+const uint8_t IMU_LP_FILTER_CFG_IDX = 2;  // 96 Hz
+
+const uint32_t COMM_SEM_WAIT_US = 2000;
 
 /* ADC value when V_bat = V_logic: 106
  * V_bat = scale * raw
