@@ -59,9 +59,9 @@ struct IMUDataMsg {
 };
 const uint16_t IMUDataMsgID = 0x0C02;
 const uint16_t IMUDataMsgID2 = 0x0C03;
-enum IMUDataMsgError {IMU_NO_ERR = 0, IMU_ERR_NOT_CONNECTED = 1, IMU_ERR_TEMP = 0b10,
-                      IMU_ERR_NO_IRQ = 0b100, IMU_ERR_OVER_SCALE = 0b1000,
-                      IMU_ERR_SEM = 16, IMU_ERR_INFO_SEM = 32, IMU_ERR_OVERLOOP = 64};
+enum IMUError {IMU_NO_ERR = 0, IMU_ERR_NOT_CONNECTED = 1, IMU_ERR_TEMP = 0b10,
+               IMU_ERR_NO_IRQ = 0b100, IMU_ERR_OVER_SCALE = 0b1000,
+               IMU_ERR_SEM = 16, IMU_ERR_INFO_SEM = 32, IMU_ERR_OVERLOOP = 64};
 
 
 struct IMUInfoMsg {

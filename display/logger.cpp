@@ -78,7 +78,7 @@ void Logger::log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x) {
 }
 
 void Logger::log(string name, const SensorData &x) {
-    log(name + "utime", x.timestamp_us);
+    log(name + "time", x.timestamp_us * 1e6);
     log(name + "accel", x.accel, 3);
     log(name + "gyro", x.gyro, 3);
 }

@@ -26,7 +26,7 @@ std::ostream& operator<<(std::ostream& os, const scalar_statistic& data) {
 void Jac_rotated_wrt_axis_angle(Eigen::Ref<Matrix3f> Jacobian, const Vector3f &axis_angle,
                                        const Matrix3f &R, const Vector3f &unrotated_vector) {
     // from A compact formula for the derivative of a 3-D rotation in exponential coordinates
-    // Guillermo Gallego, Anthony Yezzi 2014
+    // Guillermo Gallego, Anthony Yezzi 2014 https://arxiv.org/pdf/1312.0788.pdf
     float angle = axis_angle.norm();
     Jacobian = - R * raised_cross_matrix(unrotated_vector) / (angle * angle)
                * (axis_angle * axis_angle.transpose()

@@ -89,6 +89,16 @@ public:
             make_field(name + " [" + std::to_string(x.size()) + "]");
         finish_log_field();
     }
+    template<typename T>
+    void log(const string &name, const std::vector<T> &x) {
+        if (disable) return;
+        outstr << "[ ";
+        for (const T &x_i : x) outstr << std::setw(W) << x_i << " ";
+        outstr << "], ";
+        if (!headerSent)
+            make_field(name + " [" + std::to_string(x.size()) + "]");
+        finish_log_field();
+    }
 
     bool print(unsigned skipevery = 0);
     bool dontprint(unsigned skipevery = 0); //removes logging

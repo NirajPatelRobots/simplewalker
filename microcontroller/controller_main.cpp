@@ -1,11 +1,9 @@
 /* main thread that does sensor reading, sending and receiving for the micro for simplewalker.
 Niraj Feb 2024
 TODO:
-    receive target state
     class for angle reading, angvel filter, set sensorData and MotorControlState
     class for running state, with other classes as members, abstracts NUM_MOTORS loops
-        shouldn't include not loop timing, nor communication
-    separate messages for IMU data and angle data?
+        shouldn't include loop timing nor communication
  */
 
 #include "pico_comm.hpp"
@@ -32,7 +30,7 @@ int main() {
 
     std::vector<DCMotorController> controllers{};
     for (int i{}; i < NUM_MOTORS; i++) {
-        controllers.push_back(i);
+        controllers.emplace_back(i);
         controllers.at(i).set_parameters(PARAM_KP_DEFAULT, PARAM_KV_DEFAULT, PARAM_ANGVEL_DEFAULT,
                                          PARAM_COUL_DEFAULT, PARAM_OUTPUT_DEFAULT);
     }

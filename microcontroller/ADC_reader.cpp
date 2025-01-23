@@ -1,4 +1,5 @@
 #include "ADC_reader.hpp"
+#include "pico/time.h"
 # define M_PI_2 1.5707963267948966
 
 void ADCReader::connect_SPI() {

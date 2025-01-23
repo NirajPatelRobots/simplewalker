@@ -1,7 +1,12 @@
 /*
  * Class for reading from a MCP3008 ADC over SPI,
  * transforming and storing channel information.
+ * TODO:
+ *      Read all at same time
+ *      separate sample from read
  */
+#ifndef SIMPLEWALKER_PICO_ADC_READER_HPP
+#define SIMPLEWALKER_PICO_ADC_READER_HPP
 #include "hardware/spi.h"
 #include "hardware/gpio.h"
 #include <string>
@@ -20,7 +25,7 @@ struct ADCChannel {
         raw_value = raw;
         scaled_value = gain * (raw + offset);
     }
-    float get_scaled_offset() { return gain * offset;}
+    float get_scaled_offset() const {return gain * (float)offset;}
 };
 
 class ADCReader {
@@ -35,7 +40,7 @@ public:
     float read_ADC_scaled(const std::string &channel_name);
     shared_ptr<ADCChannel> get_channel(int channel_num);
     shared_ptr<ADCChannel> get_channel(const std::string &channel_name);
-    float readBatteryVoltage(void);
-    float readAngle(int);
     bool set_pins(int SPI_CS, int SPI_Tx, int SPI_Rx, int SPI_CLK);
 };
+
+#endif

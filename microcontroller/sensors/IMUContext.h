@@ -36,6 +36,8 @@ public:
     void read_and_send();
     void send_IMUdata_missing(bool ignore_sem=false);
     void send_IMU_info();
+    const IMUDataMsg &get_IMUData() {return DataOutbox->message;}
+    const IMUInfoMsg &get_IMUInfo() {return SelfInfoOutbox->message;}
     ~IMUContext();
 };
 

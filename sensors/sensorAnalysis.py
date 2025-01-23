@@ -3,6 +3,10 @@ September 2022
 TODO:
     detect bad samples (got old (very different) data from buffer for data[1:6])
     automatically detect logs with bumps
+    detect linear independence
+    weight solver with covariance of each log?
+        so that noisier samples have less effect
+    per-axis scale factor?
     temperature
 """
 
