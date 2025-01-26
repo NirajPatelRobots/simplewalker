@@ -108,7 +108,7 @@ int main() {
         if (settings.b("Logger", "log_state")) logger->obj_log(EKF->state);
         if (settings.b("Logger", "log_R")) logger->log("R", state.R);
         if (settings.b("Logger", "log_state_pred")) logger->obj_log("Predicted ", EKF->state_pred);
-        if (settings.b("Logger", "log_unexpected_msg_IDs")) logger->log("unexpected IDs", controller_comm->unexpected_IDs);
+        if (settings.b("Logger", "log_unexpected_comm_data")) logger->log("unexpected comm data", controller_comm->unexpected_bytes_in);
         savelog.log(logtimes);
         savelog.obj_log(EKF->state);
         savelog.obj_log(*sensors);

@@ -1,10 +1,9 @@
 #include "comm_serial.hpp"
 #include <wiringSerial.h> // raspberry pi serial
-#include <algorithm>
 
 SerialCommunicator::SerialCommunicator(string _name) : Communicator(_name) {
     serialfile = serialOpen("/dev/ttyACM0", 115200);
-    is_connected_ = (serialfile < 0);
+    is_connected_ = (serialfile > 0);
     clear_buffer();
 }
 
@@ -14,13 +13,11 @@ SerialCommunicator::~SerialCommunicator() {
 
 MessageBoxInterface* SerialCommunicator::parse_buffer_inbox() {
     if (instream.size() < 2) throw std::logic_error("Buffer doesn't have enough data for msgID");
-    int16_t ID = ((int16_t)(instream[0] & 0xFF) + (int16_t)((instream[1] & 0xFF) << 8));
+    int16_t ID = ((int16_t)instream.at(0) + ((int16_t)instream.at(1) << 8));
     MessageBoxInterface* inbox = get_inbox(ID);
     if (!inbox) {
-        if (std::find(unexpected_IDs.begin(), unexpected_IDs.end(), ID) == unexpected_IDs.end())
-            unexpected_IDs.push_back(ID);
+        unexpected_bytes_in.push_back(instream.at(0));
         instream.pop_front();
-        num_bad_bytes_in_++;
     }
     return inbox;
 }

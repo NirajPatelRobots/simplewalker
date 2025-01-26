@@ -1,7 +1,8 @@
 /*pico 2 way communication with the rasberry pi zero (main computer)
 (LSB first)
 */
-
+#ifndef SIMPLEWALKER_PICO_COMM_HPP
+#define SIMPLEWALKER_PICO_COMM_HPP
 #include "pico/stdlib.h"
 #include "../communication/communication.hpp"
 
@@ -17,3 +18,4 @@ public:
     void receive_messages() override;
     int send(const MessageBoxInterface &outbox, const char *data_start) override; //return 0 on success
 };
+#endif  //SIMPLEWALKER_PICO_COMM_HPP

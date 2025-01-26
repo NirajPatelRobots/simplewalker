@@ -6,8 +6,9 @@ TODO:
     there's gotta be a better (safer?) way to do this char setting stuff
         char* for data_start in MessageBoxInterface?
     Maybe split MessageBoxInterface into interface classes for inbox and outbox
+    smart pointers
+    automatic msg_ID without having it in message data
     decide between msg_len and SIZE
-    detect late message
     custom exception
     skip every so many sends
 */
@@ -17,6 +18,7 @@ TODO:
 #include <deque>
 #include <string>
 #include <iostream>
+#include <vector>
 using std::deque, std::string, std::to_string;
 
 class Communicator;
@@ -38,31 +40,28 @@ public:
 // Communicator interface class works with MessageBoxes, subclasses are implementations of communication
 class Communicator {
 protected:
-    unsigned int num_bad_bytes_in_, num_bad_bytes_out_;
-    std::deque<MessageBoxInterface *> inboxes;
+    unsigned int num_bad_bytes_out_;
+    std::vector<MessageBoxInterface *> inboxes;
     std::string name_;
 public:
-    std::deque<int16_t> unexpected_IDs;
-    const unsigned int &num_bad_bytes_in, &num_bad_bytes_out;
+    std::vector<uint8_t> unexpected_bytes_in;
+    const unsigned int &num_bad_bytes_out;
     const std::string &name;
     explicit Communicator(std::string &_name)
-            : num_bad_bytes_in_(0), num_bad_bytes_out_(0), inboxes(), name_(_name), unexpected_IDs(),
-              num_bad_bytes_in(num_bad_bytes_in_), num_bad_bytes_out(num_bad_bytes_out_), name(name_) {}
+            : num_bad_bytes_out_(0), inboxes(), name_(_name), unexpected_bytes_in(),
+              num_bad_bytes_out(num_bad_bytes_out_), name(name_) {}
 
     void add_inbox(MessageBoxInterface *new_inbox) {
         if (id_is_registered(new_inbox->msgID)) {throw std::invalid_argument("message ID already registered");}
         inboxes.push_back(new_inbox);
     }
-    const deque<MessageBoxInterface *> &get_inboxes() const {return inboxes;}
+    const std::vector<MessageBoxInterface *> &get_inboxes() const {return inboxes;}
     bool id_is_registered(int query_id) {
         for (auto inbox : inboxes) {if (inbox->msgID == query_id) return true;} return false;
     }
     MessageBoxInterface *get_inbox(int query_id) {
         for (auto inbox : inboxes) {if (inbox->msgID == query_id) return inbox;} return nullptr;
     }
-
-    virtual void receive_messages() = 0;
-    virtual int send(const MessageBoxInterface &outbox, const char *data_start) = 0; //return 0 on success
     void clear_all_messages() {
         for (auto inbox : inboxes) inbox->clear();
     }
@@ -81,6 +80,17 @@ public:
         if (print_wait_message)
             std::cout<<"                                                         \r" << std::flush;
     }
+    void print_unexpected_bytes() {
+        static size_t last_num_bad_bytes{0};
+        if (unexpected_bytes_in.size() != last_num_bad_bytes) {
+            last_num_bad_bytes = unexpected_bytes_in.size();
+            std::cout << "Controller bad bytes in: " <<  unexpected_bytes_in.size() << std::hex;
+            for (auto &bad_byte : unexpected_bytes_in) std::cout << " " << bad_byte;
+            std::cout << std::dec << std::endl;
+        }
+    }
+    virtual void receive_messages() = 0;
+    virtual int send(const MessageBoxInterface &outbox, const char *data_start) = 0; //return 0 on success
     virtual ~Communicator() = default;
 };
 
@@ -138,7 +148,7 @@ public:
     }
     void clear() override {message = T();}
     ~MessageOutbox() override = default;
-    inline const static int SIZE = sizeof(T) / sizeof(char);
+    inline constexpr static int SIZE = sizeof(T) / sizeof(char);
 };
 
 

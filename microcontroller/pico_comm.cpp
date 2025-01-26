@@ -27,6 +27,8 @@ int PicoCommunication::send(const MessageBoxInterface &outbox, const char *data_
     for (int i = 0; i < outbox.msg_len; i++) {
         putchar_raw(data_start[i]);
     }
+    stdio_flush();
+    return 0;
 }
 
 PicoCommunication::PicoCommunication(string name)
@@ -39,10 +41,8 @@ MessageBoxInterface* PicoCommunication::parse_buffer_inbox() {
     int16_t ID = ((int16_t)(instream[0] & 0xFF) + (int16_t)((instream[1] & 0xFF) << 8));
     MessageBoxInterface* inbox = get_inbox(ID);
     if (!inbox) {
-        if (std::find(unexpected_IDs.begin(), unexpected_IDs.end(), ID) == unexpected_IDs.end())
-            unexpected_IDs.push_back(ID);
+        unexpected_bytes_in.push_back(instream.at(0));
         instream.pop_front();
-        num_bad_bytes_in_++;
     }
     return inbox;
 }

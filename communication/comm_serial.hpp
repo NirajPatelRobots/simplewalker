@@ -2,14 +2,13 @@
  * created Dec 2022
  * TODO:
  *      detects stream disruption
+ *      switch to standard C/C++ serial library
  *      change device name
- *      BUG: seems to randomly disconnect , maybe segfault or something
  */
 
 #ifndef SIMPLEWALKER_COMM_SERIAL_H
 #define SIMPLEWALKER_COMM_SERIAL_H
 
-#include <queue>
 #include "communication.hpp"
 
 class SerialCommunicator : public Communicator {
@@ -19,7 +18,7 @@ class SerialCommunicator : public Communicator {
     MessageBoxInterface *parse_buffer_inbox();
 public:
     explicit SerialCommunicator(string _name);
-    bool is_connected() {return is_connected_;}
+    bool is_connected() const {return is_connected_;}
     void receive_messages() override;
     int send(const MessageBoxInterface &outbox, const char *data_start) override; //return 0 on success
     ~SerialCommunicator() override;
