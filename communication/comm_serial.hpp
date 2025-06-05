@@ -14,12 +14,10 @@
 class SerialCommunicator : public Communicator {
     int serialfile;
     bool is_connected_;
-    deque<char> instream;
-    MessageBoxInterface *parse_buffer_inbox();
 public:
     explicit SerialCommunicator(string _name);
     bool is_connected() const {return is_connected_;}
-    void receive_messages() override;
+    bool receive_bytes() override;
     int send(const MessageBoxInterface &outbox, const char *data_start) override; //return 0 on success
     ~SerialCommunicator() override;
     void clear_buffer();

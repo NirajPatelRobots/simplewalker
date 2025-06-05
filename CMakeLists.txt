@@ -10,7 +10,7 @@ set(src_names state_estimation/state_estimation state_estimation/robot_state
 set(src_dirs mainsrc communication display physics sensors state_estimation test)
 
 
-set(src_comm "communication/comm_serial.cpp")
+set(src_comm "communication/comm_serial.cpp" "communication/communication.cpp")
 set(src_comm_ext "communication/comm_tcp.cpp")
 set(src_files "")
 foreach(src_name ${src_names})
@@ -69,6 +69,7 @@ add_executable(unittest_walkerUtils mainsrc/walkerUtils.cpp test/unittests/unitt
 target_link_libraries(unittest_walkerUtils gtest gtest_main)
 gtest_discover_tests(unittest_walkerUtils)
 
-add_executable(unittest_basic_communication test/unittests/unittest_basic_communication.cpp)
+add_executable(unittest_basic_communication
+        test/unittests/unittest_basic_communication.cpp communication/communication.cpp)
 target_link_libraries(unittest_basic_communication gtest gtest_main gmock)
 gtest_discover_tests(unittest_basic_communication)

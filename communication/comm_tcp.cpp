@@ -52,10 +52,6 @@ void TCPCommunicator::disconnect() {
     server_is_open_ = false;
 }
 
-void TCPCommunicator::receive_messages() {
-    // TODO
-}
-
 int TCPCommunicator::send(const MessageBoxInterface &outbox, const char *data_start) {
     if (is_connected()) {
         if (write(state->socket_desc, data_start, outbox.msg_len) == (ssize_t)outbox.msg_len)

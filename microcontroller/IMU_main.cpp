@@ -6,6 +6,7 @@ Niraj April 2022 */
 #include "micro_parameters.h"
 #include "pico/binary_info.h"
 #include "pico/sem.h"
+#include "hardware/gpio.h"
 #include "sensors/IMUContext.h"
 
 

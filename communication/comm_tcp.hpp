@@ -26,7 +26,7 @@ public:
     void disconnect();
     bool server_is_open() const {return server_is_open_;}
     bool is_connected() const {return is_connected_;}
-    void receive_messages() override; // TODO
+    inline bool receive_bytes() override { return false; } // TODO
     int send(const MessageBoxInterface &outbox, const char *data_start) override; //return 0 on success
 };
 

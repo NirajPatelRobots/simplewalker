@@ -5,11 +5,11 @@ October 2022
 TODO:
     there's gotta be a better (safer?) way to do this char setting stuff
         char* for data_start in MessageBoxInterface?
-    Maybe split MessageBoxInterface into interface classes for inbox and outbox
+    Split MessageBoxInterface into interface classes for inbox and outbox
     smart pointers
     automatic msg_ID without having it in message data
     decide between msg_len and SIZE
-    custom exception
+    custom exception, build option for removing exceptions
     skip every so many sends
 */
 #ifndef SIMPLEWALKER_COMM_HPP
@@ -19,6 +19,7 @@ TODO:
 #include <string>
 #include <iostream>
 #include <vector>
+#include "stdint.h"
 using std::deque, std::string, std::to_string;
 
 class Communicator;
@@ -43,53 +44,25 @@ protected:
     unsigned int num_bad_bytes_out_;
     std::vector<MessageBoxInterface *> inboxes;
     std::string name_;
+    deque<char> instream;
+    MessageBoxInterface *parse_buffer_inbox();
+    virtual bool receive_bytes() = 0; // implement rx. called by receive_messages(). false means no data was read.
 public:
     std::vector<uint8_t> unexpected_bytes_in;
     const unsigned int &num_bad_bytes_out;
     const std::string &name;
-    explicit Communicator(std::string &_name)
-            : num_bad_bytes_out_(0), inboxes(), name_(_name), unexpected_bytes_in(),
-              num_bad_bytes_out(num_bad_bytes_out_), name(name_) {}
+    Communicator(const std::string &_name)
+    : num_bad_bytes_out_(0), inboxes(), name_(_name), instream(), unexpected_bytes_in(),
+      num_bad_bytes_out(num_bad_bytes_out_), name(name_) {}
 
-    void add_inbox(MessageBoxInterface *new_inbox) {
-        if (id_is_registered(new_inbox->msgID)) {throw std::invalid_argument("message ID already registered");}
-        inboxes.push_back(new_inbox);
-    }
-    const std::vector<MessageBoxInterface *> &get_inboxes() const {return inboxes;}
-    bool id_is_registered(int query_id) {
-        for (auto inbox : inboxes) {if (inbox->msgID == query_id) return true;} return false;
-    }
-    MessageBoxInterface *get_inbox(int query_id) {
-        for (auto inbox : inboxes) {if (inbox->msgID == query_id) return inbox;} return nullptr;
-    }
-    void clear_all_messages() {
-        for (auto inbox : inboxes) inbox->clear();
-    }
-    void flush_message_queue(int num_to_discard = 3, bool print_wait_message = false) {
-        if (print_wait_message)
-            std::cout<<"Waiting for " << name_ << " messages...\r" << std::flush;
-        int messages_received = 0;
-        clear_all_messages();
-        while (messages_received < num_to_discard) {
-            receive_messages();
-            for (auto inbox : inboxes) {
-                messages_received += inbox->num_available();
-            }
-            clear_all_messages();
-        }
-        if (print_wait_message)
-            std::cout<<"                                                         \r" << std::flush;
-    }
-    void print_unexpected_bytes() {
-        static size_t last_num_bad_bytes{0};
-        if (unexpected_bytes_in.size() != last_num_bad_bytes) {
-            last_num_bad_bytes = unexpected_bytes_in.size();
-            std::cout << "Controller bad bytes in: " <<  unexpected_bytes_in.size() << std::hex;
-            for (auto &bad_byte : unexpected_bytes_in) std::cout << " " << bad_byte;
-            std::cout << std::dec << std::endl;
-        }
-    }
-    virtual void receive_messages() = 0;
+    bool add_inbox(MessageBoxInterface *new_inbox);
+    inline const std::vector<MessageBoxInterface *> &get_inboxes() const {return inboxes;}
+    bool id_is_registered(int query_id) const;
+    MessageBoxInterface *get_inbox(int query_id) const;
+    void clear_all_messages();
+    void flush_message_queue(int num_to_discard = 3, bool print_wait_message = false);
+    void print_unexpected_bytes(bool do_ascii = true);
+    void receive_messages();
     virtual int send(const MessageBoxInterface &outbox, const char *data_start) = 0; //return 0 on success
     virtual ~Communicator() = default;
 };
@@ -101,7 +74,9 @@ protected:
     deque<T> messages;
 public:
     MessageInbox(int16_t _msgID, Communicator &communicator)
-        : MessageBoxInterface(_msgID, SIZE, communicator), messages()  {comm.add_inbox(this);}
+        : MessageBoxInterface(_msgID, SIZE, communicator), messages()  {
+        if (!comm.add_inbox(this)) {throw std::invalid_argument("message ID already registered");}
+    }
     /* sets message_out if a message is available.
     Returns the number of messages available after the set, return < 0 is failure */
     int get_newest(T &message_out) {
@@ -154,7 +129,7 @@ public:
 
 class LoopbackCommunicator : public Communicator {
 public:
-    explicit LoopbackCommunicator(std::string name) : Communicator(name) {}
+    explicit LoopbackCommunicator(const std::string &name) : Communicator(name) {}
     int send(const MessageBoxInterface &outbox, const char *data_start) override {
         deque<char> data{};
         for (size_t i=0; i < outbox.msg_len; i++)
@@ -166,7 +141,8 @@ public:
         }
         return 0;  // success
     }
-    void receive_messages() override {}
+    inline void receive_messages() {}
+    bool receive_bytes() override {return true;}
     ~LoopbackCommunicator() override = default;
 };
 
