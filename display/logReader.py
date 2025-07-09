@@ -36,7 +36,7 @@ class LoadedLog:
         """return the fields of a saved log as {name: np.shape} dict"""
         with open(filename, 'r') as inFile:
             reader = csv.reader(inFile)
-            fieldnames = [f.strip(" |") for f in next(reader) if len(f) > 0]
+            fieldnames = [f.strip(" |") for f in next(reader) if len(f.strip(" |")) > 0]
         fields = OrderedDict()
         for name in fieldnames:
             match = re.match(r"(.+)[\[\(](.+)[\]\)]", name)
@@ -49,11 +49,13 @@ class LoadedLog:
                 fields[match.group(1).strip()] = shape
         return fields
 
-    def load(self, filename: str, field_names: List[str]) -> None:
+    def load(self, filename: str, field_names: List[str] = None) -> None:
         self.reset_data()
         log_fields = self.parse_log_fields(filename)
         if self.loud:
             print("Opened log", filename, "fields:", log_fields)
+        if field_names is None:
+            field_names = list(log_fields)
         for name in field_names:
             try:
                 self.fields[name] = np.empty(shape=log_fields[name][:-1] + (0,))

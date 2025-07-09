@@ -5,7 +5,7 @@ TODO:
 
 import unittest
 import os
-from logReader import LoadedLog
+from display.logReader import LoadedLog
 import numpy as np
 from typing import List, Dict
 
@@ -145,6 +145,27 @@ class TestLoadedLog(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             LoadedLog("this_doesnt_exist", [])
         LoadedLog("this_doesnt_exist", [], load_now=False)
+
+    def test_load_no_filenames(self):
+        self.create_logfile()
+        log = LoadedLog(TEST_LOG_NAME)
+        self.assertIn("timestamp", log.fields)
+        self.assertIn("accel", log.fields)
+        self.assertIn("gyro", log.fields)
+        log = LoadedLog()
+        log.load(TEST_LOG_NAME)
+        self.assertIn("timestamp", log.fields)
+        self.assertIn("accel", log.fields)
+        self.assertIn("gyro", log.fields)
+
+    def test_load_empty_fieldname(self):
+        self.create_logfile(column_names={" accel (3x1)|": 3, " gyro (3x1)| ": 3, " ": 1})
+        log = LoadedLog(TEST_LOG_NAME)
+        self.assertNotIn("", log.fields)
+        with self.assertRaises(KeyError) as cm:
+            LoadedLog(TEST_LOG_NAME, ["accel", ""])
+        self.assertIn("field ''", str(cm.exception))
+
 
 
 if __name__ == '__main__':
