@@ -5,24 +5,43 @@ March 2022 blame Niraj
 #include "logger.hpp"
 
 RobotState::RobotState()
-: R_(DEFAULT_ROTATION), vect(VectorXf::Zero(N)), R(R_), RT(RT_) {
+: R_(DEFAULT_ROTATION), vect(VectorXf::Zero(N)), acceleration(Vector3f::Zero()), timestamp_us(), R(R_), RT(RT_) {
+    set_R_(R);
     setAxisFromR_();
-    updateRotationMatrix_(0, Vector3f(1, 0, 0));
 }
 
+/* if axis has changed enough, update rotation matrix.*/
 void RobotState::calculate(void) {
-    /* if axis has changed enough, update rotation matrix.*/
-    Vector3f delta_axis = axis() - R_cached_axis;
-    float delta_angle = delta_axis.norm();
+    float delta_angle = (axis() - R_cached_axis).norm();
+    float axis_angle = axis().norm();
+    if (axis_angle > 2 * M_PI) {
+        axis() -= 2 * M_PI * axis() / axis_angle;
+        axis_angle -= 2 * M_PI;
+    }
     if (delta_angle > rot_angle_update_thresh) {
         cached_rotation_count = 0;
-        updateRotationMatrix_(delta_angle, delta_axis / delta_angle);
-        setAxisFromR_();
+        set_R_(axis_angle, axis() / axis_angle);
     } else ++cached_rotation_count;
 }
 
-void RobotState::updateRotationMatrix_(float delta_angle, const Vector3f &axis_normalized) {
-    R_ = Eigen::AngleAxisf(delta_angle, axis_normalized) * R;
+void RobotState::set_R(const Eigen::Ref<const Matrix3f> &new_R) {
+    if ((new_R * new_R.transpose() - Matrix3f::Identity()).norm() > 1e-5 ) {
+        std::cerr << "Err: attempted to set non-orthogonal R\n";
+        throw std::runtime_error("ERR: attempted to set non-orthogonal R");
+    }
+    set_R_(new_R);
+}
+
+void RobotState::increment_R_(float delta_angle, const Vector3f &axis_normalized) {
+    set_R_(Eigen::AngleAxisf(delta_angle, axis_normalized) * R);
+}
+
+void RobotState::set_R_(float angle, const Vector3f &axis_normalized) {
+    set_R_(Eigen::AngleAxisf(angle, axis_normalized).toRotationMatrix());
+}
+
+void RobotState::set_R_(const Eigen::Ref<const Matrix3f> &new_R) {
+    R_ = new_R;
     RT_ = R.transpose();
     R_cached_axis = axis();
 }

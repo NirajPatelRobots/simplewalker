@@ -1,10 +1,10 @@
 /* simplewalker state for state estimation 
 TODO:
-    stabilizeRotation characterize drift
     copy assignment operator
-    make covariance part of state instead of EKF
+    make StatisticState with RobotState and covariance extracted from EKF?
     get state element std_dev from covariance
-    separate state_t simple struct?
+    separate state_t/DynamicPose simple struct?
+    Rename RobotState to DynamicPose and create new RobotState with multiple frames + legs
 March 2022 blame Niraj*/
 #ifndef ROBOT_STATE_HPP
 #define ROBOT_STATE_HPP
@@ -20,20 +20,23 @@ class RobotState {
     stores robot state and calculate()s higher level info.
     R is rotation matrix, v_world_frame = R * v_body_frame.
     RT is transposed rotation matrix, v_body_frame = RT * v_world_frame
-    updating R with small rotations is numerically awkward, so R is not always updated by calculate.
+    R is not always updated by calculate.
         rot_angle_update_thresh is maximum angle of rotation before an update to R.
     timestamp is the time this state represents. Position and velocity are instantaneous state variables at this time.
     acceleration is not part of the state vector. It's approximated constant over the timestep preceding this state measurement.
     */
     Matrix3f R_, RT_;
-    Vector3f R_cached_axis;  // the axis vector representation of R. 
-    void updateRotationMatrix_(float delta_angle, const Vector3f &axis_normalized);
+    Vector3f R_cached_axis;  // the axis vector representation of R.
+    void increment_R_(float delta_angle, const Vector3f &axis_normalized);
+    void set_R_(const Eigen::Ref<const Matrix3f> &new_R); // does not check error
+    void set_R_(float angle, const Vector3f &axis_normalized);
     void setAxisFromR_();
 public:
     enum index {IDX_POS = 0, IDX_AXIS = 3, IDX_VEL = 6, IDX_ANGVEL = 9};
     VectorXf vect;
     RobotState();
     void calculate();
+    void set_R(const Eigen::Ref<const Matrix3f> &new_R);  // throws runtime_error if R_new not orthogonal
     float rot_angle_update_thresh = 0.0001;
     unsigned cached_rotation_count = 0;
     //state vector elements
