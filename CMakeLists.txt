@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.5)
 project(simplewalker)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -7,7 +7,7 @@ set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time")
 
 set(src_names state_estimation/state_estimation state_estimation/robot_state
  sensors/sensorBoss display/logger physics/leg_kinematics mainsrc/walkerUtils)
-set(src_dirs mainsrc communication display physics sensors state_estimation test)
+set(src_dirs mainsrc communication display physics sensors state_estimation)
 
 
 set(src_comm "communication/comm_serial.cpp" "communication/communication.cpp")
@@ -44,32 +44,8 @@ add_executable(measure_motor_angle_manually ${src_comm} calibrate/measure_motor_
 target_link_libraries(measure_motor_angle_manually wiringPi)
 
 
-
 # test_localization
-include_directories(${src_dirs})
 add_executable(test_localization ${src_files} state_estimation/test_localization.cpp)
 
-# **************************** manual tests ****************************
-add_executable(jacobian_tests physics/leg_kinematics.cpp mainsrc/walkerUtils.cpp
-                              test/test_utils.cpp display/logger.cpp test/jacobian_tests.cpp)
 
-
-# **************************** unittests ****************************
-add_subdirectory(/usr/src/googletest build)
-enable_testing()
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
-include(GoogleTest)
-
-
-add_executable(unittest_leg_kinematics physics/leg_kinematics.cpp test/unittests/unittest_leg_kinematics.cpp)
-target_link_libraries(unittest_leg_kinematics gtest gtest_main)
-gtest_discover_tests(unittest_leg_kinematics)
-
-add_executable(unittest_walkerUtils mainsrc/walkerUtils.cpp test/unittests/unittest_walkerUtils.cpp)
-target_link_libraries(unittest_walkerUtils gtest gtest_main)
-gtest_discover_tests(unittest_walkerUtils)
-
-add_executable(unittest_basic_communication
-        test/unittests/unittest_basic_communication.cpp communication/communication.cpp)
-target_link_libraries(unittest_basic_communication gtest gtest_main gmock)
-gtest_discover_tests(unittest_basic_communication)
+add_subdirectory(test)

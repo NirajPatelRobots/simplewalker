@@ -18,11 +18,10 @@ StateEstimator::StateEstimator(float timestep,
 
 void StateEstimator::predict() {
     //set state_pred from state (motion model)
-    state_pred.pos() = state.pos() + state.vel() * dt;
+    state_pred.pos() = state.pos() + (state.vel() + .5 * state_pred.acceleration * dt) * dt;
     state_pred.axis() = state.axis() + state.angvel() * dt;
-    state_pred.vel() = state.vel();
+    state_pred.vel() = state.vel() + state_pred.acceleration * dt;
     state_pred.angvel() = state.angvel();
-    state_pred.acceleration = (state_pred.vel() - state.vel()) / dt;
     state_pred.calculate();
     cov_pred = motion_jac * cov * motion_jac.transpose() + motion_noise;
     state_pred.timestamp_us = state.timestamp_us + (uint32_t)(dt * 1e6);

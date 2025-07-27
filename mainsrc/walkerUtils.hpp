@@ -48,16 +48,16 @@ struct scalar_statistic {
 
 std::ostream& operator<<(std::ostream& os, const scalar_statistic& data);
 
-struct Vector_statistic{ //TODO
-    Vector3f mean{0, 0, 0};
-    Vector3f max{0, 0, 0};
-    Matrix3f covariance{Matrix3f::Identity()};
-    Vector3f most_recent{0, 0, 0};
-    unsigned num_data{0};
-    unsigned num_bad{0};
-    bool update(Vector3f new_val);
-    bool is_max() const {return (most_recent == max);}
-};
+//struct vector_statistic{ //TODO
+//    Vector3f mean{0, 0, 0};
+//    Vector3f max{0, 0, 0};
+//    Matrix3f covariance{Matrix3f::Identity()};
+//    Vector3f most_recent{0, 0, 0};
+//    unsigned num_data{0};
+//    unsigned num_bad{0};
+//    bool update(Vector3f new_val);
+//    bool is_max() const {return (most_recent == max);}
+//};
 
 // math
 /* find the Jacobian of a rotated vector with respect to the axis-angle vector.
@@ -79,5 +79,9 @@ Matrix3f axis_angle_to_R(const Vector3f &axis_angle);
 
 // create a 3x3 matrix such that matrix multiplication raised_cross_matrix(a) * b = cross(a, b)
 Matrix3f raised_cross_matrix(const Vector3f &vec);
+
+inline Vector3f project_zeroZ(const Vector3f &input) {
+    return Vector3f(input(0),input(1),0);
+}
 
 #endif

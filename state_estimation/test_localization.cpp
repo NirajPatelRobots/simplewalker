@@ -1,6 +1,6 @@
 /* Code for testing state estimator
 TODO:
-    true_state in LocalizationTester
+    true_state in more tests, set sensors from true_state
     move parts of tests into parent LocalizationTester
         settings
     get all settings from localize_test_settings?
@@ -31,6 +31,7 @@ public:
     int step, num_R_resets;
     float accel_noise_mag{}, gyro_noise_mag{};
     Matrix3f IMU_orientation;
+    bool perfect_accel_prediction_;
 
     LocalizationTester(const string &testname) :
         walkerSettings("settings/settings.xml"),
@@ -45,7 +46,7 @@ public:
         true_state(make_unique<RobotState>()), state(EKF->state), state_pred(EKF->state_pred),
         logger(make_unique<ConvenientLogger>("data/localization_test_" + testname + ".log")),
         random_generator(0), normal_distribution(0, 1), name(testname),
-        prediction_time(), correction_time(), step(0), num_R_resets(0)
+        prediction_time(), correction_time(), step(0), num_R_resets(0), perfect_accel_prediction_(false)
         {
         EKF->set_damping_deceleration(walkerSettings.f("State_Estimation", "damping_deceleration"));
         Eigen::Map<SensorVector>(vect_start(sensor_data.get())) = SensorVector::Zero();
@@ -58,6 +59,8 @@ public:
 
     void do_state_estimation() {
         ++step;
+        if (perfect_accel_prediction_)
+            state_pred.acceleration = true_state->acceleration;
         chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
         EKF->predict();
         sensors->predict(state_pred, EKF->dt);
@@ -183,6 +186,7 @@ public:
         if (testSettings.b(name.c_str(), "skip")) return -1;
         float move_duration = testSettings.f(name.c_str(), "move_duration");
         float hold_duration = testSettings.f(name.c_str(), "hold_duration");
+        perfect_accel_prediction_ = testSettings.b("perfect_accel_prediction");
 
         accel_noise_mag = testSettings.f(name.c_str(), "accel_noise");
         gyro_noise_mag = testSettings.f(name.c_str(), "gyro_noise");
