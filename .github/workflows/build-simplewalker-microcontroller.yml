@@ -1,6 +1,12 @@
 name: Build Simplewalker Microcontroller
 
-on: push
+on:
+  push:
+    paths:
+      - .github/workflows/build-simplewalker-microcontroller.yml
+      - microcontroller/**
+      - communication/communication.*
+      - communication/messages.h
 
 jobs:
   build:
@@ -16,16 +22,58 @@ jobs:
       - name: make calibrate_motor
         run: make calibrate_motor
         working-directory: ./microcontroller/build
-      - name: Archive calibrate_motor
-        uses: actions/upload-artifact@v4
-        with:
-          path: ./microcontroller/build/calibrate_motor.uf2
       - name: make hardware_test
         run: make hardware_test
         working-directory: ./microcontroller/build
       - name: make controller_main
         run: make controller_main
         working-directory: ./microcontroller/build
+
+
+  build_IMU_lib_from_pico-examples:
+    runs-on: ubuntu-latest
+    container:
+      image: lukstep/raspberry-pi-pico-sdk:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: NirajPatelRobots/pico-examples
+          sparse-checkout: |
+            **/CMakeLists.txt
+            i2c/mpu6050_i2c/**
+          sparse-checkout-cone-mode: false
+      - run: mkdir build
+      - name: Configure cmake
+        run: cmake ..
+        working-directory: ./build
+      - name: make mpu6050_i2c
+        run: make
+        working-directory: ./build/i2c/mpu6050_i2c/
+      - name: upload mpu6050_i2c_lib
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpu6050_i2c_lib
+          path: |
+            ./build/i2c/mpu6050_i2c/MPU6050_i2c_pico*_lib
+            ./i2c/mpu6050_i2c/*.h*
+          if-no-files-found: error
+          retention-days: 1
+
+
+  build_with_IMU:
+    runs-on: ubuntu-latest
+    container:
+      image: lukstep/raspberry-pi-pico-sdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: download mpu6050_i2c_lib
+        uses: actions/download-artifact@v5
+        with:
+          name: mpu6050_i2c_lib
+      - run: ls mpu6050_i2c_lib
+      - run: mkdir microcontroller/build
+      - name: Configure cmake
+        run: cmake ..
       - name: make IMU_main
         run: make IMU_main
         working-directory: ./microcontroller/build
