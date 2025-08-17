@@ -26,7 +26,7 @@ public:
     MotorController(int motor_ID) : ID(motor_ID) {}
     bool set_target(uint32_t start_time_us, float angle_target, float angvel_target, float torque_pred);
     void update_target(uint32_t time_us) {target.update(time_us);}
-    virtual bool calc_command(const MotorControlState &state, float &command); // returns whether it worked
+    virtual bool calc_command(const MotorControlState &state, float &command) = 0; // returns whether it worked
 };
 
 class DCMotorController : public MotorController {
