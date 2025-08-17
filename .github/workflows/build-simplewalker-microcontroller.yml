@@ -42,7 +42,7 @@ jobs:
             **/CMakeLists.txt
             i2c/mpu6050_i2c/**
           sparse-checkout-cone-mode: false
-      - run: mkdir pico-examples/build
+      - run: mkdir build
       - run: ls -R
       - run: echo $PICO_SDK_PATH
       - name: Configure cmake
