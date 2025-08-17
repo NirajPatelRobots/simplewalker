@@ -12,11 +12,13 @@ pico_sdk_init()
 
 set(pico_motor_IO_src "motor_output.cpp" "ADC_reader.cpp" "motor_IO.cpp")
 set(IMU_src "sensors/IMU_errcheck.cpp" "sensors/IMUContext.cpp")
+set(COMM_src "pico_comm.cpp" "../communication/communication.cpp")
 
 
 if (DEFINED ENV{MPU6050_SRC_DIR} AND DEFINED ENV{MPU6050_BUILD_DIR})
+    message("MPU6050 src: $ENV{MPU6050_SRC_DIR} build: $ENV{MPU6050_BUILD_DIR}")
     add_executable(IMU_main
-            IMU_main.cpp "pico_comm.cpp" ${IMU_src}
+            IMU_main.cpp ${COMM_src} ${IMU_src}
     )
     target_include_directories(IMU_main PUBLIC $ENV{MPU6050_SRC_DIR} $ENV{MPU6050_BUILD_DIR} $CMAKE_SRC_DIR sensors/*.h)
     target_link_directories(IMU_main PUBLIC $ENV{MPU6050_BUILD_DIR})
@@ -34,7 +36,7 @@ add_executable(controller_main
         controller_main.cpp
         motor_control.cpp
         ${pico_motor_IO_src}
-        "pico_comm.cpp"
+        ${COMM_src}
         )
 target_link_libraries(controller_main pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
@@ -46,7 +48,7 @@ pico_add_extra_outputs(controller_main)
 add_executable(hardware_test
         hardwareTest.cpp
         ${pico_motor_IO_src}
-        "pico_comm.cpp"
+        ${COMM_src}
 )
 target_link_libraries(hardware_test pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
@@ -58,7 +60,7 @@ pico_add_extra_outputs(hardware_test)
 add_executable(calibrate_motor
         calibrateMotor.cpp
         ${pico_motor_IO_src}
-        "pico_comm.cpp"
+        ${COMM_src}
 )
 target_link_libraries(calibrate_motor pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
