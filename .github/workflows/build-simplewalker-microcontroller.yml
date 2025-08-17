@@ -42,26 +42,29 @@ jobs:
             **/CMakeLists.txt
             i2c/mpu6050_i2c/**
           sparse-checkout-cone-mode: false
-      - run: mkdir build
+      - run: mkdir pico-examples/build
+      - run: ls -R
+      - run: echo $PICO_SDK_PATH
       - name: Configure cmake
         run: cmake ..
-        working-directory: ./build
+        working-directory: ./pico-examples/build
       - name: make mpu6050_i2c
         run: make
-        working-directory: ./build/i2c/mpu6050_i2c/
+        working-directory: ./pico-examples/build/i2c/mpu6050_i2c/
       - name: upload mpu6050_i2c_lib
         uses: actions/upload-artifact@v4
         with:
           name: mpu6050_i2c_lib
           path: |
-            ./build/i2c/mpu6050_i2c/MPU6050_i2c_pico*_lib
-            ./i2c/mpu6050_i2c/*.h*
+            ./pico-examples/build/i2c/mpu6050_i2c/MPU6050_i2c_pico*_lib
+            ./pico-examples/i2c/mpu6050_i2c/*.h*
           if-no-files-found: error
           retention-days: 1
 
 
   build_with_IMU:
     runs-on: ubuntu-latest
+    needs: build_IMU_lib_from_pico-examples
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
