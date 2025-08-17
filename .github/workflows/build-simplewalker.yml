@@ -1,29 +1,49 @@
 name: Build Simplewalker
 
-on: push
+on:
+  push:
+    paths-ignore:
+      - .github/workflows/build-simplewalker-microcontroller.yml
+      - microcontroller/**
 
 jobs:
-  build:
+  Build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
       - name: install dependencies
-        run: sudo apt install -y libeigen3-dev librapidxml-dev libgtest-dev
+        run: sudo apt install -y libeigen3-dev librapidxml-dev libgtest-dev libwiringpi-dev
       - run: mkdir build
       - name: Configure cmake
         run: cmake ..
         working-directory: ./build
+
       - name: make test_localization
         run: make test_localization
         working-directory: ./build
       - name: Archive test_localization
         uses: actions/upload-artifact@v4
         with:
+          name: test_localization
           path: ./build/test_localization
+          retention-days: 1
+
       - name: make collect_sensor_cal_data
         run: make collect_sensor_cal_data
         working-directory: ./build
+
       - name: make simplewalker
         run: make simplewalker
         working-directory: ./build
+
+
+  Test localization:
+    runs-on: ubuntu-latest
+    steps:
+      - name: download test_localization
+        uses: actions/download-artifact@v5
+        with:
+          name: test_localization
+      - name: run test_localization
+        run: ./test_localization
+
