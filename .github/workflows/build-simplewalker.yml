@@ -56,5 +56,5 @@ jobs:
       - run: mkdir data
       - run: chmod +x ./test_localization
       - name: run test_localization
-        run: ./test_localization
+        run: ./test_localization >> $GITHUB_STEP_SUMMARY
 

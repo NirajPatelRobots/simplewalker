@@ -81,11 +81,8 @@ jobs:
         run: cmake ..
         working-directory: ./microcontroller/build
         env:
-          MPU6050_SRC_DIR: ./imu/i2c/mpu6050_i2c/
-          MPU6050_BUILD_DIR: ./imu/build/i2c/mpu6050_i2c/
+          MPU6050_SRC_DIR:   ${{ github.workspace }}/imu/i2c/mpu6050_i2c/
+          MPU6050_BUILD_DIR: ${{ github.workspace }}/imu/build/i2c/mpu6050_i2c/
       - name: make IMU_main
         run: make IMU_main
         working-directory: ./microcontroller/build
-        env:
-          MPU6050_SRC_DIR: ./imu/i2c/mpu6050_i2c/
-          MPU6050_BUILD_DIR: ./imu/build/i2c/mpu6050_i2c/
