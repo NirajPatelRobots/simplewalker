@@ -72,7 +72,6 @@ jobs:
           path: imu
       - run: mkdir microcontroller/build
       - run: ls -R
-      - name: set IMU lib path env vars
       - name: Configure cmake
         run: cmake ..
         working-directory: ./microcontroller/build
