@@ -19,25 +19,13 @@ jobs:
       - name: Archive calibrate_motor
         uses: actions/upload-artifact@v4
         with:
-          path: ./microcontroller/build/calibrate_motor
+          path: ./microcontroller/build/calibrate_motor.uf2
       - name: make hardware_test
         run: make hardware_test
         working-directory: ./microcontroller/build
-      - name: Archive hardware_test
-        uses: actions/upload-artifact@v4
-        with:
-          path: ./microcontroller/build/hardware_test
       - name: make controller_main
         run: make controller_main
         working-directory: ./microcontroller/build
-      - name: Archive controller_main
-        uses: actions/upload-artifact@v4
-        with:
-          path: ./microcontroller/build/controller_main
       - name: make IMU_main
         run: make IMU_main
         working-directory: ./microcontroller/build
-      - name: Archive IMU_main
-        uses: actions/upload-artifact@v4
-        with:
-          path: ./microcontroller/build/IMU_main
