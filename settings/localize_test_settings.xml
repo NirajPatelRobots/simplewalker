@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<settings>
+    <General>
+        <main_timestep> 0.005 </main_timestep>
+    </General>
+
+    <perfect_accel_prediction>
+        false
+    </perfect_accel_prediction>
+
+    <SensorBoss>
+        <accel_stddev> 0.2 </accel_stddev> <!-- experiment: 0.1 m/s^2 -->
+        <gyro_stddev> 0.001 </gyro_stddev> <!-- experiment: 1e-4 rad/s -->
+        <IMU_orientation> 1 0 0
+            0 0 1
+            0 -1 0 </IMU_orientation>
+    </SensorBoss>
+
+    <State_Estimation>
+        <pos_stddev> 0.1 </pos_stddev>
+        <axis_stddev> 0.15 </axis_stddev>
+        <vel_stddev> 1.0 </vel_stddev>
+        <angvel_stddev> 0.1 </angvel_stddev>
+        <damping_deceleration> 0.1 </damping_deceleration>
+        <prediction_only> </prediction_only>
+    </State_Estimation>
+
+<stationary>
+    <skip> </skip>
+    <duration> 15.0 </duration>
+    <accel_noise> 0.1 </accel_noise> <!-- experiment: 0.1 m/s^2 -->
+    <gyro_noise> 0.0001 </gyro_noise> <!-- experiment: 1e-4 rad/s -->
+</stationary>
+
+<start_moving>
+    <skip>  </skip>
+    <ramp_duration> 2.5 </ramp_duration>
+    <hold_duration> 0. </hold_duration>
+    <accel_noise> 0. </accel_noise>
+    <gyro_noise> 0. </gyro_noise>
+    <target_velocity> 1.2 </target_velocity>
+    <direction> 0 -1 0 </direction>
+</start_moving>
+
+
+<tilt>
+    <skip>  </skip>
+    <move_duration> 1.0 </move_duration>
+    <hold_duration> 10.0 </hold_duration>
+    <accel_noise> 0. </accel_noise>
+    <gyro_noise> 0. </gyro_noise>
+    <axis_change> 0 -0.03 0 </axis_change>
+</tilt>
+
+<swing>
+    <skip>  </skip>
+    <num_swings> 2 </num_swings>
+    <swing_period> 1. </swing_period>
+    <accel_noise> 0. </accel_noise>
+    <gyro_noise> 0. </gyro_noise>
+    <swing_height> 0. </swing_height>
+    <max_angle> 0.2 </max_angle>
+    <direction> 1 0 0 </direction>
+</swing>
+
+<orbit>
+    <skip>  </skip>
+    <num_orbits> 5.0 </num_orbits>
+    <accel_noise> 0. </accel_noise>
+    <gyro_noise> 0.0 </gyro_noise>
+    <path_rad> 0.6 </path_rad>
+    <path_freq> 0.4 </path_freq>
+</orbit>
+
+</settings>

@@ -45,6 +45,13 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: test_localization
+      - name: checkout settings
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            settings/settings.xml
+            settings/localize_test_settings.xml
+          sparse-checkout-cone-mode: false
       - run: chmod +x ./test_localization
       - name: run test_localization
         run: ./test_localization
