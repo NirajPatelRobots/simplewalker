@@ -12,7 +12,7 @@ jobs:
         run: sudo apt install -y libeigen3-dev librapidxml-dev libgtest-dev
       - run: mkdir build
       - name: Configure cmake
-        run: cmake simplewalker
+        run: cmake ..
         working-directory: ./build
       - name: make
         run: make .
