@@ -14,6 +14,16 @@ jobs:
       - name: Configure cmake
         run: cmake ..
         working-directory: ./build
-      - name: make
-        run: make
+      - name: make test_localization
+        run: make test_localization
+      - name: Archive test_localization
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./build/test_localization
+        working-directory: ./build
+      - name: make collect_sensor_cal_data
+        run: make collect_sensor_cal_data
+        working-directory: ./build
+      - name: make simplewalker
+        run: make simplewalker
         working-directory: ./build
