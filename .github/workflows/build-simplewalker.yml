@@ -1,7 +1,5 @@
 name: Build Simplewalker
 
-# TODO: why test_localization print logs?
-
 on:
   push:
     paths-ignore:
