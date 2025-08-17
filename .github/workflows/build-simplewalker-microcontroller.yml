@@ -1,0 +1,16 @@
+name: Build Simplewalker Microcontroller
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: lukstep/raspberry-pi-pico-sdk:latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: mkdir microcontroller/build && cd microcontroller/build
+      - name: Configure cmake
+        run: cmake ..
+      - name: make
+        run: make .

@@ -1,0 +1,17 @@
+name: Build Simplewalker
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: install dependencies
+        run: apt install libeigen3-dev librapidxml-dev libgtest-dev
+      - run: mkdir build && cd build
+      - name: Configure cmake
+        run: cmake ..
+      - name: make
+        run: make .
