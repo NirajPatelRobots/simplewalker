@@ -71,7 +71,12 @@ jobs:
           name: mpu6050_i2c_lib
           path: imu
       - run: mkdir microcontroller/build
-      - run: ls -R
+      - run: ls $MPU6050_SRC_DIR
+        env:
+          MPU6050_SRC_DIR: ./imu/i2c/mpu6050_i2c/
+      - run: ls $MPU6050_BUILD_DIR
+        env:
+          MPU6050_BUILD_DIR: ./imu/build/i2c/mpu6050_i2c/
       - name: Configure cmake
         run: cmake ..
         working-directory: ./microcontroller/build
@@ -81,3 +86,6 @@ jobs:
       - name: make IMU_main
         run: make IMU_main
         working-directory: ./microcontroller/build
+        env:
+          MPU6050_SRC_DIR: ./imu/i2c/mpu6050_i2c/
+          MPU6050_BUILD_DIR: ./imu/build/i2c/mpu6050_i2c/
