@@ -67,7 +67,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: mpu6050_i2c_lib
-      - run: ls mpu6050_i2c_lib
+      - run: ls -R
       - run: mkdir microcontroller/build
       - name: Configure cmake
         run: cmake ..
