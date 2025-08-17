@@ -7,7 +7,7 @@ on:
       - microcontroller/**
 
 jobs:
-  Build:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
         working-directory: ./build
 
 
-  Test localization:
+  test_localization:
     runs-on: ubuntu-latest
     steps:
       - name: download test_localization
