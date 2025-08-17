@@ -45,7 +45,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: test_localization
-      - run: du -h .
+      - run: chmod +x ./test_localization
       - name: run test_localization
         run: ./test_localization
 
