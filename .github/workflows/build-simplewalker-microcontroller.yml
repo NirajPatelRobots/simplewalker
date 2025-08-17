@@ -9,8 +9,10 @@ jobs:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir microcontroller/build && cd microcontroller/build
+      - run: mkdir microcontroller/build
       - name: Configure cmake
-        run: cmake ..
+        run: cmake ./microcontroller
+        working-directory: ./microcontroller/build
       - name: make
         run: make .
+        working-directory: ./microcontroller/build
