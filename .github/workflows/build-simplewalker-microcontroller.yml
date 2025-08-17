@@ -40,6 +40,7 @@ jobs:
           repository: NirajPatelRobots/pico-examples
           sparse-checkout: |
             **/CMakeLists.txt
+            **.cmake
             i2c/mpu6050_i2c/**
           sparse-checkout-cone-mode: false
       - run: mkdir build
@@ -47,17 +48,17 @@ jobs:
       - run: echo $PICO_SDK_PATH
       - name: Configure cmake
         run: cmake ..
-        working-directory: ./pico-examples/build
+        working-directory: ./build
       - name: make mpu6050_i2c
         run: make
-        working-directory: ./pico-examples/build/i2c/mpu6050_i2c/
+        working-directory: ./build/i2c/mpu6050_i2c/
       - name: upload mpu6050_i2c_lib
         uses: actions/upload-artifact@v4
         with:
           name: mpu6050_i2c_lib
           path: |
-            ./pico-examples/build/i2c/mpu6050_i2c/MPU6050_i2c_pico*_lib
-            ./pico-examples/i2c/mpu6050_i2c/*.h*
+            ./build/i2c/mpu6050_i2c/MPU6050_i2c_pico*_lib
+            ./i2c/mpu6050_i2c/*.h*
           if-no-files-found: error
           retention-days: 1
 
