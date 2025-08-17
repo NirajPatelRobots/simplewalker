@@ -51,7 +51,7 @@ jobs:
         with:
           name: mpu6050_i2c_lib
           path: |
-            ./build/i2c/mpu6050_i2c/MPU6050_i2c_pico*_lib.a
+            ./build/i2c/mpu6050_i2c/libMPU6050_i2c_pico*_lib.a
             ./i2c/mpu6050_i2c/*.h*
           if-no-files-found: error
           retention-days: 1
@@ -73,12 +73,12 @@ jobs:
       - run: mkdir microcontroller/build
       - run: ls -R
       - name: set IMU lib path env vars
-        run: |
-          export MPU6050_SRC_DIR=imu/i2c/mpu6050_i2c/
-          export MPU6050_BUILD_DIR=imu/build/i2c/mpu6050_i2c/
       - name: Configure cmake
         run: cmake ..
         working-directory: ./microcontroller/build
+        env:
+          MPU6050_SRC_DIR: ./imu/i2c/mpu6050_i2c/
+          MPU6050_BUILD_DIR: ./imu/build/i2c/mpu6050_i2c/
       - name: make IMU_main
         run: make IMU_main
         working-directory: ./microcontroller/build
