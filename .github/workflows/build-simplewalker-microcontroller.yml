@@ -20,13 +20,13 @@ jobs:
         run: cmake ..
         working-directory: ./microcontroller/build
       - name: make calibrate_motor
-        run: make calibrate_motor
+        run: make calibrate_motor -j$(nproc)
         working-directory: ./microcontroller/build
       - name: make hardware_test
-        run: make hardware_test
+        run: make hardware_test -j$(nproc)
         working-directory: ./microcontroller/build
       - name: make controller_main
-        run: make controller_main
+        run: make controller_main -j$(nproc)
         working-directory: ./microcontroller/build
 
 
@@ -43,7 +43,7 @@ jobs:
         run: cmake ..
         working-directory: ./build
       - name: make mpu6050_i2c
-        run: make
+        run: make -j$(nproc)
         working-directory: ./build/i2c/mpu6050_i2c/
       - run: ls -R ./build
       - name: upload mpu6050_i2c_lib
@@ -71,18 +71,12 @@ jobs:
           name: mpu6050_i2c_lib
           path: imu
       - run: mkdir microcontroller/build
-      - run: ls $MPU6050_SRC_DIR
-        env:
-          MPU6050_SRC_DIR: ./imu/i2c/mpu6050_i2c/
-      - run: ls $MPU6050_BUILD_DIR
-        env:
-          MPU6050_BUILD_DIR: ./imu/build/i2c/mpu6050_i2c/
       - name: Configure cmake
         run: cmake ..
         working-directory: ./microcontroller/build
         env:
           MPU6050_SRC_DIR:   ${{ github.workspace }}/imu/i2c/mpu6050_i2c/
           MPU6050_BUILD_DIR: ${{ github.workspace }}/imu/build/i2c/mpu6050_i2c/
-      - name: make IMU_main
-        run: make IMU_main
+      - name: make IMU_main -j$(nproc)
+        run: make IMU_main -j$(nproc)
         working-directory: ./microcontroller/build

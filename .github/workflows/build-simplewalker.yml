@@ -19,7 +19,7 @@ jobs:
         working-directory: ./build
 
       - name: make test_localization
-        run: make test_localization
+        run: make test_localization -j$(nproc)
         working-directory: ./build
       - name: Archive test_localization
         uses: actions/upload-artifact@v4
@@ -30,11 +30,11 @@ jobs:
           overwrite: true
 
       - name: make collect_sensor_cal_data
-        run: make collect_sensor_cal_data
+        run: make collect_sensor_cal_data -j$(nproc)
         working-directory: ./build
 
       - name: make simplewalker
-        run: make simplewalker
+        run: make simplewalker -j$(nproc)
         working-directory: ./build
 
 
@@ -57,4 +57,3 @@ jobs:
       - run: chmod +x ./test_localization
       - name: run test_localization
         run: ./test_localization >> $GITHUB_STEP_SUMMARY
-
