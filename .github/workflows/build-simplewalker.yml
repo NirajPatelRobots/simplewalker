@@ -21,13 +21,14 @@ jobs:
       - name: make test_localization
         run: make test_localization -j$(nproc)
         working-directory: ./build
-      - name: Archive test_localization
+      - name: Upload test_localization
         uses: actions/upload-artifact@v4
         with:
           name: test_localization
           path: ./build/test_localization
           retention-days: 1
           overwrite: true
+          if-no-files-found: error
 
       - name: make collect_sensor_cal_data
         run: make collect_sensor_cal_data -j$(nproc)
@@ -36,6 +37,34 @@ jobs:
       - name: make simplewalker
         run: make simplewalker -j$(nproc)
         working-directory: ./build
+
+      - run: make unittest_basic_communication -j$(nproc)
+        working-directory: ./build
+      - run: make unittest_walkerUtils -j$(nproc)
+        working-directory: ./build
+      - run: make unittest_state_prediction -j$(nproc)
+        working-directory: ./build
+      - name: Upload unit tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit_tests
+          path: ./build/test/unittest*
+          retention-days: 1
+          overwrite: true
+          if-no-files-found: error
+
+  run_unit_tests:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download unit tests
+        uses: actions/download-artifact@v5
+        with: { name: unit_tests }
+      - run: mkdir data
+      - run: chmod +x ./unittest_basic_communication ./unittest_walkerUtils ./unittest_state_prediction
+      - run: ./unittest_basic_communication
+      - run: ./unittest_walkerUtils
+      - run: ./unittest_state_prediction
 
 
   test_localization:
@@ -49,11 +78,10 @@ jobs:
             settings/settings.xml
             settings/localize_test_settings.xml
           sparse-checkout-cone-mode: false
-      - name: download test_localization
+      - name: Download test_localization
         uses: actions/download-artifact@v5
-        with:
-          name: test_localization
+        with: { name: test_localization }
       - run: mkdir data
       - run: chmod +x ./test_localization
-      - name: run test_localization
+      - name: Run test_localization
         run: ./test_localization >> $GITHUB_STEP_SUMMARY

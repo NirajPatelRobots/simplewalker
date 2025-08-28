@@ -45,7 +45,6 @@ jobs:
       - name: make mpu6050_i2c
         run: make -j$(nproc)
         working-directory: ./build/i2c/mpu6050_i2c/
-      - run: ls -R ./build
       - name: upload mpu6050_i2c_lib
         uses: actions/upload-artifact@v4
         with:
