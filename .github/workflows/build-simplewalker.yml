@@ -42,6 +42,8 @@ jobs:
         working-directory: ./build
       - run: make unittest_walkerUtils -j$(nproc)
         working-directory: ./build
+      - run: make unittest_leg_kinematics -j$(nproc)
+        working-directory: ./build
       - run: make unittest_state_prediction -j$(nproc)
         working-directory: ./build
       - name: Upload unit tests
@@ -61,11 +63,12 @@ jobs:
         uses: actions/download-artifact@v5
         with: { name: unit_tests }
       - run: mkdir data
-      - run: chmod +x ./unittest_basic_communication ./unittest_walkerUtils ./unittest_state_prediction
+      - run: chmod +x ./unittest_basic_communication ./unittest_walkerUtils ./unittest_state_prediction ./unittest_leg_kinematics
       - run: ./unittest_basic_communication
       - run: ./unittest_walkerUtils
         continue-on-error: true
       - run: ./unittest_state_prediction
+      - run: ./unittest_leg_kinematics
 
 
   test_localization:

@@ -2,12 +2,9 @@
 TODO:
     true_state in more tests, set sensors from true_state
     move parts of tests into parent LocalizationTester
-        settings
-    get all settings from localize_test_settings?
 March 2022 */
 #include "state_estimation.hpp"
 #include "convenientLogger.hpp"
-#include "messages.h"
 #include <chrono>
 #include <fstream>
 #include <random>
@@ -15,7 +12,7 @@ namespace chrono = std::chrono;
 
 class LocalizationTester {
 public:
-    const WalkerSettings walkerSettings;
+    const WalkerSettings settings;
     unique_ptr<SensorData> sensor_data;
     unique_ptr<SensorBoss> sensors;
     unique_ptr<StateEstimator> EKF;
@@ -34,21 +31,27 @@ public:
     bool perfect_accel_prediction_;
 
     LocalizationTester(const string &testname) :
-        walkerSettings("settings/settings.xml"),
+        settings("settings/localize_test_settings.xml"),
         sensor_data(make_unique<SensorData>()),
-        sensors(make_unique<SensorBoss>(walkerSettings.f("SensorBoss", "accel_stddev"),
-                                        walkerSettings.f("SensorBoss", "gyro_stddev"))),
-        EKF(make_unique<StateEstimator>(walkerSettings.f("General", "main_timestep"),
-                                        walkerSettings.f("State_Estimation", "pos_stddev"), 
-                                        walkerSettings.f("State_Estimation", "axis_stddev"),
-                                        walkerSettings.f("State_Estimation", "vel_stddev"),
-                                        walkerSettings.f("State_Estimation", "angvel_stddev"))),
+        sensors(make_unique<SensorBoss>(settings.f("SensorBoss", "accel_stddev"),
+                                        settings.f("SensorBoss", "gyro_stddev"))),
+        EKF(make_unique<StateEstimator>(settings.f("General", "main_timestep"),
+                                        settings.f("State_Estimation", "pos_stddev"),
+                                        settings.f("State_Estimation", "axis_stddev"),
+                                        settings.f("State_Estimation", "vel_stddev"),
+                                        settings.f("State_Estimation", "angvel_stddev"))),
         true_state(make_unique<RobotState>()), state(EKF->state), state_pred(EKF->state_pred),
-        logger(make_unique<ConvenientLogger>("data/localization_test_" + testname + ".log")),
+        logger(),
         random_generator(0), normal_distribution(0, 1), name(testname),
         prediction_time(), correction_time(), step(0), num_R_resets(0), perfect_accel_prediction_(false)
         {
-        EKF->set_damping_deceleration(walkerSettings.f("State_Estimation", "damping_deceleration"));
+        EKF->set_damping_deceleration(settings.f("State_Estimation", "damping_deceleration"));
+        perfect_accel_prediction_ = settings.b("perfect_accel_prediction");
+        accel_noise_mag = settings.f(name.c_str(), "accel_noise");
+        gyro_noise_mag = settings.f(name.c_str(), "gyro_noise");
+        if (settings.b("File_Logging")) {
+            logger = make_unique<ConvenientLogger>("data/localization_test_" + testname + ".log");
+        }
         Eigen::Map<SensorVector>(vect_start(sensor_data.get())) = SensorVector::Zero();
         std::vector<float> IMU_orientation_raw({1., 0., 0.,
                                                 0., 0., 1.,
@@ -73,17 +76,19 @@ public:
     }
 
     void log_step(float timestamp) {
-        logger->log("timestamp", timestamp);
-        logger->obj_log("state", state);
-        logger->obj_log("state_pred", state_pred);
-        logger->obj_log("state_true", *true_state);
-        logger->log("sensors ", sensors->data);
-        logger->log("sensors_pred ", sensors->data_pred);
-        logger->log("R", state.R);
-        logger->log("R_pred", state_pred.R);
-        logger->log("R_true", true_state->R);
-        logger->log("State Covariance", EKF->state_covariance);
-        logger->print();
+        if (logger) {
+            logger->log("timestamp", timestamp);
+            logger->obj_log("state", state);
+            logger->obj_log("state_pred", state_pred);
+            logger->obj_log("state_true", *true_state);
+            logger->log("sensors ", sensors->data);
+            logger->log("sensors_pred ", sensors->data_pred);
+            logger->log("R", state.R);
+            logger->log("R_pred", state_pred.R);
+            logger->log("R_true", true_state->R);
+            logger->log("State Covariance", EKF->state_covariance);
+            logger->print();
+        }
     }
 
     void print_results() {
@@ -117,12 +122,10 @@ public:
 class TestLocalization_Stationary : public LocalizationTester {
 public:
     TestLocalization_Stationary() : LocalizationTester("stationary") {};
-    int run(const WalkerSettings &testSettings) {
-        if (testSettings.b(name.c_str(), "skip")) return -1;
-        float duration = testSettings.f("stationary", "duration");
+    int run() {
+        if (settings.b(name.c_str(), "skip")) return -1;
+        float duration = settings.f("stationary", "duration");
 
-        accel_noise_mag = testSettings.f("stationary", "accel_noise");
-        gyro_noise_mag = testSettings.f("stationary", "gyro_noise");
         cout<<"Simulating staying still for "<<duration<<" s. Start at "<<state.vect.transpose()<<endl;
         cout<<"Accel noise: " << accel_noise_mag << " [m/s^2] gyro noise: " << gyro_noise_mag << " [rad/s]" << endl;
 
@@ -141,15 +144,13 @@ public:
 class TestLocalization_StartMoving : public LocalizationTester {
 public:
     TestLocalization_StartMoving() : LocalizationTester("start_moving") {};
-    int run(const WalkerSettings &testSettings) {
-        if (testSettings.b(name.c_str(), "skip")) return -1;
-        float ramp_duration = testSettings.f("start_moving", "ramp_duration");
-        float hold_duration = testSettings.f("start_moving", "hold_duration");
-        float target_velocity = testSettings.f("start_moving", "target_velocity");
+    int run() {
+        if (settings.b(name.c_str(), "skip")) return -1;
+        float ramp_duration = settings.f("start_moving", "ramp_duration");
+        float hold_duration = settings.f("start_moving", "hold_duration");
+        float target_velocity = settings.f("start_moving", "target_velocity");
 
-        accel_noise_mag = testSettings.f("start_moving", "accel_noise");
-        gyro_noise_mag = testSettings.f("start_moving", "gyro_noise");
-        Vector3f direction = Eigen::Map<Vector3f>(testSettings.vf("start_moving", "direction").data());
+        Vector3f direction = Eigen::Map<Vector3f>(settings.vf("start_moving", "direction").data());
         direction /= direction.norm();
         Vector3f moving_accel = target_velocity / ramp_duration * direction;
 
@@ -182,16 +183,13 @@ public:
 class TestLocalization_Tilt : public LocalizationTester {
 public:
     TestLocalization_Tilt() : LocalizationTester("tilt") {};
-    int run(const WalkerSettings &testSettings) {
-        if (testSettings.b(name.c_str(), "skip")) return -1;
-        float move_duration = testSettings.f(name.c_str(), "move_duration");
-        float hold_duration = testSettings.f(name.c_str(), "hold_duration");
-        perfect_accel_prediction_ = testSettings.b("perfect_accel_prediction");
+    int run() {
+        if (settings.b(name.c_str(), "skip")) return -1;
+        float move_duration = settings.f(name.c_str(), "move_duration");
+        float hold_duration = settings.f(name.c_str(), "hold_duration");
 
-        accel_noise_mag = testSettings.f(name.c_str(), "accel_noise");
-        gyro_noise_mag = testSettings.f(name.c_str(), "gyro_noise");
         Vector3f axis_change;
-        axis_change = Eigen::Map<Vector3f>(testSettings.vf(name.c_str(), "axis_change").data());
+        axis_change = Eigen::Map<Vector3f>(settings.vf(name.c_str(), "axis_change").data());
 
         cout << "Simulating tilting. Tilt around axis [" << axis_change.transpose() << "] over "
             << move_duration << " s, then hold for " << hold_duration << " s."
@@ -227,7 +225,7 @@ public:
         cout << "True Axis to target axis error angle [rad]: "
              << acosf((float)(true_state->axis().transpose() * target_axis) / (true_state->axis().norm() * target_axis.norm())) << "\n";
         cout << "R angle error [rad]: "
-             << Eigen::AngleAxisf(state.RT * true_state->R).angle() << "\n";
+             << Eigen::AngleAxisf(state.RT() * true_state->R).angle() << "\n";
         cout << "Axis angle error [rad]: "
              << acosf((float)(state.axis().transpose() * true_state->axis()) / (true_state->axis().norm() * state.axis().norm())) << "\n\n";
         return 0;
@@ -239,17 +237,15 @@ public:
 class TestLocalization_Swing : public LocalizationTester {
 public:
     TestLocalization_Swing() : LocalizationTester("swing") {};
-    int run(const WalkerSettings &testSettings) {
-        if (testSettings.b(name.c_str(), "skip")) return -1;
-        int num_swings = testSettings.f("swing", "num_swings");
-        float period = testSettings.f("swing", "swing_period");
-        float swing_height = testSettings.f("swing", "swing_height");
-        float max_angle = testSettings.f("swing", "max_angle");
+    int run() {
+        if (settings.b(name.c_str(), "skip")) return -1;
+        int num_swings = settings.f("swing", "num_swings");
+        float period = settings.f("swing", "swing_period");
+        float swing_height = settings.f("swing", "swing_height");
+        float max_angle = settings.f("swing", "max_angle");
 
-        accel_noise_mag = testSettings.f("swing", "accel_noise");
-        gyro_noise_mag = testSettings.f("swing", "gyro_noise");
         Vector3f direction;
-        direction << Eigen::Map<Vector3f>(testSettings.vf("swing", "direction").data());
+        direction << Eigen::Map<Vector3f>(settings.vf("swing", "direction").data());
         direction /= direction.norm();
         float swing_angular_freq = 2 * M_PI / period;
         Vector3f axis_direction = direction.cross(UP_DIR);
@@ -284,13 +280,11 @@ public:
 class TestLocalization_Orbit : public LocalizationTester {
 public:
     TestLocalization_Orbit() : LocalizationTester("orbit") {};
-    int run(const WalkerSettings &testSettings) {
-        if (testSettings.b(name.c_str(), "skip")) return -1;
-        float path_rad = testSettings.f("orbit", "path_rad");
-        float path_freq = testSettings.f("orbit", "path_freq");
-        int revolutions = testSettings.f("orbit", "num_orbits");
-        accel_noise_mag = testSettings.f("orbit", "accel_noise");
-        gyro_noise_mag = testSettings.f("orbit", "gyro_noise");
+    int run() {
+        if (settings.b(name.c_str(), "skip")) return -1;
+        float path_rad = settings.f("orbit", "path_rad");
+        float path_freq = settings.f("orbit", "path_freq");
+        int revolutions = settings.f("orbit", "num_orbits");
 
         float timestep = EKF->dt;
         cout << "Simulating circular path of radius " << 100 * path_rad << " cm" << endl
@@ -324,21 +318,20 @@ public:
 };
 
 int main() {
-    const WalkerSettings testSettings("settings/localize_test_settings.xml");
     unique_ptr<TestLocalization_Stationary> test_stationary = make_unique<TestLocalization_Stationary>();
-    test_stationary->run(testSettings);
+    test_stationary->run();
 
     unique_ptr<TestLocalization_StartMoving> test_startmoving = make_unique<TestLocalization_StartMoving>();
-    test_startmoving->run(testSettings);
+    test_startmoving->run();
 
     unique_ptr<TestLocalization_Tilt> test_tilt = make_unique<TestLocalization_Tilt>();
-    test_tilt->run(testSettings);
+    test_tilt->run();
 
     unique_ptr<TestLocalization_Swing> test_swing = make_unique<TestLocalization_Swing>();
-    test_swing->run(testSettings);
+    test_swing->run();
 
     unique_ptr<TestLocalization_Orbit> test_orbit = make_unique<TestLocalization_Orbit>();
-    test_orbit->run(testSettings);
+    test_orbit->run();
     cout<<"Done Testing Localization"<<endl;
     return 0;
 }

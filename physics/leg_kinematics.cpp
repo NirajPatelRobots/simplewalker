@@ -20,6 +20,11 @@ void forward_kinematics(Vector3f &p_leg, Matrix3f &forward_Jacobian, const Vecto
     fk_Jac_physTrig(forward_Jacobian, sines, cosines);
 }
 
+void forward_kinematics_R(Matrix3f &R, const Vector3f &theta) {
+    // rotate by theta2 around RIGHT axis, then rotate by theta0 around FORWARD axis
+    R = Eigen::AngleAxisf(theta(0), FORWARD_DIR) * Eigen::AngleAxisf(theta(2), -LEFT_DIR);
+}
+
 void forward_Jacobian(Matrix3f &forward_Jacobian, const Vector3f &theta) {
     Vector3f sines = theta.array().sin();
     Vector3f cosines = theta.array().cos();
@@ -65,3 +70,31 @@ void fk_Jac_physTrig(Matrix3f &Jac, const Vector3f &sines, const Vector3f &cosin
     Jac *= SHIN_LENGTH;
 }
 
+
+float calc_foot_spring_angle(Vector3f &sprung_point, const Vector3f &unsprung_point,
+                             const Matrix3f &R, float foot_radius) {
+    if (sprung_point(UP_IDX) > foot_radius) {
+        return 0; // no reason to bend above ground
+    }
+    const Vector3f p_i = (sprung_point - unsprung_point);
+    const float L = p_i.norm();
+    const Vector3f p_l = L * R * UP_DIR;  // vector length L from unsprung_point in the direction of the leg
+
+    const float depth = foot_radius - sprung_point(2);
+    const float initial_descent = - p_i(2);
+    float angle = 2 * std::atan2(p_l(2) - std::sqrt(p_l(2) * p_l(2) + 2 * depth * initial_descent - depth * depth),
+                                 depth - 2 * initial_descent);
+    const float singularity_distance = abs(depth - 2 * initial_descent);
+    if (singularity_distance < 1e-2) {
+        const float backup_angle = 2 * std::atan2(-p_i(2), p_l(2));
+        cout << "~~~We're in the calc_foot_spring_angle SINGULARITY ZONE~~~\n"
+             << angle << " | " << backup_angle << std::endl;
+        // TODO use backup_angle
+    }
+    if (angle > M_PI)
+        angle -= 2 * M_PI;
+    if (angle < -M_PI)
+        angle += 2 * M_PI;
+    sprung_point += p_l * std::sin(angle) + p_i * (std::cos(angle) - 1);
+    return angle;
+}

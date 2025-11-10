@@ -19,6 +19,8 @@ bool MatrixIsCloseToZero(const MatrixXf &test) {
     return test.squaredNorm() < TOLERANCE;
 }
 
+inline float randomFloat() {return Eigen::Vector<float, 1>::Random()(0);}
+
 TEST(StatePrediction, TestZeroAccel) {
     RobotState state = get_random_state();
     Vector3f accel_result = Vector3f::Random();
@@ -39,7 +41,7 @@ TEST(StatePrediction, TestConstAccel) {
 
 TEST(StatePrediction, TestPointTiltUpright) {
     Vector3f accel_result = Vector3f::Random();
-    float height = Eigen::Vector<float, 1>::Random()(0) + 2;
+    float height = randomFloat() + 2;
     Vector3f rot_point(0, 0, -height);
 
     predict_point_tilt(Vector3f::Zero(), rot_point, accel_result);
@@ -83,11 +85,11 @@ TEST(StatePrediction, TestPointTiltHorizontal) {
 
 // world frame
 void randomLegPositions(float offset_dist, Vector3f &offset, Vector3f &left_point, Vector3f &right_point) {
-    float angle = Eigen::Vector<float, 1>::Random()(0) * M_PI_2;
-    float height = Eigen::Vector<float, 1>::Random()(0) + 2;
+    float angle = randomFloat() * M_PI_2;
+    float height = randomFloat() + 2;
     Matrix3f rotation {Eigen::AngleAxisf(angle, Vector3f{0,0,1})};
     offset = rotation * Vector3f {offset_dist, 0, -height};
-    float left_dist_out = Eigen::Vector<float, 1>::Random()(0), right_dist_out = Eigen::Vector<float, 1>::Random()(0);
+    float left_dist_out = randomFloat(), right_dist_out = randomFloat();
     left_point =  rotation * Vector3f{0,  left_dist_out,  0} + offset;
     right_point = rotation * Vector3f{0, -right_dist_out, 0} + offset;
 }
@@ -105,7 +107,7 @@ TEST(StatePrediction, TestLineTiltUpright) {
 TEST(StatePrediction, TestLineTilt) {
     Vector3f accel_result = Vector3f::Random(), accel_result_2 = Vector3f::Random();
     Vector3f left_point, right_point, offset;
-    float offset_dist = Eigen::Vector<float, 1>::Random()(0) * .5 + .7;
+    float offset_dist = randomFloat() * .5 + .7;
     randomLegPositions(offset_dist, offset, left_point, right_point);
     EXPECT_NEAR(offset_dist, project_zeroZ(offset).norm(), TOLERANCE);
 
@@ -127,7 +129,7 @@ TEST(StatePrediction, TestLineTilt) {
 TEST(StatePrediction, TestLineTiltHorizontal) {
     Vector3f accel_result = Vector3f::Random(), accel_result_2 = Vector3f::Random();
     Vector3f left_point, right_point, offset, tilt_point = Vector3f::Zero();
-    float offset_dist = Eigen::Vector<float, 1>::Random()(0) * .5 + .7;
+    float offset_dist = randomFloat() * .5 + .7;
     randomLegPositions(offset_dist, offset, left_point, right_point);
     tilt_point(UP_IDX) = left_point(UP_IDX); // tilt point at same height as rotation points
 

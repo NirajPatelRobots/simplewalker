@@ -20,16 +20,16 @@ void SensorBoss::update_sensors(const SensorData *raw_data) {
 
 void SensorBoss::predict(const RobotState &state_pred, float dt) {
     Vector3f imu_accel_pred_world = IMU_ORIENTATION * (state_pred.acceleration + GRAVITY_ACCEL);
-    vect_pred_.segment<3>(IDX_ACCEL) = state_pred.RT * imu_accel_pred_world;
+    vect_pred_.segment<3>(IDX_ACCEL) = state_pred.RT() * imu_accel_pred_world;
     // accel is not in state vector, so accelerometer is a fcn of velocity in state equations
-    jac.block<3,3>(IDX_ACCEL, RobotState::IDX_VEL) = state_pred.RT * IMU_ORIENTATION / dt;
+    jac.block<3,3>(IDX_ACCEL, RobotState::IDX_VEL) = state_pred.RT() * IMU_ORIENTATION / dt;
     Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_ACCEL, RobotState::IDX_AXIS), -state_pred.axis(),
-                               state_pred.RT, imu_accel_pred_world);
+                               state_pred.RT(), imu_accel_pred_world);
 
-    vect_pred_.segment<3>(IDX_GYRO) = state_pred.RT * IMU_ORIENTATION * state_pred.angvel();
-    jac.block<3,3>(IDX_GYRO, RobotState::IDX_ANGVEL) = state_pred.RT * IMU_ORIENTATION;
+    vect_pred_.segment<3>(IDX_GYRO) = state_pred.RT() * IMU_ORIENTATION * state_pred.angvel();
+    jac.block<3,3>(IDX_GYRO, RobotState::IDX_ANGVEL) = state_pred.RT() * IMU_ORIENTATION;
     Jac_rotated_wrt_axis_angle(jac.block<3,3>(IDX_GYRO, RobotState::IDX_AXIS), -state_pred.axis(),
-                               state_pred.RT, IMU_ORIENTATION * state_pred.angvel());
+                               state_pred.RT(), IMU_ORIENTATION * state_pred.angvel());
 
     data_pred_.timestamp_us = state_pred.timestamp_us;
 }

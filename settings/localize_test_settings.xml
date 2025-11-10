@@ -16,6 +16,8 @@
             0 -1 0 </IMU_orientation>
     </SensorBoss>
 
+    <File_Logging>  </File_Logging>
+
     <State_Estimation>
         <pos_stddev> 0.1 </pos_stddev>
         <axis_stddev> 0.15 </axis_stddev>

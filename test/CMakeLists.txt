@@ -24,6 +24,7 @@ target_link_libraries(unittest_basic_communication gtest gtest_main gmock)
 gtest_discover_tests(unittest_basic_communication)
 
 add_executable(unittest_state_prediction
-        unittests/unittest_state_prediction.cpp ../state_estimation/state_prediction.cpp ../state_estimation/robot_state.cpp)
+        unittests/unittest_state_prediction.cpp ../state_estimation/state_prediction.cpp
+        ../state_estimation/robot_state.cpp ../physics/leg_kinematics.cpp)
 target_link_libraries(unittest_state_prediction gtest gtest_main)
 gtest_discover_tests(unittest_state_prediction)
