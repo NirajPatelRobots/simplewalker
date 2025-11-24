@@ -50,14 +50,14 @@ void DynamicPose::setAxisFromR_() {
     R_cached_axis = axis();
 }
 
-Block3f DynamicPose::pos() {return vect.segment<3>(IDX_POS);}
-const Vector3f DynamicPose::pos() const {return vect.segment<3>(IDX_POS);}
-Block3f DynamicPose::axis() {return vect.segment<3>(IDX_AXIS);}
-const Vector3f DynamicPose::axis() const {return vect.segment<3>(IDX_AXIS);}
-Block3f DynamicPose::vel() {return vect.segment<3>(IDX_VEL);}
-const Vector3f DynamicPose::vel() const {return vect.segment<3>(IDX_VEL);}
-Block3f DynamicPose::angvel() {return vect.segment<3>(IDX_ANGVEL);}
-const Vector3f DynamicPose::angvel() const {return vect.segment<3>(IDX_ANGVEL);}
+//Block3f DynamicPose::pos() {return vect.segment<3>(IDX_POS);}
+//const Vector3f DynamicPose::pos() const {return vect.segment<3>(IDX_POS);}
+//Block3f DynamicPose::axis() {return vect.segment<3>(IDX_AXIS);}
+//const Vector3f DynamicPose::axis() const {return vect.segment<3>(IDX_AXIS);}
+//Block3f DynamicPose::vel() {return vect.segment<3>(IDX_VEL);}
+//const Vector3f DynamicPose::vel() const {return vect.segment<3>(IDX_VEL);}
+//Block3f DynamicPose::angvel() {return vect.segment<3>(IDX_ANGVEL);}
+//const Vector3f DynamicPose::angvel() const {return vect.segment<3>(IDX_ANGVEL);}
 
 
 FootInfo::FootInfo(FootShape polygon_, Vector3f attach_point_, float radius_)
@@ -83,9 +83,8 @@ void FootState::set(const Eigen::Ref<const Vector3f> &body_pos, const Eigen::Ref
     forward_kinematics_R(R_leg, leg_angles);
     position = body_pos + R_body * (info.attach_point + p_leg);
     R = R_body * R_leg;
-    for (const int &i : {0,1}) {
+    for (unsigned long i = 0; i < points.size(); i++) {
         points[i] = R * info.points[i] + position;
-        points_contact[i] = points[i](UP_IDX) < info.radius;
     }
     if (info.spring_torque_per_rad.has_value()) {
         if (points_contact[1]) { // TODO determine which points are sprung without hard-coding (points_are_sprung?)
@@ -95,6 +94,9 @@ void FootState::set(const Eigen::Ref<const Vector3f> &body_pos, const Eigen::Ref
             spring_angle = calc_foot_spring_angle(points[2], points[0], R, info.radius);
             points[1] = points[0] + (points[0] - points[2]);
         }
+    }
+    for (unsigned long i = 0; i < points.size(); i++) {
+        points_contact[i] = points[i](UP_IDX) < info.radius;
     }
 }
 

@@ -1,5 +1,5 @@
-#ifndef WALKERTYPES_H
-#define WALKERTYPES_H
+#ifndef WALKER_SENSORDATA_H
+#define WALKER_SENSORDATA_H
 #include <stdint.h>
 
 const int WALKER_COMM_NUM_MOTORS{6};

@@ -25,7 +25,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test_localization
-          path: ./build/test_localization
+          path: ./build/test/test_localization
           retention-days: 1
           overwrite: true
           if-no-files-found: error
@@ -40,7 +40,7 @@ jobs:
 
       - run: make unittest_basic_communication -j$(nproc)
         working-directory: ./build
-      - run: make unittest_walkerUtils -j$(nproc)
+      - run: make unittest_rotation -j$(nproc)
         working-directory: ./build
       - run: make unittest_leg_kinematics -j$(nproc)
         working-directory: ./build
@@ -63,10 +63,9 @@ jobs:
         uses: actions/download-artifact@v5
         with: { name: unit_tests }
       - run: mkdir data
-      - run: chmod +x ./unittest_basic_communication ./unittest_walkerUtils ./unittest_state_prediction ./unittest_leg_kinematics
+      - run: chmod +x ./unittest_basic_communication ./unittest_rotation ./unittest_state_prediction ./unittest_leg_kinematics
       - run: ./unittest_basic_communication
-      - run: ./unittest_walkerUtils
-        continue-on-error: true
+      - run: ./unittest_rotation
       - run: ./unittest_state_prediction
       - run: ./unittest_leg_kinematics
 

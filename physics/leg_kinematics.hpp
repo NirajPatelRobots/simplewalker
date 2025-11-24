@@ -8,7 +8,7 @@ Adapted Mar 2022 from kinematics.py
 By Niraj */
 #ifndef LEG_KINEMATICS_HPP
 #define LEG_KINEMATICS_HPP
-#include "walkerUtils.hpp"
+#include "rotation.hpp"
 
 const float SHIN_LENGTH = 0.1, THIGH_LENGTH = 0.1; // [m] (if you make them different, fix _fk_Jac_physTrig to do that)
 

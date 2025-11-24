@@ -1,12 +1,7 @@
 /*
 Logging more advanced simplewalker information, child class of Logger
-
-Can output:
-    header to explain other data
-    relevant data of many objects
-    human readable or raw data
-    Can output to stdout or file
-    
+TODO:
+    cpp file
 */
 #ifndef SIMPLEWALKER_CONVENIENT_LOGGER
 #define SIMPLEWALKER_CONVENIENT_LOGGER
@@ -21,6 +16,8 @@ public:
     void obj_log(const RobotState &x) {obj_log("", x);}
     void obj_log(std::string name, const SensorBoss &x);
     void obj_log(const SensorBoss &x) {obj_log("", x);}
+    void obj_log(string name, const SensorData &x);
+    void obj_log(const SensorData &x) {obj_log("", x);}
 };
 
 void ConvenientLogger::obj_log(std::string name, const RobotState &x) {
@@ -35,6 +32,12 @@ void ConvenientLogger::obj_log(std::string name, const SensorBoss &x) {
     Logger::log(name + " gyro", x.gyro());
     Logger::log(name + " accel_pred", x.accel_pred());
     Logger::log(name + " gyro_pred", x.gyro_pred());
+}
+
+void ConvenientLogger::obj_log(string name, const SensorData &x) {
+    log(name + "time", x.timestamp_us * 1e6);
+    log(name + "accel", x.accel, 3);
+    log(name + "gyro", x.gyro, 3);
 }
 
 #endif

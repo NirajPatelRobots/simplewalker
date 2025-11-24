@@ -13,7 +13,7 @@ Requirements:
 - Eigen 3.4.8
 - python 3.7
 - rapidxml
-- googletest 1.10
+- googletest 1.17 (installed by cmake)
 - wiringPi (`apt-get install libwiringpi-dev` to build on ubuntu)
 - MPU6050 pico code: https://github.com/NirajPatelRobots/pico-examples
 

@@ -103,8 +103,8 @@ int main() {
 
         if (settings.b("Logger", "log_times")) logger->log(logtimes);
         if (settings.b("Logger", "log_controlstate")) logger->log("controlstate", (float*)controlState.get(), sizeof(ControlStateMsg) / sizeof(float));
-        if (settings.b("Logger", "log_sensor")) logger->log(sensors->data);
-        if (settings.b("Logger", "log_sensor_pred")) logger->log(sensors->data_pred);
+        if (settings.b("Logger", "log_sensor")) logger->obj_log(sensors->data);
+        if (settings.b("Logger", "log_sensor_pred")) logger->obj_log(sensors->data_pred);
         if (settings.b("Logger", "log_state")) logger->obj_log(EKF->state);
         if (settings.b("Logger", "log_R")) logger->log("R", state.R);
         if (settings.b("Logger", "log_state_pred")) logger->obj_log("Predicted ", EKF->state_pred);

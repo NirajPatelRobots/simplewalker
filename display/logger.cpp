@@ -77,12 +77,6 @@ void Logger::log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x) {
     finish_log_field();
 }
 
-void Logger::log(string name, const SensorData &x) {
-    log(name + "time", x.timestamp_us * 1e6);
-    log(name + "accel", x.accel, 3);
-    log(name + "gyro", x.gyro, 3);
-}
-
 void Logger::log(const Logtimes &logtimes) {
     log("predict", logtimes.predict);
     log("correct", logtimes.correct);
@@ -147,88 +141,6 @@ void Logger::print_line(void) {
 bool Logger::dontprint(unsigned) {
     disable = true;
     return false;
-}
-
-
-// <<<<<<<<<<<<<<<<<<<<<<<<<<< SETTINGS              <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-WalkerSettings::WalkerSettings(string filename) {
-    std::ifstream inFile(filename);
-    if (inFile.is_open()) {
-        text = std::vector<char>((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
-        inFile.close();
-        text.push_back('\0');
-        doc.parse<rapidxml::parse_trim_whitespace>(&text[0]);
-        settings_node = doc.first_node("settings");
-        if (!settings_node) std::cerr<<"Couldn't find settings node in "<<filename<<endl;
-    }
-    else {
-        std::cerr<<"Couldn't find "<<filename<<endl;
-    }
-}
-
-const char *WalkerSettings::cstr(const char * const groupname, const char * const fieldname) const {
-    if (!settings_node) return nullptr;
-    rapidxml::xml_node<> *node = settings_node->first_node(groupname);
-    if (node) {
-        node = node->first_node(fieldname);
-        if (node) return node->value();
-    }
-    std::cout<<"Couldn't load "<< groupname << "::" << fieldname <<std::endl;
-    return nullptr;
-}
-
-const char *WalkerSettings::cstr(const char * const fieldname) const {
-    if (!settings_node) return nullptr;
-    rapidxml::xml_node<> *node = settings_node->first_node(fieldname);
-    if (node) return node->value();
-    std::cout<<"Couldn't load "<<fieldname<<std::endl;
-    return nullptr;
-}
-
-float WalkerSettings::f(const char * const fieldname) const {
-    if (!settings_node) return 0.0;
-    return std::atof( cstr(fieldname));
-}
-float WalkerSettings::f(const char * const groupname, const char * const fieldname) const {
-    if (!settings_node) return 0.0;
-    return std::atof( cstr(groupname, fieldname));
-}
-
-int WalkerSettings::i(const char * const fieldname) const {
-    if (!settings_node) return 0;
-    return std::atoi( cstr(fieldname));
-}
-int WalkerSettings::i(const char * const groupname, const char * const fieldname) const {
-    if (!settings_node) return 0;
-    return std::atoi( cstr(groupname, fieldname));
-}
-
-bool WalkerSettings::b(const char * const fieldname) const {
-    const char * text = cstr(fieldname);
-    return (text && std::strlen(text) > 0 && string("false").compare(text) != 0 && string("0").compare(text) != 0);
-}
-bool WalkerSettings::b(const char * const groupname, const char * const fieldname) const {
-    const char * text = cstr(groupname, fieldname);
-    return (text && std::strlen(text) > 0 && string("false").compare(text) != 0 && string("0").compare(text) != 0);
-}
-
-std::vector<float> strtovf(const char * text) {
-    std::vector<float> out;
-    if (!text) {return out;}
-    char *after;
-    while (std::strlen(text) > 0) {
-        out.push_back(std::strtof(text, &after));
-        text = after;
-    }
-    return out;
-}
-
-std::vector<float> WalkerSettings::vf(const char * const fieldname) const {
-    return strtovf(cstr(fieldname));
-}
-std::vector<float> WalkerSettings::vf(const char * const groupname, const char * const fieldname) const {
-    return strtovf(cstr(groupname, fieldname));
 }
 
 

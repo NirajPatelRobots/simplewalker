@@ -153,3 +153,24 @@ void JacobianTest::update_results(const Vector3f true_out, const Vector3f approx
     }
 }
 
+bool scalar_statistic::update(float new_val) {
+    if (!std::isfinite(new_val)) {
+        num_bad++;
+        return false;
+    }
+    unsigned n = num_data++;
+    float new_mean = (mean * n + new_val)/(n + 1);
+    if (new_val > max)  max = new_val;
+    std_dev = sqrtf((n * powf(std_dev, 2) + n*(n-1) * powf(new_mean - mean, 2)) / (n+1) );
+    mean = new_mean;
+    most_recent = new_val;
+    return true;
+}
+
+std::ostream& operator<<(std::ostream& os, const scalar_statistic& data) {
+    os<<"Mean: "<<data.mean<<", max: "<<data.max<<", std_dev: "<<data.std_dev<<" [n = "<<data.num_data<<"]";
+    if (data.num_bad)
+        os<<" ("<<data.num_bad<<" bad)";
+    os<<std::endl;
+    return os;
+}

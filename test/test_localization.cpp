@@ -5,6 +5,7 @@ TODO:
 March 2022 */
 #include "state_estimation.hpp"
 #include "convenientLogger.hpp"
+#include "test_utils.hpp"
 #include <chrono>
 #include <fstream>
 #include <random>
@@ -81,8 +82,8 @@ public:
             logger->obj_log("state", state);
             logger->obj_log("state_pred", state_pred);
             logger->obj_log("state_true", *true_state);
-            logger->log("sensors ", sensors->data);
-            logger->log("sensors_pred ", sensors->data_pred);
+            logger->obj_log("sensors ", sensors->data);
+            logger->obj_log("sensors_pred ", sensors->data_pred);
             logger->log("R", state.R);
             logger->log("R_pred", state_pred.R);
             logger->log("R_true", true_state->R);

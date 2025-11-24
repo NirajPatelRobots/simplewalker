@@ -47,14 +47,14 @@ public:
     float rot_angle_update_thresh = 0.0001;
     unsigned cached_rotation_count = 0;
     //state vector elements
-    Block3f pos();
-    const Vector3f pos() const;
-    Block3f axis();
-    const Vector3f axis() const;
-    Block3f vel();
-    const Vector3f vel() const;
-    Block3f angvel();
-    const Vector3f angvel() const;
+    inline Block3f pos() {return vect.segment<3>(IDX_POS);}
+    inline const Vector3f pos() const {return vect.segment<3>(IDX_POS);}
+    inline Block3f axis() {return vect.segment<3>(IDX_AXIS);}
+    inline const Vector3f axis() const {return vect.segment<3>(IDX_AXIS);}
+    inline Block3f vel() {return vect.segment<3>(IDX_VEL);}
+    inline const Vector3f vel() const {return vect.segment<3>(IDX_VEL);}
+    inline Block3f angvel() {return vect.segment<3>(IDX_ANGVEL);}
+    inline const Vector3f angvel() const {return vect.segment<3>(IDX_ANGVEL);}
     // additional state elements
     Vector3f acceleration; // average acceleration during the preceding timestep
     uint32_t timestamp_us;

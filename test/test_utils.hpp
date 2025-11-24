@@ -6,6 +6,9 @@ TODO:
     use process clock for timing
     JacobianTest subclass of inputoutput_vector_compare
     set input magnitude
+    vector_statistic
+    scalar_statistic unit
+    scalar_statistic std_dev could be nan
 
 Niraj, May 2022*/
 #include <iostream>
@@ -15,6 +18,31 @@ Niraj, May 2022*/
 #include "leg_kinematics.hpp"
 
 using Eigen::Array3f, Eigen::MatrixXf, Eigen::VectorXf;
+
+struct scalar_statistic {
+    float mean{0};
+    float max {0};
+    float std_dev{0};
+    float most_recent{0};
+    unsigned num_data{0};
+    unsigned num_bad{0};
+    std::string unit{};
+    bool update(float new_val);  // returns whether statistics were updated, false if invalid input
+    bool is_max() const {return (most_recent == max);}
+};
+
+std::ostream& operator<<(std::ostream& os, const scalar_statistic& data);
+
+/*struct vector_statistic{ //TODO
+    Vector3f mean{0, 0, 0};
+    Vector3f max{0, 0, 0};
+    Matrix3f covariance{Matrix3f::Identity()};
+    Vector3f most_recent{0, 0, 0};
+    unsigned num_data{0};
+    unsigned num_bad{0};
+    bool update(Vector3f new_val);
+    bool is_max() const {return (most_recent == max);}
+};*/
 
 struct single_Jac_run_result {
     float error; //the magnitude of difference between jacobian calculated and true output

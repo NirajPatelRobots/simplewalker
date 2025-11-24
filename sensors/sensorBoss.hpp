@@ -8,16 +8,19 @@ TODO:
     health estimate
     active covariance
     data_is_valid()
+    SensorBoss template can contain multiple IMUs and leg sensors
+    hide IDX_ACCEL and IDX_GYRO?
 */
 #ifndef SENSORBOSS_HPP
 #define SENSORBOSS_HPP
 #include "robot_state.hpp"
+#include "sensor_data.h"
 const int M = 6;
 typedef Eigen::Vector<float, M> SensorVector;
 
 class SensorBoss {
 protected:
-    SensorData data_, data_pred_;
+    SensorData data_, data_pred_; // unbiased
     Eigen::Map<SensorVector> data_vect_, vect_pred_;
     SensorVector bias;
     MatrixXf cov;
