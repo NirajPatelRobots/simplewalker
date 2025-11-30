@@ -32,7 +32,7 @@ gtest_discover_tests(unittest_rotation)
 add_executable(unittest_basic_communication
         unittests/unittest_basic_communication.cpp ../communication/communication.cpp)
 target_include_directories(unittest_basic_communication PUBLIC ../communication)
-target_link_libraries(unittest_basic_communication GTest::gtest_main gmock)
+target_link_libraries(unittest_basic_communication GTest::gtest_main)
 gtest_discover_tests(unittest_basic_communication)
 
 add_executable(unittest_state_prediction

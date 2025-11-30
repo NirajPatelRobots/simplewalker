@@ -10,6 +10,7 @@ TODO:
     automatic msg_ID without having it in message data
     decide between msg_len and SIZE
     custom exception, build option for removing exceptions
+    Communicator::send(int msg_id, size_t size, char *data_start)? Would need to change child classes
     skip every so many sends
 */
 #ifndef SIMPLEWALKER_COMM_HPP
@@ -72,10 +73,12 @@ template <typename T>
 class MessageInbox : public MessageBoxInterface {
 protected:
     deque<T> messages;
+    Communicator *fwd_target;
 public:
-    MessageInbox(int16_t _msgID, Communicator &communicator)
-        : MessageBoxInterface(_msgID, SIZE, communicator), messages()  {
+    MessageInbox(int16_t _msgID, Communicator &communicator, Communicator *forward_to = nullptr)
+        : MessageBoxInterface(_msgID, SIZE, communicator), messages(), fwd_target(forward_to)  {
         if (!comm.add_inbox(this)) {throw std::invalid_argument("message ID already registered");}
+        if (fwd_target == &communicator) {throw std::invalid_argument("Communicator can't forward to itself");}
     }
     /* sets message_out if a message is available.
     Returns the number of messages available after the set, return < 0 is failure */
@@ -83,6 +86,9 @@ public:
         if (num_available() > 0) {
             message_out = messages.back();
             messages.pop_back();
+            if (fwd_target) {
+                fwd_target->send(*this, (const char *)(&message_out));
+            }
             return num_available();
         }
         return -1;

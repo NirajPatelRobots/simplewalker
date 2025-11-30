@@ -2,12 +2,11 @@
 November 2022
 TODO:
     define an equality comparator for test_struct_1
-    Test Communicator add multiple inboxes with same ID
+    mock communicator?
 */
 #include <memory>
 #include <any>
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "communication.hpp"
 
 struct test_struct_1 {
@@ -61,6 +60,16 @@ TEST_F(BasicCommunicationTest, InboxIsEmpty) {
     EXPECT_EQ(0, received_message.num_animals);
     EXPECT_FALSE(received_message.has_electricity);
     EXPECT_EQ(0, test_inbox_1.num_available());
+}
+
+TEST_F(BasicCommunicationTest, NoMultipleInboxSameID) {
+    MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
+    EXPECT_THROW({
+        MessageInbox<test_struct_1> test_inbox_2(test_ID_1, *loopback_comm);
+    }, std::invalid_argument);
+    EXPECT_THROW({
+        MessageInbox<test_struct_2> test_inbox_2(test_ID_1, *loopback_comm);
+    }, std::invalid_argument);
 }
 
 TEST_F(BasicCommunicationTest, InboxReceiveMessage) {
@@ -126,6 +135,7 @@ TEST_F(BasicCommunicationTest, SendLoopback) {
     test_outbox_1.message = {.dynamic_feedback = 1000.23, .num_animals = 3, .has_electricity=true};
 
     ASSERT_EQ(0, test_outbox_1.send());
+    loopback_comm->receive_messages();
     ASSERT_EQ(1, test_inbox_1.num_available());
     EXPECT_EQ(0, test_inbox_2.num_available());
     EXPECT_EQ(0, test_inbox_1.get_newest(received_message));
@@ -135,4 +145,64 @@ TEST_F(BasicCommunicationTest, SendLoopback) {
     EXPECT_EQ(test_outbox_1.message.has_electricity, received_message.has_electricity);
 }
 
+TEST_F(BasicCommunicationTest, ForwardMessage) {
+    std::unique_ptr<LoopbackCommunicator> other_comm;
+    other_comm = std::make_unique<LoopbackCommunicator>("other_comm");
 
+    // outbox, message to send, inboxes to receive
+    MessageOutbox<test_struct_1> test_outbox(test_ID_1, *loopback_comm);
+    test_outbox.message = {.dynamic_feedback = 1000.23, .num_animals = 3, .has_electricity=true};
+    // loopback_comm forwards message id 1 to other_comm
+    MessageInbox<test_struct_1> test_inbox(test_ID_1, *loopback_comm, other_comm.get());
+    MessageInbox<test_struct_1> other_inbox(test_ID_1, *other_comm);
+
+    // send message 1
+    ASSERT_EQ(0, test_outbox.send());
+    loopback_comm->receive_messages();
+
+    // check it's received by loopback
+    ASSERT_EQ(1, test_inbox.num_available());
+    EXPECT_EQ(0, test_inbox.get_newest(received_message));
+    EXPECT_EQ(test_outbox.message.dynamic_feedback, received_message.dynamic_feedback);
+    EXPECT_EQ(test_outbox.message.num_animals, received_message.num_animals);
+    EXPECT_EQ(test_outbox.message.has_electricity, received_message.has_electricity);
+
+    // check it's received by other_comm
+    received_message = {0, 0, false};
+    ASSERT_EQ(1, other_inbox.num_available());
+    EXPECT_EQ(0, other_inbox.get_newest(received_message));
+    EXPECT_EQ(test_outbox.message.dynamic_feedback, received_message.dynamic_feedback);
+    EXPECT_EQ(test_outbox.message.num_animals, received_message.num_animals);
+    EXPECT_EQ(test_outbox.message.has_electricity, received_message.has_electricity);
+}
+
+TEST_F(BasicCommunicationTest, DontForwardMessage) {
+    std::unique_ptr<LoopbackCommunicator> other_comm;
+    other_comm = std::make_unique<LoopbackCommunicator>("other_comm");
+
+    // outbox, message to send, inboxes to receive
+    MessageOutbox<test_struct_1> test_outbox(test_ID_1, *loopback_comm);
+    test_outbox.message = {.dynamic_feedback = 1000.23, .num_animals = 3, .has_electricity=true};
+    MessageInbox<test_struct_1> test_inbox(test_ID_1, *loopback_comm);
+    MessageInbox<test_struct_1> other_inbox(test_ID_1, *other_comm);
+    // loopback_comm forwards message id 2, NOT ID 1
+    MessageInbox<test_struct_1> test_inbox_2(test_ID_2, *loopback_comm, other_comm.get());
+
+    // send message 1
+    ASSERT_EQ(0, test_outbox.send());
+    loopback_comm->receive_messages();
+
+    // check it's received by loopback
+    ASSERT_EQ(1, test_inbox.num_available());
+    EXPECT_EQ(0, test_inbox.get_newest(received_message));
+
+    // check it's NOT received by other_comm
+    ASSERT_EQ(0, other_inbox.num_available());
+    EXPECT_EQ(-1, other_inbox.get_newest(received_message));
+}
+
+TEST_F(BasicCommunicationTest, CantForwardToSelf) {
+    EXPECT_THROW({
+        MessageInbox<test_struct_1> test_inbox(test_ID_1, *loopback_comm, loopback_comm.get());
+    }, std::invalid_argument);
+}
