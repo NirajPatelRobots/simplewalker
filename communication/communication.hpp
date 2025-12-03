@@ -10,7 +10,7 @@ TODO:
     automatic msg_ID without having it in message data
     decide between msg_len and SIZE
     custom exception, build option for removing exceptions
-    Communicator::send(int msg_id, size_t size, char *data_start)? Would need to change child classes
+    Communicator::send(int msg_id, size_t size, char *data_start)
     skip every so many sends
 */
 #ifndef SIMPLEWALKER_COMM_HPP
@@ -58,8 +58,8 @@ public:
 
     bool add_inbox(MessageBoxInterface *new_inbox);
     inline const std::vector<MessageBoxInterface *> &get_inboxes() const {return inboxes;}
-    bool id_is_registered(int query_id) const;
-    MessageBoxInterface *get_inbox(int query_id) const;
+    bool id_is_registered(int16_t query_id) const;
+    MessageBoxInterface *get_inbox(int16_t query_id) const;
     void clear_all_messages();
     void flush_message_queue(int num_to_discard = 3, bool print_wait_message = false);
     void print_unexpected_bytes(bool do_ascii = true);
@@ -137,18 +137,11 @@ class LoopbackCommunicator : public Communicator {
 public:
     explicit LoopbackCommunicator(const std::string &name) : Communicator(name) {}
     int send(const MessageBoxInterface &outbox, const char *data_start) override {
-        deque<char> data{};
         for (size_t i=0; i < outbox.msg_len; i++)
-            data.push_back(*(data_start+i));
-        MessageBoxInterface *inbox = get_inbox(outbox.msgID);
-        if (!inbox) return 1;
-        if (inbox->msg_len == outbox.msg_len) {
-            inbox->set_message(data.begin(), data.end());
-        }
+            instream.push_back(*(data_start+i));
         return 0;  // success
     }
-    inline void receive_messages() {}
-    bool receive_bytes() override {return true;}
+    bool receive_bytes() override {return !instream.empty();}
     ~LoopbackCommunicator() override = default;
 };
 

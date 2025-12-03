@@ -1,11 +1,11 @@
 #include "communication.hpp"
 
 
-bool Communicator::id_is_registered(int query_id) const {
+bool Communicator::id_is_registered(int16_t query_id) const {
     for (auto inbox : inboxes) {if (inbox->msgID == query_id) return true;} return false;
 }
 
-MessageBoxInterface *Communicator::get_inbox(int query_id) const {
+MessageBoxInterface *Communicator::get_inbox(int16_t query_id) const {
     for (auto inbox : inboxes) {if (inbox->msgID == query_id) return inbox;} return nullptr;
 }
 
@@ -33,7 +33,7 @@ void Communicator::receive_messages() {
 
 MessageBoxInterface* Communicator::parse_buffer_inbox() {
     if (instream.size() < 2) return nullptr;
-    int16_t ID = ((int16_t)instream.at(0) + ((int16_t)instream.at(1) << 8));
+    uint16_t ID = ((uint8_t)instream.at(0) + ((uint16_t)((uint8_t)instream.at(1)) << 8));
     MessageBoxInterface* inbox = get_inbox(ID);
     if (!inbox) {
         unexpected_bytes_in.push_back(instream.at(0));

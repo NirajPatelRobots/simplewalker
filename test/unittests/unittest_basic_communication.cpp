@@ -10,19 +10,32 @@ TODO:
 #include "communication.hpp"
 
 struct test_struct_1 {
+    uint16_t id;
+    uint16_t num_animals;
     float dynamic_feedback;
-    int num_animals;
     bool has_electricity;
 };
-const int test_ID_1 = 140;
+const uint16_t test_ID_1 = 140;
 const int size_1 = sizeof(test_struct_1) / sizeof(char);
 
+test_struct_1 example_message() {
+    return {.id = test_ID_1, .num_animals = 8, .dynamic_feedback = 4.5, .has_electricity=true};
+};
+
 struct test_struct_2 {
+    uint16_t id;
+    uint16_t false_readings;
     float static_feedback;
-    int false_readings;
     bool is_luminous;
 };
-const int test_ID_2 = 3000;
+const uint16_t test_ID_2 = 3000;
+
+struct nonaligned_struct {
+    uint16_t id;
+    uint32_t num_samples;
+    float water_level_m;
+    bool should_polymerize;
+};
 
 class MockCommunicator : public Communicator {
 public:
@@ -37,7 +50,7 @@ protected:
     test_struct_1 received_message;
     void SetUp() override {
         loopback_comm = std::make_unique<LoopbackCommunicator>("test_communicator");
-        received_message = {0, 0, false};
+        received_message = {0, 0, 0, false};
     }
 };
 
@@ -74,7 +87,7 @@ TEST_F(BasicCommunicationTest, NoMultipleInboxSameID) {
 
 TEST_F(BasicCommunicationTest, InboxReceiveMessage) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
-    test_struct_1 test_message{.dynamic_feedback = 4.5, .num_animals = 8, .has_electricity=true};
+    test_struct_1 test_message = example_message();
     deque<char> test_data{};
     for (size_t i=0; i < size_1; i++)
         test_data.push_back(*(((char*)&test_message) + i));
@@ -82,6 +95,7 @@ TEST_F(BasicCommunicationTest, InboxReceiveMessage) {
     ASSERT_EQ(1, test_inbox_1.num_available());
     EXPECT_EQ(0, test_inbox_1.get_newest(received_message));
 
+    EXPECT_EQ(test_message.id, test_ID_1);
     EXPECT_EQ(test_message.dynamic_feedback, received_message.dynamic_feedback);
     EXPECT_EQ(test_message.num_animals, received_message.num_animals);
     EXPECT_EQ(test_message.has_electricity, received_message.has_electricity);
@@ -90,7 +104,7 @@ TEST_F(BasicCommunicationTest, InboxReceiveMessage) {
 
 TEST_F(BasicCommunicationTest, InboxReceiveMultipleMessages) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
-    test_struct_1 test_message{.dynamic_feedback = 4.5, .num_animals = 8, .has_electricity=true};
+    test_struct_1 test_message = example_message();
     test_inbox_1.set(test_struct_1{});   // first, empty message
     test_inbox_1.set(test_message);
     ASSERT_EQ(2, test_inbox_1.num_available());
@@ -108,7 +122,7 @@ TEST_F(BasicCommunicationTest, InboxReceiveMultipleMessages) {
 
 TEST_F(BasicCommunicationTest, InboxClear) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
-    test_struct_1 test_message{.dynamic_feedback = 4.5, .num_animals = 8, .has_electricity=true};
+    test_struct_1 test_message = example_message();
     test_inbox_1.set(test_struct_1{});
     test_inbox_1.set(test_message);
     ASSERT_EQ(2, test_inbox_1.num_available());
@@ -132,7 +146,7 @@ TEST_F(BasicCommunicationTest, SendLoopback) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
     MessageOutbox<test_struct_1> test_outbox_1(test_ID_1, *loopback_comm);
     EXPECT_EQ(2, loopback_comm->get_inboxes().size());
-    test_outbox_1.message = {.dynamic_feedback = 1000.23, .num_animals = 3, .has_electricity=true};
+    test_outbox_1.message = example_message();
 
     ASSERT_EQ(0, test_outbox_1.send());
     loopback_comm->receive_messages();
@@ -140,9 +154,27 @@ TEST_F(BasicCommunicationTest, SendLoopback) {
     EXPECT_EQ(0, test_inbox_2.num_available());
     EXPECT_EQ(0, test_inbox_1.get_newest(received_message));
 
+    EXPECT_EQ(test_outbox_1.message.id, test_ID_1);
     EXPECT_EQ(test_outbox_1.message.dynamic_feedback, received_message.dynamic_feedback);
     EXPECT_EQ(test_outbox_1.message.num_animals, received_message.num_animals);
     EXPECT_EQ(test_outbox_1.message.has_electricity, received_message.has_electricity);
+}
+
+TEST_F(BasicCommunicationTest, SendLoopbackNonAlignedStruct) {
+    MessageInbox<nonaligned_struct> test_inbox(test_ID_1, *loopback_comm);
+    MessageOutbox<nonaligned_struct> test_outbox(test_ID_1, *loopback_comm);
+    test_outbox.message = {.id = test_ID_1, .num_samples = 150, .water_level_m = 41.2, .should_polymerize=true};
+    nonaligned_struct rx_nonaligned_message = {0, 0, 0, false};
+
+    ASSERT_EQ(0, test_outbox.send());
+    loopback_comm->receive_messages();
+    ASSERT_EQ(1, test_inbox.num_available());
+    EXPECT_EQ(0, test_inbox.get_newest(rx_nonaligned_message));
+
+    EXPECT_EQ(test_outbox.message.id, test_ID_1);
+    EXPECT_EQ(test_outbox.message.water_level_m, rx_nonaligned_message.water_level_m);
+    EXPECT_EQ(test_outbox.message.num_samples, rx_nonaligned_message.num_samples);
+    EXPECT_EQ(test_outbox.message.should_polymerize, rx_nonaligned_message.should_polymerize);
 }
 
 TEST_F(BasicCommunicationTest, ForwardMessage) {
@@ -151,7 +183,7 @@ TEST_F(BasicCommunicationTest, ForwardMessage) {
 
     // outbox, message to send, inboxes to receive
     MessageOutbox<test_struct_1> test_outbox(test_ID_1, *loopback_comm);
-    test_outbox.message = {.dynamic_feedback = 1000.23, .num_animals = 3, .has_electricity=true};
+    test_outbox.message = example_message();
     // loopback_comm forwards message id 1 to other_comm
     MessageInbox<test_struct_1> test_inbox(test_ID_1, *loopback_comm, other_comm.get());
     MessageInbox<test_struct_1> other_inbox(test_ID_1, *other_comm);
@@ -168,7 +200,8 @@ TEST_F(BasicCommunicationTest, ForwardMessage) {
     EXPECT_EQ(test_outbox.message.has_electricity, received_message.has_electricity);
 
     // check it's received by other_comm
-    received_message = {0, 0, false};
+    received_message = {0, 0, 0, false};
+    other_comm->receive_messages();
     ASSERT_EQ(1, other_inbox.num_available());
     EXPECT_EQ(0, other_inbox.get_newest(received_message));
     EXPECT_EQ(test_outbox.message.dynamic_feedback, received_message.dynamic_feedback);
@@ -182,7 +215,7 @@ TEST_F(BasicCommunicationTest, DontForwardMessage) {
 
     // outbox, message to send, inboxes to receive
     MessageOutbox<test_struct_1> test_outbox(test_ID_1, *loopback_comm);
-    test_outbox.message = {.dynamic_feedback = 1000.23, .num_animals = 3, .has_electricity=true};
+    test_outbox.message = example_message();
     MessageInbox<test_struct_1> test_inbox(test_ID_1, *loopback_comm);
     MessageInbox<test_struct_1> other_inbox(test_ID_1, *other_comm);
     // loopback_comm forwards message id 2, NOT ID 1
@@ -197,6 +230,7 @@ TEST_F(BasicCommunicationTest, DontForwardMessage) {
     EXPECT_EQ(0, test_inbox.get_newest(received_message));
 
     // check it's NOT received by other_comm
+    other_comm->receive_messages();
     ASSERT_EQ(0, other_inbox.num_available());
     EXPECT_EQ(-1, other_inbox.get_newest(received_message));
 }
