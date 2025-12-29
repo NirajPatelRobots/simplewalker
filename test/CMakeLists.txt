@@ -39,3 +39,8 @@ add_executable(unittest_state_prediction
         unittests/unittest_state_prediction.cpp ../state_estimation/state_prediction.cpp)
 target_link_libraries(unittest_state_prediction RobotStateLib GTest::gtest_main)
 gtest_discover_tests(unittest_state_prediction)
+
+add_executable(unittest_settings
+        unittests/unittest_settings.cpp ../display/settings.cpp)
+target_link_libraries(unittest_settings GTest::gtest_main)
+gtest_discover_tests(unittest_settings)

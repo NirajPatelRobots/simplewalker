@@ -46,6 +46,8 @@ jobs:
         working-directory: ./build
       - run: make unittest_state_prediction -j$(nproc)
         working-directory: ./build
+      - run: make unittest_settings -j$(nproc)
+        working-directory: ./build
       - name: Upload unit tests
         uses: actions/upload-artifact@v4
         with:
@@ -63,11 +65,12 @@ jobs:
         uses: actions/download-artifact@v5
         with: { name: unit_tests }
       - run: mkdir data
-      - run: chmod +x ./unittest_basic_communication ./unittest_rotation ./unittest_state_prediction ./unittest_leg_kinematics
+      - run: chmod +x ./unittest_basic_communication ./unittest_rotation ./unittest_state_prediction ./unittest_leg_kinematics ./unittest_settings
       - run: ./unittest_basic_communication
       - run: ./unittest_rotation
       - run: ./unittest_state_prediction
       - run: ./unittest_leg_kinematics
+      - run: ./unittest_settings
 
 
   test_localization:
