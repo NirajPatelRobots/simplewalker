@@ -9,7 +9,7 @@ Download the repo to a raspberry pi zero (or another SBC).
 
 Requirements:
 - C++ 17
-- cmake 3.5
+- cmake 3.23+
 - Eigen 3.4.8
 - python 3.7
 - rapidxml
