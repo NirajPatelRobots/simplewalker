@@ -18,3 +18,4 @@ target_sources(ExternalComm
             BASE_DIRS .
             FILES communication.hpp comm_tcp.hpp
         )
+target_link_libraries(ExternalComm pthread)

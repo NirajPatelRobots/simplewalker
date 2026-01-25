@@ -56,8 +56,7 @@ int main() {
     ConvenientLogger savelog("data/statelog.log");
     Logtimes logtimes{};
 
-    base_comm->start_server(settings.f("General", "state_send_port"));
-    if (settings.b("General", "state_send")) base_comm->try_connect();
+    if (settings.b("General", "state_send")) base_comm->start_server(settings.f("General", "state_send_port"));
     controller_comm->flush_message_queue(3, true);
 
     std::cout<<"    Start main loop, T = "<< looptime.count() << " ms     " << std::endl;

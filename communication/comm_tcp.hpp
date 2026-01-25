@@ -1,9 +1,8 @@
-/* Communication over TCP socket
+/* Communication over TCP socket server
  * Dec 2022
  * TODO:
  *      receive messages
- *      detects stream disruption
- *      wait for connection in another thread
+ *      sometimes, disconnecting causes it to print a lot of junk then segfault
  */
 
 #ifndef SIMPLEWALKER_COMM_TCP_H
@@ -17,16 +16,13 @@ struct TCPCommunicatorState;
 class TCPCommunicator : public Communicator {
 private:
     std::unique_ptr<TCPCommunicatorState> state;
-    bool server_is_open_, is_connected_;
 public:
-    explicit TCPCommunicator(string _name);
+    explicit TCPCommunicator(const string &_name);
     ~TCPCommunicator() override;
     void start_server(int port_num);
-    void try_connect();
-    void disconnect();
-    bool server_is_open() const {return server_is_open_;}
-    bool is_connected() const {return is_connected_;}
-    inline bool receive_bytes() override { return false; } // TODO
+    void stop_server();
+    bool is_connected() const;
+    inline bool receive_bytes() override;
     int send(const MessageBoxInterface &outbox, const char *data_start) override; //return 0 on success
 };
 

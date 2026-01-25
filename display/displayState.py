@@ -7,12 +7,12 @@ TODO:
 import numpy as np
 from xml.etree import ElementTree
 import vpython as v
-import remoteState
+import baseReceiver
 from typing import List
 
 
 class DisplayRobot:
-    def __init__(self, state: remoteState.RemoteRobotState):
+    def __init__(self, state: baseReceiver.RemoteRobotState):
         self.state = state
         self.x_axis = v.vector(1, 0, 0)
         self.y_axis = v.vector(0, 1, 0)
@@ -42,8 +42,8 @@ class DisplayRobot:
 def main():
     settingsTree = ElementTree.parse("settings/settings.xml")
     settings = settingsTree.getroot()
-    state = remoteState.RemoteRobotState()
-    receiver = remoteState.BaseReceiver()
+    state = baseReceiver.RemoteRobotState()
+    receiver = baseReceiver.BaseReceiver()
     receiver.connect_state(int(settings.find("General").find("state_send_port").text))
     displayRobot = DisplayRobot(state)
 
