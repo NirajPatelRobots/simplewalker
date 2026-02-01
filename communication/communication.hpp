@@ -11,7 +11,6 @@ TODO:
     decide between msg_len and SIZE
     custom exception, build option for removing exceptions
     Communicator::send(int msg_id, size_t size, char *data_start)
-    skip every so many sends
 */
 #ifndef SIMPLEWALKER_COMM_HPP
 #define SIMPLEWALKER_COMM_HPP
@@ -69,7 +68,7 @@ public:
 };
 
 
-template <typename T>
+template <typename T, unsigned skip_every = 0>
 class MessageInbox : public MessageBoxInterface {
 protected:
     deque<T> messages;
@@ -83,6 +82,13 @@ public:
     /* sets message_out if a message is available.
     Returns the number of messages available after the set, return < 0 is failure */
     int get_newest(T &message_out) {
+        static unsigned skip_counter = 0;
+        while (num_available() > 0 && skip_counter++ < skip_every) {
+            messages.pop_front();
+        }
+        if (skip_counter > skip_every) {
+            skip_counter = 0;
+        }
         if (num_available() > 0) {
             message_out = messages.back();
             messages.pop_back();

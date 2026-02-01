@@ -120,6 +120,35 @@ TEST_F(BasicCommunicationTest, InboxReceiveMultipleMessages) {
     EXPECT_FALSE(received_message.has_electricity);
 }
 
+TEST_F(BasicCommunicationTest, InboxSkipMessage) {
+    MessageInbox<test_struct_1, /*skip_every = */ 1> test_inbox_1(test_ID_1, *loopback_comm);
+    test_struct_1 test_message = example_message();
+    // should skip first message (default message)
+    test_inbox_1.set(test_struct_1{});
+    EXPECT_EQ(1, test_inbox_1.num_available());
+    EXPECT_EQ(-1, test_inbox_1.get_newest(received_message));
+    // should receive next message
+    test_inbox_1.set(test_message);
+    EXPECT_EQ(1, test_inbox_1.num_available());
+    EXPECT_EQ(0, test_inbox_1.get_newest(received_message));
+    EXPECT_EQ(test_message.dynamic_feedback, received_message.dynamic_feedback);
+    EXPECT_EQ(test_message.num_animals, received_message.num_animals);
+    EXPECT_EQ(test_message.has_electricity, received_message.has_electricity);
+    // now queue is empty
+    EXPECT_EQ(-1, test_inbox_1.get_newest(received_message));
+    for (auto &_ : {0, 0}) { // do it twice
+        // send test_message then empty message, check that only newer of the two is received
+        test_inbox_1.set(test_message);
+        test_inbox_1.set(test_struct_1{});
+        EXPECT_EQ(2, test_inbox_1.num_available());
+        EXPECT_EQ(0, test_inbox_1.get_newest(received_message));
+        EXPECT_EQ(0.0, received_message.dynamic_feedback);
+        EXPECT_EQ(0, received_message.num_animals);
+        EXPECT_FALSE(received_message.has_electricity);
+        EXPECT_EQ(0, test_inbox_1.num_available());
+    }
+}
+
 TEST_F(BasicCommunicationTest, InboxClear) {
     MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
     test_struct_1 test_message = example_message();
@@ -175,6 +204,32 @@ TEST_F(BasicCommunicationTest, SendLoopbackNonAlignedStruct) {
     EXPECT_EQ(test_outbox.message.water_level_m, rx_nonaligned_message.water_level_m);
     EXPECT_EQ(test_outbox.message.num_samples, rx_nonaligned_message.num_samples);
     EXPECT_EQ(test_outbox.message.should_polymerize, rx_nonaligned_message.should_polymerize);
+}
+
+TEST_F(BasicCommunicationTest, LoopbackReceiveMultiple) {
+    MessageInbox<test_struct_1> test_inbox_1(test_ID_1, *loopback_comm);
+    MessageOutbox<test_struct_1> test_outbox_1(test_ID_1, *loopback_comm);
+    // send empty message then example_message
+    test_outbox_1.message = test_struct_1{};
+    test_outbox_1.message.id = test_ID_1;
+    ASSERT_EQ(0, test_outbox_1.send());
+    test_outbox_1.message = example_message();
+    ASSERT_EQ(0, test_outbox_1.send());
+
+    loopback_comm->receive_messages();
+    ASSERT_EQ(2, test_inbox_1.num_available());
+
+    EXPECT_EQ(1, test_inbox_1.get_newest(received_message));
+    EXPECT_EQ(received_message.id, test_ID_1);
+    EXPECT_EQ(test_outbox_1.message.dynamic_feedback, received_message.dynamic_feedback);
+    EXPECT_EQ(test_outbox_1.message.num_animals, received_message.num_animals);
+    EXPECT_EQ(test_outbox_1.message.has_electricity, received_message.has_electricity);
+
+    EXPECT_EQ(0, test_inbox_1.get_newest(received_message));
+    EXPECT_EQ(received_message.id, test_ID_1);
+    EXPECT_EQ(0.0, received_message.dynamic_feedback);
+    EXPECT_EQ(0, received_message.num_animals);
+    EXPECT_FALSE(received_message.has_electricity);
 }
 
 TEST_F(BasicCommunicationTest, ForwardMessage) {

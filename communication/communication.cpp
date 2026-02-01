@@ -23,11 +23,12 @@ void Communicator::receive_messages() {
         return;
     }
     MessageBoxInterface *inbox = parse_buffer_inbox();
-    if (inbox && instream.size() >= inbox->msg_len) {
+    while (inbox && instream.size() >= inbox->msg_len) {
         inbox->set_message(instream.begin(), instream.begin() + inbox->msg_len);
         for (unsigned i = 0; i < inbox->msg_len; i++) {
             instream.pop_front();
         }
+        inbox = parse_buffer_inbox();
     }
 }
 

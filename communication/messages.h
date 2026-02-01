@@ -72,7 +72,7 @@ struct IMUInfoMsg {
     uint32_t run_time_us;
     uint32_t info_run_time_us;
     uint32_t debug_int;
-    float IMU_temp, debug_float;
+    float debug_float, IMU_temp;
 };
 const uint16_t IMUInfoMsgID = 0x0C00;
 

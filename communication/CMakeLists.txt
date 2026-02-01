@@ -1,21 +1,30 @@
-add_library(InterboardComm)
-target_sources(InterboardComm
+add_library(BasicCommunication)
+target_sources(BasicCommunication
         PRIVATE
-            "communication.cpp" "comm_serial.cpp"
+            "communication.cpp"
         PUBLIC
             FILE_SET HEADERS
             BASE_DIRS .
-            FILES communication.hpp comm_serial.hpp
+            FILES communication.hpp
         )
-target_link_libraries(InterboardComm wiringPi)
+add_library(InterboardComm)
+target_sources(InterboardComm
+        PRIVATE
+            "comm_serial.cpp"
+        PUBLIC
+            FILE_SET HEADERS
+            BASE_DIRS .
+            FILES comm_serial.hpp
+        )
+target_link_libraries(InterboardComm BasicCommunication wiringPi)
 
 add_library(ExternalComm)
 target_sources(ExternalComm
         PRIVATE
-            "communication.cpp" "comm_tcp.cpp"
+            "comm_tcp.cpp"
         PUBLIC
             FILE_SET HEADERS
             BASE_DIRS .
-            FILES communication.hpp comm_tcp.hpp
+            FILES comm_tcp.hpp
         )
-target_link_libraries(ExternalComm pthread)
+target_link_libraries(ExternalComm BasicCommunication pthread)
