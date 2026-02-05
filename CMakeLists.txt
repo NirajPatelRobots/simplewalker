@@ -23,6 +23,10 @@ add_subdirectory(display)
 add_executable(simplewalker mainsrc/simplewalker.cpp)
 target_link_libraries(simplewalker IO InterboardComm ExternalComm StateEstimationLib)
 
+# monitor only
+add_executable(monitor_only mainsrc/monitor_only.cpp)
+target_link_libraries(monitor_only IO InterboardComm ExternalComm)
+
 # collect_sensor_cal_data
 add_executable(collect_sensor_cal_data sensors/collect_sensor_cal_data.cpp)
 target_link_libraries(collect_sensor_cal_data wiringPi stdc++fs IO InterboardComm)

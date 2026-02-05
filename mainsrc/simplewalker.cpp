@@ -2,18 +2,19 @@
 
 TODO:
     organize file logged data
+    store bools for whether to do each logger->log instead of rereading settings
+    create common shared code:
+        - RobotMicroInterface in monitor_only
+        - Sensors and State Estimation with settings
     cmd line argument for settings filepath
-    state send possible random disconnect error
 */
 #include "comm_serial.hpp"
 #include "comm_tcp.hpp"
 #include "messages.h"
 #include "state_estimation.hpp"
 #include "convenientLogger.hpp"
-#include <chrono>
-#include <thread>
+#include "communication_timer.hpp"
 
-namespace chrono = std::chrono;
 const static int MSG_WAIT_TIME_US {1000}; //wait this long before skipipng
 
 void set_state_msg(RobotStateMsg *msg, const RobotState &state, chrono::duration<float> timestamp) {
@@ -39,6 +40,7 @@ int main() {
     sensors->set_bias(settings.vf("SensorBoss", "accel_bias"), settings.vf("SensorBoss", "gyro_bias"));
     sensors->set_IMU_orientation(settings.vf("SensorBoss", "IMU_orientation"));
     float timestep = settings.f("General", "main_timestep");
+    auto timestep_us = static_cast<unsigned>(1e6 * timestep);
     const bool prediction_only = settings.b("State_Estimation", "prediction_only");
     if (prediction_only) std::cout<<"\tPrediction Only, Ignoring Sensors"<<std::endl;
     unique_ptr<StateEstimator> EKF(new StateEstimator(timestep,
@@ -48,38 +50,20 @@ int main() {
                                    settings.f("State_Estimation", "angvel_stddev")));
     EKF->set_damping_deceleration(settings.f("State_Estimation", "damping_deceleration"));
     RobotState &state = EKF->state;
-    chrono::milliseconds looptime(static_cast<int>(1000 * timestep));
-    chrono::microseconds msgwaittime(MSG_WAIT_TIME_US);
-    chrono::time_point<chrono::steady_clock> latereadtime;
-    bool ERR_msg_late = false;
     shared_ptr<ConvenientLogger> logger{std::static_pointer_cast<ConvenientLogger>(stdlogger)};
     ConvenientLogger savelog("data/statelog.log");
     Logtimes logtimes{};
+    auto timer = make_unique<CommTimer>(timestep_us, MSG_WAIT_TIME_US);
 
     if (settings.b("General", "state_send")) base_comm->start_server(settings.f("General", "state_send_port"));
-    controller_comm->flush_message_queue(3, true);
+    controller_comm->flush_message_queue(settings.i("General", "initial_flush_controller_queue"), true);
 
-    std::cout<<"    Start main loop, T = "<< looptime.count() << " ms     " << std::endl;
-    chrono::time_point<chrono::steady_clock> timestart = chrono::steady_clock::now();
-    chrono::time_point<chrono::steady_clock> loopstart = timestart + looptime;
-    std::this_thread::sleep_until(loopstart);
+    int logger_skip_every = settings.f("Logger.skip_every");
+    cout << "Timestep: " << timestep_us << " us\nPrint interval: " << timestep_us * (logger_skip_every + 1) << " us\n";
+    int broadcast_counter = 0;
     while (true) {
+        timer->wait_receive_message(controlInbox, *controlState);
         set_logtime(logtimes.sleep);
-        controller_comm->receive_messages();
-        while (controlInbox.get_newest(*controlState) < 0) {
-            controller_comm->receive_messages();
-            latereadtime = chrono::steady_clock::now();
-            ERR_msg_late = true;
-            if (latereadtime - loopstart > msgwaittime) {
-                std::cout<<"ERROR: message missing -";
-                break;
-            }
-        }
-        if (ERR_msg_late) {
-            std::cout<<"late  \n";
-            loopstart = latereadtime; // slow down time so we don't get ahead
-            ERR_msg_late = false;
-        }
         set_logtime(logtimes.commreceive);
 
         EKF->predict();
@@ -94,9 +78,10 @@ int main() {
             EKF->correct(*sensors);
         }
         set_logtime(logtimes.correct);
-        if ((loopstart - timestart).count() % ((int)settings.f("General", "broadcast_rate_div") * 100) < 100) {
-            set_state_msg(&stateOutbox.message, EKF->state, loopstart - timestart);
+        if (++broadcast_counter >= settings.i("General.broadcast_rate_div")) {
+            set_state_msg(&stateOutbox.message, EKF->state, timer->duration());
             stateOutbox.send();
+            broadcast_counter = 0;
         }
         set_logtime(logtimes.commsend);
 
@@ -115,8 +100,5 @@ int main() {
         if (logger->print(settings.f("Logger", "skip_every"))) {
             set_logtime(logtimes.log);
         }
-
-        loopstart += looptime;
-        std::this_thread::sleep_until(loopstart);
     }
 }

@@ -8,11 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: debian-latest
     steps:
       - uses: actions/checkout@v4
       - name: install dependencies
-        run: sudo apt install -y libeigen3-dev librapidxml-dev libgtest-dev libwiringpi-dev
+        run: sudo apt install -y libeigen3-dev librapidxml-dev libwiringpi-dev
       - run: mkdir build
       - name: Configure cmake
         run: cmake ..
@@ -36,6 +36,10 @@ jobs:
 
       - name: make simplewalker
         run: make simplewalker -j$(nproc)
+        working-directory: ./build
+
+      - name: make monitor_only
+        run: make monitor_only -j$(nproc)
         working-directory: ./build
 
       - run: make unittest_basic_communication -j$(nproc)

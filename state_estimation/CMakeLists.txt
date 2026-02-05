@@ -17,4 +17,4 @@ target_sources(StateEstimationLib
             BASE_DIRS . ../sensors
             FILES state_estimation.hpp ../sensors/sensorBoss.hpp ../sensors/sensor_data.h
         )
-target_link_libraries(StateEstimationLib RobotStateLib)
+target_link_libraries(StateEstimationLib PUBLIC RobotStateLib)
