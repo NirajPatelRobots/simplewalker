@@ -42,6 +42,33 @@ void Logger::log(string name, float x) {
     finish_log_field();
 }
 
+void Logger::log(string name, double x) {
+    if (disable) return;
+    outstr << std::setw(W) << x << " |, ";
+    if (!headerSent) {
+        make_field(name);
+    }
+    finish_log_field();
+}
+
+void Logger::log(string name, int x) {
+    if (disable) return;
+    outstr << x << " |, ";
+    if (!headerSent) {
+        make_field(name);
+    }
+    finish_log_field();
+}
+
+void Logger::log(string name, unsigned x) {
+    if (disable) return;
+    outstr << x << " |, ";
+    if (!headerSent) {
+        make_field(name);
+    }
+    finish_log_field();
+}
+
 void Logger::log(string name, const float x[], int length) {
     if (disable) return;
     outstr << "( ";

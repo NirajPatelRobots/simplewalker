@@ -52,6 +52,9 @@ protected:
 public:
     Logger(string filename = "", bool log_newline = false);  //default file is stdout
     void log(string name, float x);
+    void log(string name, double x);
+    void log(string name, int x);
+    void log(string name, unsigned x);
     void log(string name, const float x[], int length);
     void log(string name, const Eigen::Ref<const Eigen::MatrixXf> &x);
     void log(const Logtimes &logtimes);
@@ -61,7 +64,7 @@ public:
     void log(const string &name, const std::deque<T> &x) {
         if (disable) return;
         outstr << "[ ";
-            for (const T &x_i : x) outstr << std::setw(W) << x_i << " ";
+            for (const T &x_i : x) outstr << std::setw(W) << +x_i << " "; // +x_i makes uint8 not print char
         outstr << "], ";
         if (!headerSent)
             make_field(name + " [" + std::to_string(x.size()) + "]");
@@ -71,7 +74,7 @@ public:
     void log(const string &name, const std::vector<T> &x) {
         if (disable) return;
         outstr << "[ ";
-        for (const T &x_i : x) outstr << std::setw(W) << x_i << " ";
+        for (const T &x_i : x) outstr << std::setw(W) << +x_i << " ";
         outstr << "], ";
         if (!headerSent)
             make_field(name + " [" + std::to_string(x.size()) + "]");

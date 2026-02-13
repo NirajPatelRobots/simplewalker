@@ -32,8 +32,8 @@ add_executable(collect_sensor_cal_data sensors/collect_sensor_cal_data.cpp)
 target_link_libraries(collect_sensor_cal_data wiringPi stdc++fs IO InterboardComm)
 
 # measure motor angle manually
-add_executable(measure_motor_angle_manually calibrate/measure_motor_angle_manually.cpp)
-target_link_libraries(measure_motor_angle_manually InterboardComm)
+add_executable(monitor_controller mainsrc/monitor_controller.cpp)
+target_link_libraries(monitor_controller IO InterboardComm)
 
 
 add_subdirectory(test)

@@ -21,6 +21,7 @@ const uint16_t MotorCalibrationTriggerMsgID = 0x0D11;
 
 struct MotorCalibrationStateMsg { // sent by microcontroller during motor calibration
     uint16_t ID;
+    uint16_t errcode;
     uint32_t timestamp_us;
     float angle;
     float angvel;
@@ -48,6 +49,25 @@ struct ControlStateMsg { // sends current motor control and sensor state from th
     struct SensorData sensor_data;
 };
 const uint16_t ControlStateMsgID = 0x0C01;
+
+
+struct ControlInfoMsg {
+    uint16_t ID;
+    uint16_t control_runtime_us;
+    uint32_t no_comm_runtime_us;
+    uint32_t timestamp_us;
+    float battery_voltage;
+}; // report debug and other low-frequency information related to motor control
+const uint16_t ControlInfoMsgID = 0x0C21;
+
+
+struct ControllerInfoMsg {
+    uint16_t ID;
+    uint32_t timestamp_us;
+    uint32_t free_heap_bytes;
+    float processor_temp;
+}; // report debug and other low-frequency information related to microcontroller
+const uint16_t ControllerInfoMsgID = 0x0C22;
 
 
 struct IMUDataMsg {
