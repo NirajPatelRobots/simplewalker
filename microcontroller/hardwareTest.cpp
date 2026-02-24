@@ -13,16 +13,16 @@ int main() {
     std::unique_ptr<MotorsIO> motors_IO{std::make_unique<MotorsIO>(SIMPLEWALKER_MOTOR_IO_SETTINGS, ADC)};
     ADC->connect_SPI();
     motors_IO->initialize_ADC_channels();
-    int waitms = 1000;
+    int waitms = 2000;
     float magnitude{1}, angle;
     unsigned int startTime, motorTime, ADCtime, multTime, sendTime = 0;
     while (1) {
         startTime = to_us_since_boot(get_absolute_time());
         motors_IO->set_battery_voltage(ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL));
-        motors_IO->set_motor_voltage(motorNum, magnitude);
-        motorTime = to_us_since_boot(get_absolute_time()) - startTime;
         angle = ADC->read_ADC_scaled(SIMPLEWALKER_MOTOR_IO_SETTINGS[motorNum].sensor_channel_num);
-        ADCtime = to_us_since_boot(get_absolute_time()) - motorTime - startTime;
+        ADCtime = to_us_since_boot(get_absolute_time()) - startTime;
+        motors_IO->set_motor_voltage(motorNum, magnitude);
+        motorTime = to_us_since_boot(get_absolute_time()) - ADCtime - startTime;
         magnitude = -magnitude;
         multTime = to_us_since_boot(get_absolute_time()) - ADCtime - motorTime - startTime;
         printf("VBatt=%.2f, Angle=%.2f, time[us]:(Motor: %d, ADC: %d, Mult: %d, Send: %d)\n",

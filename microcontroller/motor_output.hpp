@@ -1,8 +1,11 @@
-/* Created by Niraj Oct 2021 */
+/* Created by Niraj Oct 2021
+ * TODO:
+ *     DC in-in vs. direction-magnitude pin modes
+ *     Variable pwm freq (quieter?)
+ */
 
 #ifndef SIMPLEWALKER_PICO_MOTOR_OUTPUT_HPP
 #define SIMPLEWALKER_PICO_MOTOR_OUTPUT_HPP
-#include "pico/stdlib.h"
 
 class MotorOutput {
 public:
@@ -12,17 +15,20 @@ public:
 };
 
 class DCMotorOutput : public MotorOutput {
-    const uint pin_forward, pin_reverse, pwmslice_num;
+    const unsigned pin_forward, pin_reverse, pwmslice_num;
 public:
-    DCMotorOutput(uint _pin_forward, uint _pin_reverse);
+    DCMotorOutput(unsigned _pin_forward, unsigned _pin_reverse);
+    bool coast = false; // TODO default true?
     int set_output(float fraction) override; // ensures abs(fraction) <= 1
 };
 
 class ServoMotorOutput : public MotorOutput {
-    const uint pin, pwmslice_num;
+    const unsigned pin, pwmslice_num;
 public:
-    ServoMotorOutput(uint _pin);
+    ServoMotorOutput(unsigned _pin);
     int set_output(float fraction) override; // ensures 0 <= fraction <= 1
 };
+
+float get_pwm_freq();
 
 #endif

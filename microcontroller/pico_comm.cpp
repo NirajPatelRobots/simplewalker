@@ -3,9 +3,7 @@
 
 
 int PicoCommunication::send(const MessageBoxInterface &outbox, const char *data_start) {
-    for (int i = 0; i < outbox.msg_len; i++) {
-        putchar_raw(data_start[i]);
-    }
+    stdio_put_string(data_start, outbox.msg_len, false, false);
     stdio_flush();
     return 0;
 }

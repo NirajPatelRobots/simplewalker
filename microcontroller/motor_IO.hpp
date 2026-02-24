@@ -65,6 +65,7 @@ public:
     bool set_motor_voltage(int motor_num, float voltage); // returns false if it couldn't be set
 
     void set_battery_voltage(float voltage) {if (voltage > 0) battery_voltage_ = voltage;}
+    float get_battery_voltage() {return battery_voltage_;}
 
     void initialize_ADC_channels(); // ADC_->set_channel for motors with ADC
     int error_code() const {return error;}

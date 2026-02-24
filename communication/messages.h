@@ -19,12 +19,12 @@ struct MotorCalibrationTriggerMsg { //send to microcontroller to run motor calib
 };
 const uint16_t MotorCalibrationTriggerMsgID = 0x0D11;
 
+enum MotorCalibrationStatus {MOTORCAL_IDLE, MOTORCAL_RUNNING, MOTORCAL_CENTERING };
 struct MotorCalibrationStateMsg { // sent by microcontroller during motor calibration
     uint16_t ID;
-    uint16_t errcode;
+    uint16_t status;
     uint32_t timestamp_us;
     float angle;
-    float angvel;
     float voltage;
 };
 const uint16_t MotorCalibrationStateMsgID = 0x0C11;
@@ -53,8 +53,12 @@ const uint16_t ControlStateMsgID = 0x0C01;
 
 struct ControlInfoMsg {
     uint16_t ID;
-    uint16_t control_runtime_us;
-    uint32_t no_comm_runtime_us;
+    uint16_t errcode;
+    uint16_t sleep_time_us;
+    uint16_t comm_rx_time_us;
+    uint16_t comm_tx_time_us;
+    uint16_t ADC_time_us;
+    uint16_t motor_set_time_us;
     uint32_t timestamp_us;
     float battery_voltage;
 }; // report debug and other low-frequency information related to motor control

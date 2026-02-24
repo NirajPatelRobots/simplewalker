@@ -13,6 +13,8 @@ TODO:
 #include "../communication/messages.h"
 #include <stdio.h>
 #include <math.h>
+#include <optional>
+#include "pico/time.h"
 
 
 class ExcitationVoltageGenerator {
@@ -73,6 +75,55 @@ int excitationVoltage(float frequency_scale, float amplitude_scale, float *V) {
 }
 };
 
+class DeadbandExcitationVoltageGenerator {
+    float V, V_step = 0.01, moving_angvel_thresh = 0.2;
+    std::optional<float> moving_V, stationary_V;
+    int direction, check_cycles, num_cycle_check = 8;
+public:
+    DeadbandExcitationVoltageGenerator() :
+            V(0), moving_V(), stationary_V(), direction(1), check_cycles(0)
+    {}
+    bool measure_deadband(float angVel, float &voltage_out) {
+        static float avg_angvel = 0;
+        avg_angvel += angVel * direction;
+        if (++check_cycles < num_cycle_check) {
+            voltage_out = V * direction;
+            return false;
+        }
+        avg_angvel /= num_cycle_check;
+        check_cycles = 0;
+        bool is_moving_wrong_direction = avg_angvel < -moving_angvel_thresh;
+        bool is_moving = avg_angvel > moving_angvel_thresh;
+        avg_angvel = 0; //reset avg
+        if (is_moving_wrong_direction) {
+            V += V_step;
+        } else if (is_moving && V >= 0) {
+            if (!moving_V.has_value() || V < moving_V) {
+                moving_V = V;
+                V -= V_step;
+            }
+        } else {
+            if (!stationary_V.has_value() || V > stationary_V) {
+                stationary_V = V;
+            }
+            if (moving_V.has_value()) { // if it has moved then stopped, we're done
+                if (direction == 1) { // done with this direction, so reverse
+                    direction = -1;
+                    V *= -1;
+                    moving_V.reset();
+                    stationary_V.reset();
+                } else { // done completely
+                    return true;
+                }
+            } else { // if we haven't moved yet
+                V += V_step;
+            }
+        }
+        voltage_out = V * direction;
+        return false;
+    }
+};
+
 
 class MotorCalibrator {
 public:
@@ -84,9 +135,11 @@ public:
     shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> state_outbox;
     shared_ptr<MotorCalibrationTriggerMsg> instructions;
     ExcitationVoltageGenerator excitationVoltageGenerator;
+    DeadbandExcitationVoltageGenerator deadbandGenerator;
     const float const_voltage_duration{2};
-    const float start_angle{-1};
     int send_skip_iteration_counter;
+    int startup_stationary_samples = 50;
+    MotorCalibrationStatus status {MOTORCAL_IDLE};
 
     MotorCalibrator()
         : comm(std::make_unique<PicoCommunication>()),
@@ -107,10 +160,11 @@ public:
     }
 
     int calibrate_motor() {
-        float V, lastV = 0.0, angle = 0.0, angVel; //[V], [V], [rad], [rad/s]
+        float V = 0.0, lastV = 0.0, angle = 0.0, angVel = 0.0; //[V], [V], [rad], [rad/s]
         int i = 0;
         send_skip_iteration_counter = 0;
         excitationVoltageGenerator.reset_state();
+        deadbandGenerator = DeadbandExcitationVoltageGenerator();
 
         if (is_servo((Motornum)(instructions->motorNum))) {
             printf("implement servo pins\n");
@@ -118,12 +172,21 @@ public:
         }
 
         return_motor_to_start();
+        status = MOTORCAL_RUNNING;
         absolute_time_t looptarget = get_absolute_time();
+        while(++i < startup_stationary_samples) {
+            angle = read_angle();
+            angVel = calc_angvel(angle);
+            report_result(angle, angVel, V, instructions->dt * i);
+            sleep_ms(floor(instructions->dt*1000));
+        }
         bool input_finished;
         do {
             if (instructions->frequency <= 0.001) {
                 input_finished = (i * instructions->dt > const_voltage_duration);
                 V = instructions->amplitude;
+            } else if (fabs(instructions->amplitude) < 0.001) {
+                input_finished = deadbandGenerator.measure_deadband(angVel, V);
             }
             else
                 input_finished = excitationVoltageGenerator.excitationVoltage(
@@ -139,6 +202,7 @@ public:
             sleep_until(looptarget);
         } while(!input_finished);
         printf("finished calibration\n");
+        status = MOTORCAL_IDLE;
         motors_IO->set_motor_voltage(instructions->motorNum, 0);
         return 0;
     }
@@ -168,20 +232,23 @@ public:
     void return_motor_to_start() {
         float kp{3};
         int numInRange{0}, total_tries{0};
+        status = MOTORCAL_CENTERING;
         if (instructions->text_output) printf("Returning motor to start...\n");
-        while (numInRange < 10 && ++total_tries <= 10 / instructions->dt) {
-            float angle = read_angle() - start_angle;
-            float voltage = -kp * angle + (angle > 0 ? -1.5 : 1.5);
+        while (numInRange < 10 && (float)(++total_tries) <= 2 / instructions->dt) {
+            float angle = read_angle();
+            calc_angvel(angle);
+            float voltage = -kp * angle + (angle > 0 ? -1.f : 1.f);
             motors_IO->set_motor_voltage(instructions->motorNum, voltage);
-            if (fabs(angle) < 0.1) {
+            if (fabs(angle) < 0.02) {
                 numInRange++;
             } else {
-                printf("%f %f; ", angle, voltage);
                 numInRange = 0;
             }
-            sleep_ms(instructions->dt*1000);
+//            report_result(angle, 0, voltage, (float)total_tries * instructions->dt);
+            sleep_ms(floor(instructions->dt*1000));
         }
         motors_IO->set_motor_voltage(instructions->motorNum, 0);
+        if (instructions->text_output) printf("Motor at start.\n");
     }
 
     void report_result(float angle, float angvel, float voltage, float time) {
@@ -190,7 +257,7 @@ public:
                 printf("%f,%f,%f,%f\n", time, voltage, angle, angvel);
             } else {
                 state_outbox->message.angle = angle;
-                state_outbox->message.angvel = angvel;
+                state_outbox->message.status = status;
                 state_outbox->message.timestamp_us = (uint32_t) (time * 1e6);
                 state_outbox->message.voltage = voltage;
                 state_outbox->send();
