@@ -92,7 +92,6 @@ struct IMUInfoMsg {
     uint16_t ID;
     uint16_t errcode;
     uint32_t timestamp_us;
-    uint32_t free_heap_bytes;
     uint32_t run_time_us;
     uint32_t info_run_time_us;
     uint32_t debug_int;

@@ -8,6 +8,7 @@ Niraj April 2022 */
 #include "pico/sem.h"
 #include "hardware/gpio.h"
 #include "sensors/IMUContext.h"
+#include "controller_info.hpp"
 
 
 const uint8_t IRQ_PIN = 6;
@@ -23,9 +24,10 @@ void irq_callback(uint, uint32_t) {
 int main() {
     bi_decl(bi_1pin_with_name(IRQ_PIN, "IMU IRQ pin 1"));
     auto comm = make_unique<PicoCommunication>();
-    auto sem = make_shared<semaphore_t>();
-    sem_init(sem.get(), 1, 1);
-    IMUState = make_unique<IMUContext>(*comm, sem);
+    auto comm_sem = make_shared<semaphore_t>();
+    sem_init(comm_sem.get(), 1, 1);
+    IMUState = make_unique<IMUContext>(*comm, comm_sem);
+    auto controllerInfoOutbox = create_controller_info_outbox(*comm);
 
     sleep_ms(500);
     IMUState->setup_IMU();
@@ -36,6 +38,7 @@ int main() {
         got_irq = false;
         sleep_ms(IMU_INTROSPECTION_LOOP_MS);
         IMUState->send_IMU_info();
+        set_send_controller_info(controllerInfoOutbox);
         if (!got_irq) {
             IMUState->send_IMUdata_missing(true);
         }

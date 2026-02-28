@@ -23,6 +23,8 @@ int main() {
     unique_ptr<ControlStateMsg> controlState{new ControlStateMsg({})};
     MessageInbox<ControlInfoMsg> controlInfoInbox(ControlInfoMsgID, *controller_comm);
     unique_ptr<ControlInfoMsg> controlInfo{new ControlInfoMsg({})};
+    MessageInbox<ControllerInfoMsg> controllerInfoInbox(ControllerInfoMsgID, *controller_comm);
+    unique_ptr  <ControllerInfoMsg> controllerInfo{new ControllerInfoMsg({})};
 
     printf("Rx: ControlStateMsg %u bytes, ControlInfoMsg %u bytes\n",
            sizeof(ControlStateMsg) / sizeof(char), sizeof(ControlInfoMsg) / sizeof(char));
@@ -30,6 +32,7 @@ int main() {
     while (true) {
         timer->wait_receive_message(controlInbox, *controlState);
         controlInfoInbox.get_newest(*controlInfo);
+        controllerInfoInbox.get_newest(*controllerInfo);
         stdlogger->log("timestamp", controlState->sensor_data.timestamp_us);
         stdlogger->log("angles", controlState->sensor_data.angle, WALKER_COMM_NUM_MOTORS);
 //        stdlogger->log("sleep_us", controlInfo->sleep_time_us);
@@ -38,6 +41,8 @@ int main() {
         stdlogger->log("ADC_time_us", controlInfo->ADC_time_us);
         stdlogger->log("motor_set_time_us", controlInfo->motor_set_time_us);
         stdlogger->log("V_bat", controlInfo->battery_voltage);
+        stdlogger->log("free bytes", controllerInfo->free_heap_bytes);
+        stdlogger->log("cpu temp", controllerInfo->processor_temp);
         stdlogger->print();
     }
 }

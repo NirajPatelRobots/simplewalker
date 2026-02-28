@@ -82,7 +82,7 @@ int main() {
         }
         cout << "\nTime [ms]: " << IMUInfo->timestamp_us / 1000
              << " Data time: " << IMUData->timestamp_us / 1000
-             << "\nFree bytes: " << IMUInfo->free_heap_bytes << " IMU Temp [C]: " << IMUInfo->IMU_temp
+             << "\nIMU Temp [C]: " << IMUInfo->IMU_temp
              << "\nLatched IMU err: " << latched_errcode << endl;
         cout << "Move to a different position and press enter, or type done to stop ";
         std::getline(std::cin, user_input);

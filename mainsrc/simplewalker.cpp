@@ -33,6 +33,10 @@ int main() {
     unique_ptr<TCPCommunicator> base_comm(new TCPCommunicator(string("Base_TCP")));
     MessageInbox<ControlStateMsg> controlInbox(ControlStateMsgID, *controller_comm);
     unique_ptr<ControlStateMsg> controlState{new ControlStateMsg({})};
+    MessageInbox<ControlInfoMsg> controlInfoInbox(ControlInfoMsgID, *controller_comm);
+    unique_ptr  <ControlInfoMsg> controlInfo{new ControlInfoMsg({})};
+    MessageInbox<ControllerInfoMsg> controllerInfoInbox(ControllerInfoMsgID, *controller_comm);
+    unique_ptr  <ControllerInfoMsg> controllerInfo{new ControllerInfoMsg({})};
     MessageOutbox<RobotStateMsg> stateOutbox(RobotStateMsgID, *base_comm);
 
     unique_ptr<SensorBoss> sensors(new SensorBoss(settings.f("SensorBoss", "accel_stddev"),
@@ -63,6 +67,8 @@ int main() {
     int broadcast_counter = 0;
     while (true) {
         timer->wait_receive_message(controlInbox, *controlState);
+        controlInfoInbox.get_newest(*controlInfo);
+        controllerInfoInbox.get_newest(*controllerInfo);
         set_logtime(logtimes.sleep);
         set_logtime(logtimes.commreceive);
 
@@ -92,6 +98,8 @@ int main() {
         if (settings.b("Logger", "log_state")) logger->obj_log(EKF->state);
         if (settings.b("Logger", "log_R")) logger->log("R", state.R);
         if (settings.b("Logger", "log_state_pred")) logger->obj_log("Predicted ", EKF->state_pred);
+        if (settings.b("Logger", "log_free_bytes")) stdlogger->log("free bytes", controllerInfo->free_heap_bytes);
+        if (settings.b("Logger", "log_cpu_temp")) stdlogger->log("cpu temp", controllerInfo->processor_temp);
         if (settings.b("Logger", "log_unexpected_comm_data")) logger->log("unexpected comm data", controller_comm->unexpected_bytes_in);
         savelog.log(logtimes);
         savelog.obj_log(EKF->state);

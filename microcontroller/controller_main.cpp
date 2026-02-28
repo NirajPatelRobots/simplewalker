@@ -12,6 +12,7 @@ TODO:
 #include "micro_parameters.h"
 #include "simplewalker_motors.hpp"
 #include "motor_control.hpp"
+#include "controller_info.hpp"
 #include <stdio.h>
 #include <memory>
 #include <chrono>
@@ -36,6 +37,7 @@ int main() {
     std::unique_ptr<MotorsIO> motors_IO{std::make_unique<MotorsIO>(SIMPLEWALKER_MOTOR_IO_SETTINGS, ADC)};
     auto target_inbox{make_shared<MessageInbox<ControlTargetMsg>>(ControlTargetMsgID, *comm)};
     shared_ptr<ControlTargetMsg> targetMsg{make_shared<ControlTargetMsg>()};
+    auto controllerInfoOutbox = create_controller_info_outbox(*comm);
     float last_angles[NUM_MOTORS] = {0};
     bool target_msg_recent{false};
     unsigned controller_info_counter{0};
@@ -95,6 +97,7 @@ int main() {
             controlInfoOutbox->message.battery_voltage = motors_IO->get_battery_voltage();
             controlInfoOutbox->message.comm_tx_time_us += info_tx_time;
             controlInfoOutbox->send();
+            set_send_controller_info(controllerInfoOutbox);
             info_tx_time = next_logtime();
             controlStateOutbox->message.errcode = 0;
         }

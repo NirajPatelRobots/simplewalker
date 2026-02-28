@@ -23,24 +23,28 @@ public:
     MessageInbox<IMUDataMsg, IMU_DATA_SKIP_EVERY> IMUDataInbox;
     MessageInbox<IMUInfoMsg>      IMUInfoInbox;
     MessageInbox<ControlStateMsg> controlInbox;
+    MessageInbox<ControllerInfoMsg> controllerInfoInbox;
     unique_ptr  <IMUDataMsg>      IMUData;
     unique_ptr  <IMUInfoMsg>      IMUInfo;
     unique_ptr  <ControlStateMsg> controlState;
+    unique_ptr  <ControllerInfoMsg> controllerInfo;
     RobotMicroInterface(TCPCommunicator *base_comm) :
             controller_comm(new SerialCommunicator(string("Controller_serial"))),
             IMUDataInbox(IMUDataMsgID, *controller_comm, base_comm),
             IMUInfoInbox(IMUInfoMsgID, *controller_comm, base_comm),
             controlInbox(ControlStateMsgID, *controller_comm),
+            controllerInfoInbox(ControllerInfoMsgID, *controller_comm, base_comm),
             IMUData(new IMUDataMsg({})),
             IMUInfo(new IMUInfoMsg({})),
-            controlState{new ControlStateMsg({})}
+            controlState{new ControlStateMsg({})},
+            controllerInfo(new ControllerInfoMsg({}))
     {}
 };
 
 
 int main() {
     WalkerSettings settings("settings/settings.xml");
-    unsigned timestep_us = static_cast<unsigned>(1e6 * settings.f("General.main_timestep")
+    unsigned timestep_us = static_cast<unsigned>(1e6 * settings.f({"General", "IMU_timestep"})
                                                  * (IMU_DATA_SKIP_EVERY + 1)  // downsample for display and wi-fi
                                                  * 1.0025);  // hack, was going too fast
     unsigned single_message_timestep_us = static_cast<unsigned>(1e6 * settings.f("General.main_timestep"));
@@ -61,11 +65,12 @@ int main() {
         timer->wait_receive_message(microInterface.IMUDataInbox, *microInterface.IMUData);
 
         microInterface.IMUInfoInbox.get_newest(*microInterface.IMUInfo);
+        microInterface.controllerInfoInbox.get_newest(*microInterface.controllerInfo);
 
-        stdlogger->log("t", microInterface.IMUData->timestamp_us - last_t);
+        stdlogger->log("t", microInterface.IMUData->timestamp_us);
         stdlogger->log("dt", microInterface.IMUData->timestamp_us - last_t);
         stdlogger->log("accel[3]", microInterface.IMUData->accel, 3);
-        stdlogger->log("gyro[3]", microInterface.IMUData->gyro, 3);
+//        stdlogger->log("gyro[3]", microInterface.IMUData->gyro, 3);
         stdlogger->log("unexpected comm data", microInterface.controller_comm->unexpected_bytes_in);
         stdlogger->print(logger_skip_every);
     }

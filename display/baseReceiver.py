@@ -4,6 +4,7 @@ TODO:
     BUG: suddenly stopped returning when timeout, just blocks. Why?
     set from log?
     way to automatically deal with arrays
+    clearly show when message is old
     better message struct input:
         parse field_names and struct_format from struct definition string
         parse messages.h?
@@ -142,7 +143,6 @@ class BaseReceiver:
         except (TimeoutError, socket.timeout):
             # BUG: this doesn't happen
             self.connected_but_timeout = True
-            print("RX Timeout error")
         else:
             self.connected_but_timeout = False
 
@@ -193,12 +193,14 @@ def main():
 
     state_port = int(settings.find("General").find("state_send_port").text)
     receiver = BaseReceiver()
-    receiver.register_message("IMU Info", 0x0C00, "<HHIIIIIff",
-                              ["id", 'errcode', 'timestamp_us', 'free_heap_bytes', 'run_time_us', 'info_run_time_us',
+    receiver.register_message("IMU Info", 0x0C00, "<HHIIIIff",
+                              ["id", 'errcode', 'timestamp_us', 'run_time_us', 'info_run_time_us',
                                'debug_int', 'debug_float', 'IMU_temp'])
     receiver.register_message("IMU Data", 0x0C02, "<HHIffffff",
                               ["id", 'errcode', 'timestamp_us', 'accel[0]', 'accel[1]', 'accel[2]',
                                'gyro[0]', 'gyro[1]', 'gyro[2]'])
+    receiver.register_message("Controller Info", 0x0C22, "<IIIf",  # struct packing promotes ID to 4 bytes
+                              ["id", 'timestamp_us', 'free_heap_bytes', 'processor_temp'])
     receiver.blocking_connect(state_port)
 
     with Live(Table()) as live:

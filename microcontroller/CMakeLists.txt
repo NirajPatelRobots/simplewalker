@@ -15,14 +15,26 @@ set(IMU_src "sensors/IMU_errcheck.cpp" "sensors/IMUContext.cpp")
 set(COMM_src "pico_comm.cpp" "../communication/communication.cpp")
 
 
+add_library(ControllerInfo)
+target_sources(ControllerInfo
+        PRIVATE "controller_info.cpp"
+        PUBLIC
+            FILE_SET HEADERS
+            BASE_DIRS .
+            FILES "controller_info.hpp"
+        )
+target_link_libraries(ControllerInfo PUBLIC hardware_adc)
+
+
 if (DEFINED ENV{MPU6050_SRC_DIR} AND DEFINED ENV{MPU6050_BUILD_DIR})
     message("MPU6050 src: $ENV{MPU6050_SRC_DIR} build: $ENV{MPU6050_BUILD_DIR}")
     add_executable(IMU_main
-            IMU_main.cpp ${COMM_src} ${IMU_src}
+            IMU_main.cpp ${COMM_src} ${IMU_src} controller_info.cpp
     )
     target_include_directories(IMU_main PUBLIC $ENV{MPU6050_SRC_DIR} $ENV{MPU6050_BUILD_DIR} $CMAKE_SRC_DIR sensors/*.h)
     target_link_directories(IMU_main PUBLIC $ENV{MPU6050_BUILD_DIR})
-    target_link_libraries(IMU_main MPU6050_i2c_pico_cpp_lib pico_stdlib hardware_i2c)
+    target_link_libraries(IMU_main
+            ControllerInfo MPU6050_i2c_pico_cpp_lib pico_stdlib hardware_i2c)
     # enable usb output, disable uart output
     pico_enable_stdio_usb(IMU_main 1)
     pico_enable_stdio_uart(IMU_main 0)
@@ -38,7 +50,8 @@ add_executable(controller_main
         ${pico_motor_IO_src}
         ${COMM_src}
         )
-target_link_libraries(controller_main pico_stdlib hardware_pwm hardware_spi)
+target_link_libraries(controller_main
+        ControllerInfo pico_stdlib hardware_pwm hardware_spi)
 # enable usb output, disable uart output
 pico_enable_stdio_usb(controller_main 1)
 pico_enable_stdio_uart(controller_main 0)

@@ -3,7 +3,6 @@
 #include "pico/sem.h"
 #include "IMU_errcheck.h"
 #include "../micro_parameters.h"
-#include "../memory_util.h"
 
 
 const int DATA_SEM_WAIT_US = 200;
@@ -89,7 +88,6 @@ void IMUContext::send_IMUdata_missing(bool ignore_sem) {
 
 void IMUContext::send_IMU_info() {
     SelfInfoOutbox->message.timestamp_us = (uint32_t)to_us_since_boot(get_absolute_time());
-    SelfInfoOutbox->message.free_heap_bytes = getFreeHeapSize();
     if (sem_acquire_timeout_us(shared_data_sem.get(), DATA_SEM_WAIT_US)) {
         SelfInfoOutbox->message.IMU_temp = IMU_temp;
         SelfInfoOutbox->message.run_time_us = irq_run_time;
