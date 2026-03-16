@@ -5,6 +5,7 @@ on:
     paths-ignore:
       - .github/workflows/build-simplewalker-microcontroller.yml
       - microcontroller/**
+      - '**.py'
 
 jobs:
   build:
