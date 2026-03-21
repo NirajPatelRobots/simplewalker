@@ -4,7 +4,8 @@ on:
   push:
     paths:
       - .github/workflows/build-simplewalker-microcontroller.yml
-      - microcontroller/**
+      - microcontroller/**.*pp
+      - microcontroller/**.h
       - communication/communication.*
       - communication/messages.h
 
@@ -14,7 +15,7 @@ jobs:
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: mkdir microcontroller/build
       - name: Configure cmake
         run: cmake ..
@@ -35,7 +36,7 @@ jobs:
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: NirajPatelRobots/pico-examples
       - run: mkdir build
@@ -46,7 +47,7 @@ jobs:
         run: make -j$(nproc)
         working-directory: ./build/i2c/mpu6050_i2c/
       - name: upload mpu6050_i2c_lib
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mpu6050_i2c_lib
           path: |
@@ -63,9 +64,9 @@ jobs:
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: download mpu6050_i2c_lib
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: mpu6050_i2c_lib
           path: imu

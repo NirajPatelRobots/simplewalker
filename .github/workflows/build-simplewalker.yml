@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: install dependencies
         run: sudo apt install -y libeigen3-dev librapidxml-dev libwiringpi-dev
       - run: mkdir build
@@ -23,7 +23,7 @@ jobs:
         run: make test_localization -j$(nproc)
         working-directory: ./build
       - name: Upload test_localization
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: test_localization
           path: ./build/test/test_localization
@@ -58,7 +58,7 @@ jobs:
       - run: make unittest_settings -j$(nproc)
         working-directory: ./build
       - name: Upload unit tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: unit_tests
           path: ./build/test/unittest*
@@ -71,7 +71,7 @@ jobs:
     needs: build
     steps:
       - name: Download unit tests
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with: { name: unit_tests }
       - run: mkdir data
       - run: chmod +x ./unittest_basic_communication ./unittest_rotation ./unittest_state_prediction ./unittest_leg_kinematics ./unittest_settings
@@ -87,14 +87,14 @@ jobs:
     needs: build
     steps:
       - name: checkout settings
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             settings/settings.xml
             settings/localize_test_settings.xml
           sparse-checkout-cone-mode: false
       - name: Download test_localization
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with: { name: test_localization }
       - run: mkdir data
       - run: chmod +x ./test_localization
