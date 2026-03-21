@@ -1,9 +1,10 @@
 #include "ADC_reader.hpp"
 #include "pico/time.h"
 # define M_PI_2 1.5707963267948966
+// https://ww1.microchip.com/downloads/aemDocuments/documents/MSLD/ProductDocuments/DataSheets/MCP3004-MCP3008-Data-Sheet-DS20001295.pdf
 
 void ADCReader::connect_SPI() {
-    spi_init(spi0, 976000);
+    spi_init(spi0, 2340000);  // 2.34 MHz = 130 ksps = ~7.7 us/read, recommended by datasheet for >= 3.3V
     spi_set_format( spi0, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST );
     gpio_set_function(SPI_Tx_pin, GPIO_FUNC_SPI);
     gpio_set_function(SPI_Rx_pin, GPIO_FUNC_SPI);
@@ -30,7 +31,6 @@ int ADCReader::read_ADC_raw(int channel_num) const {
     asm volatile("nop \n nop \n nop"); // incantation from pico examples
     gpio_put(SPI_CS_pin, 0);
     asm volatile("nop \n nop \n nop");
-    sleep_ms(2);
     uint8_t indata[3], outdata[3] = {1, 0, 0};
     outdata[1] = (8 + channel_num) << 4;
     spi_write_read_blocking(spi0, outdata, indata, 3);

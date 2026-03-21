@@ -1,9 +1,9 @@
 /*
  * Class for reading from a MCP3008 ADC over SPI,
  * transforming and storing channel information.
+ * Should work for MCP3004, except that attempting to access channels 4-7 will access channels 0-3
+ * Measured: ~16us per read
  * TODO:
- *      Read all at same time
- *      separate sample from read
  */
 #ifndef SIMPLEWALKER_PICO_ADC_READER_HPP
 #define SIMPLEWALKER_PICO_ADC_READER_HPP
@@ -31,7 +31,8 @@ struct ADCChannel {
 class ADCReader {
     int SPI_CS_pin{1}, SPI_Tx_pin{3}, SPI_Rx_pin{0}, SPI_CLK_pin{2};
 public:
-    std::array<shared_ptr<ADCChannel>, 8> channels;
+    static const size_t NUM_CHANNELS = 8;
+    std::array<shared_ptr<ADCChannel>, NUM_CHANNELS> channels;
     ADCReader() = default;
     void connect_SPI();
     shared_ptr<ADCChannel> set_channel(const std::string &_name, int channel, int _offset, float _gain);
