@@ -1,19 +1,20 @@
 # -*- coding: utf-8 -*-
 """
 TODO:
-    digital filter implementations
+    more digital filter tuning (IIR vs FIR?)
     delay in acceleration for causality? filter-related?
-    better loop timing (use true timestamps for jittery dt)
-    remove transient return-to-start from optimization (but not from filter?)
     slowness:
         look at slowness factor (coulomb (and/or static?) fric too high)
         graph slowness factor and acceleration?
         some way to compare slowness functions for static and const friction? (sub-model)
     some way to deal with nonlinear parameters, like slowness threshold
+    better model sticky stops. Spring that stores and releases energy?
+    graph fourier transform of angle with filter response
     clean up and organize
         organized model definition
             Dict[model_name: (function(results: Dict) -> np.array)] ?
                 ex "Vsq": (lambda results: return np.abs(results["V_f"]) * results["V_f"])
+        file structure. New file for main() UI and graphing?
     graph individual variable contributions to model (use X matrix)
     think more about inductance (can model with 3rd derivative of angle)
     electrically isolate angle sensors to reduce noise?
@@ -30,6 +31,11 @@ from os import listdir, getcwd
 from os.path import exists, sep, isfile, join
 import sys
 
+FILT_N = 50
+FILT_ORDER = 4
+FILT_FCN = 'butter'  # 'cheby'
+FILT_RIPPLE = 0.5  # only applies to cheby filters
+
 
 def examineMotor(testdata, model = None, params = None):
     """return the model parameters (dict) of a motor.
@@ -40,18 +46,25 @@ def examineMotor(testdata, model = None, params = None):
     model is a list of strings naming additional model dynamics"""
 
     def filter_and_derivative(testdata):
-        results = {m: np.empty(0) for m in ["V_f", "angle_f", "vel", "acc", "vel_f", "acc_f"]}
-        num_samples = 12
-        results["filter_period"] = num_samples * dt
+        results = {m: np.empty(0) for m in [m + f for m in ["V", "angle", "vel", "acc"] for f in ("", "_f")] + ["t"]}
+        results["filter_period"] = testdata[0]["t"][FILT_N] - testdata[0]["t"][0]
         for this_data in testdata:
-            this_velocity = np.diff(this_data["angle"]) / dt
-            this_acc = np.diff(this_velocity) / dt
-            results["vel"] = np.concatenate((results["vel"], this_velocity, [0]))
-            results["acc"] = np.concatenate((results["acc"], this_acc, [0, 0]))
-            results["vel_f"] = np.concatenate((results["vel_f"], filter_data(this_velocity, num_samples), [0]))
-            results["acc_f"] = np.concatenate((results["acc_f"], filter_data(this_acc, num_samples), [0, 0]))
-            for m in ["V", "angle"]:
-                results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m], num_samples)))
+            clean_up_test_data(this_data, results)
+            this_data["vel"] = np.diff(this_data["angle"], append=0) / np.diff(this_data["t"], append=0)
+            this_data["acc"] = np.diff(this_data["vel"], append=0) / np.diff(this_data["t"], append=0)
+            this_t = cut_first(this_data["t"])
+            new_start_t = results["t"][-1] if len(results["t"]) > 0 else 0.
+            results["t"] = np.concatenate((results["t"], this_t - this_t[0] + new_start_t))
+            for m in ["V", "angle", "vel", "acc"]:
+                results[m] = np.concatenate((results[m], cut_first(this_data[m])))
+                results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m])))
+
+        spiky_angle_noise = round(np.std(filter_data(results["spiky_angle"], type='high')) * 1000, 3)
+        clean_angle_noise = round(np.std(filter_data(results['angle'], type='high')) * 1000, 3)
+        print(f"Angle noise std_dev [mm/s^2]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
+              f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
+        results["dt"] = dt
+        results["N"] = np.size(results["V_f"])
         return results
 
     def make_independent_variable(results, model):
@@ -92,7 +105,7 @@ def examineMotor(testdata, model = None, params = None):
             outliers = np.abs(accel_error) > results["outlier_thresh"]
             acc_f_clean = np.where(outliers, 0., acc_f)
             X_clean = np.where(outliers.reshape((-1,1)) * np.ones((1,X.shape[1])), 0., X)
-            print("removed", np.sum(outliers), "outliers out of", results["N"],
+            print("Removed", np.sum(outliers), "outliers out of", results["N"],
                   "(" + str(round(np.sum(outliers) / results["N"] * 100, 2))
                   + "%) where Error >", round(results["outlier_thresh"], 1), "rad/s^2")
             return determine_params(X_clean, acc_f_clean, results, remove_outliers=False)
@@ -106,15 +119,13 @@ def examineMotor(testdata, model = None, params = None):
         for mod, param in zip(model, param_array[2:], strict=True):
             params[mod] = param
         return params
-    
-    dt = testdata[0]["dt"]
+
+    dt = testdata[0]["dt"] if "dt" in testdata[0] else (testdata[0]["t"][1] - testdata[0]["t"][0])
     if params is None:
         params = {}
     if model is None:
         model = []
     results = filter_and_derivative(testdata)
-    results["N"] = np.size(results["V_f"])
-    results["t"] = np.linspace(0., results["N"]*dt, num=results["N"])
     
     # use Linear Least Squares regression to determine parameters
     X = make_independent_variable(results, model)
@@ -125,9 +136,9 @@ def examineMotor(testdata, model = None, params = None):
     return params, results
 
 
-def graphMotorResults(testdata, params, results):
-    print("Filter period [s]:", results["filter_period"], "dt:", testdata[0]["dt"])
-    print("Parameters:", params)
+def graphMotorResults(params, results):
+    print("Filter nyquist period [s]:", round(2 * results["filter_period"], 3), "dt:", results["dt"])
+    print("Parameters:", params, end="\n\n")
     accel_error = results["acc_f"] - results["accel_predic"]
     avg_error = np.sum(np.abs(accel_error)) / results["N"]
     error_std_dev = np.std(accel_error)
@@ -136,12 +147,13 @@ def graphMotorResults(testdata, params, results):
     print("Error std dev:", round(error_std_dev, 3), "rad/s^2")
     print("Regression R^2:", round(1 - np.sum(accel_error**2) / np.sum(results["acc_f"]**2), 3))
     accel_error_nan = np.where(np.abs(accel_error) < results["outlier_thresh"], accel_error, np.NaN)
-    print("check isnan:", np.sum(np.isnan(accel_error_nan)))
-    print("Without outliers:")
-    print("Average error =", round(np.nanmean(np.abs(accel_error_nan)), 3), "rad/s^2")
+    acc_f_nan = np.where(np.abs(accel_error) < results["outlier_thresh"], results["acc_f"], np.NaN)
+    print(f"\tWithout {np.sum(np.isnan(accel_error_nan))} outliers:")
+    print("Average error =", round(np.nanmean(np.abs(accel_error_nan)), 3), "rad/s^2, Average acceleration",
+          round(np.nanmean(np.abs(acc_f_nan)), 3), "rad/s^2")
     error_std_dev_clean = np.nanstd(np.abs(accel_error_nan))
     print("Error std dev:", round(error_std_dev_clean, 3), "rad/s^2")
-    print("Regression R^2:", round(1 - np.nansum(accel_error_nan**2) / np.sum(results["acc_f"]**2), 3))
+    print("Regression R^2:", round(1 - np.nansum(accel_error_nan**2) / np.nansum(acc_f_nan**2), 3))
 
     # graph voltage, angle, velocity, and acceleration filtered and unfiltered over time
     plt.figure(1)
@@ -149,12 +161,14 @@ def graphMotorResults(testdata, params, results):
     ax = plt.subplot(411)
     plt.suptitle("Raw and Filtered Data")
     plt.ylabel("Driving Voltage (V)")
-    lines = plt.plot(results["t"], np.concatenate([data["V"] for data in testdata]), results["t"], results["V_f"])
+    lines = plt.plot(results["t"], results["V"], results["t"], results["V_f"])
     plt.legend(lines, ["Raw", "Filtered"])
     plt.grid()
     plt.subplot(412, sharex=ax)
     plt.ylabel("Angle [rad]")
-    plt.plot(results["t"], np.concatenate([data["angle"] for data in testdata]), results["t"], results["angle_f"])
+    if "spiky_angle" in results:
+        plt.plot(results["t"], results["spiky_angle"], 'c')
+    plt.plot(results["t"], results["angle"], results["t"], results["angle_f"])
     plt.grid()
     plt.subplot(413, sharex=ax)
     plt.ylabel("Velocity [rad/s]")
@@ -230,7 +244,16 @@ def graphMotorResults(testdata, params, results):
     plt.ylabel("count")
     plt.legend()
     plt.grid()
-    
+
+    # plt.figure(8)
+    # plt.clf()
+    # even_time = np.linspace(start=results["t"][0], num=len(results["t"]), stop=len(results["t"]) * results["dt"])
+    # plt.plot(even_time, results["t"] - even_time)
+    # plt.title("Time measurement error")
+    # plt.xlabel("Evenly Spaced Time [s]")
+    # plt.ylabel("True Time diff. from Even Time [s]")
+    # plt.grid()
+
     plt.show()
     time.sleep(0.3)
 
@@ -240,17 +263,81 @@ def loadRun(filename):
         filename = filename + ".motortest"
     try:
         with open("data" + sep + filename, 'rb') as file:
-            data = np.load(file, allow_pickle=True)
-            return dict(data)
-    except:
-        print("Load failed:", filename)
+            data = dict(np.load(file, allow_pickle=True))
+            if "t" not in data:
+                data["t"] = np.linspace(0., len(data["V"]) * data["dt"], num=len(data["V"]))
+            return data
+    except Exception as e:
+        print("Load failed:", filename, " because \n", e)
 
-def filter_data(data, filt_cutoff_samples = 12):
-    n_suspicious_filtered = filt_cutoff_samples * 6
-    padded_data = np.concatenate((data[0] * np.ones(n_suspicious_filtered), data))
-    filtered = signal.sosfilt(signal.butter(4, 1/filt_cutoff_samples, 'lowpass', output='sos'), padded_data)
+def cut_first(data, n=FILT_N * 2):
+    return data[n:]
+
+def filter_data(data, type='lowpass'):
+    n_suspicious_filtered = FILT_N * 2
+    padded_data = np.concatenate((np.average(data[:n_suspicious_filtered]) * np.ones(n_suspicious_filtered), data))
+    if FILT_FCN == 'cheby':
+        filtered = signal.sosfilt(signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, type, output='sos'), padded_data)
+    else:
+        filtered = signal.sosfilt(signal.butter(FILT_ORDER, 1/FILT_N, type, output='sos'), padded_data)
     filtered = filtered[n_suspicious_filtered:]
+    if type == 'lowpass' or type == 'low':
+        filtered = cut_first(filtered)
     return filtered
+
+
+def clean_up_test_data(this_data, results):
+    # the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
+    def remove_angle_downspikes(this_data, results):
+        min_drop_start_size = 0.001
+        # min_drop_start_size = 0.004  # between 1 and 2 ticks
+        # max_drop_size = 0.02   # between 6 and 7 ticks
+        max_drop_width = 4
+
+        future_length = max_drop_width + 1
+        angle = this_data["angle"]
+        prev_angle = np.roll(angle, 1)
+        prev_angle[0] = prev_angle[1]
+        # distance from previous angle to this angle and several future angles. [:,i] is i samples in the future.
+        change_from_prev_angle = np.empty((len(angle), future_length))
+        for i in range(future_length):
+            change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
+        is_down_from_prev = change_from_prev_angle < -min_drop_start_size
+
+        clean_angle = angle.copy()
+        for width in range(1, max_drop_width + 1):
+            all_samples_down_from_prev = np.all(is_down_from_prev[:, 0:width], axis=1)
+            change_across_spike = change_from_prev_angle[:, width]
+            ends_going_up = (change_from_prev_angle[:, width-1] < change_across_spike)
+            is_start_of_spike = (all_samples_down_from_prev & ends_going_up)
+            for index_in_spike in range(width):
+                is_this_index_in_spike = np.roll(is_start_of_spike, index_in_spike)
+                interpolated_value_unshifted = (index_in_spike + 1) / (width + 1) * change_across_spike + prev_angle
+                interpolated_value = np.roll(interpolated_value_unshifted, index_in_spike)
+                clean_angle = np.where(is_this_index_in_spike, interpolated_value, clean_angle)
+        # clean angle is now clean, replace testdata with it and save results["spiky_angle"]
+        if "spiky_angle" in results:
+            results["spiky_angle"] = np.concatenate((results["spiky_angle"], cut_first(angle)))
+        else:
+            results["spiky_angle"] = cut_first(angle)
+        this_data["angle"] = clean_angle
+
+    def remove_idle_messages(this_data):
+        index_first = np.flatnonzero(this_data["t"] < 100)[0]
+        for m in ["V", "angle", "t"]:
+            this_data[m] = this_data[m][index_first:]
+        index_last = np.flatnonzero(this_data["t"] > 100)[0]
+        for m in ["V", "angle", "t"]:
+            this_data[m] = this_data[m][:index_last]
+        if index_first > 0 or len(this_data['angle']) > index_last:
+            print(f"Cut off first {index_first}, last {len(this_data['angle']) - index_last}, now {len(this_data['angle'])}")
+
+    startTime = time.time()
+    remove_idle_messages(this_data)
+    remove_angle_downspikes(this_data, results)
+    duration = time.time() - startTime
+    results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration
+
 
 # continuous number [0,1] where 1 means it's slow enough for static friction
 def slowness_factor_continuous(vel, speed_thresh = 0.06):
@@ -302,7 +389,7 @@ def main():
             if len(args) > 1:
                 if args[1] == "all" and len(args) > 2:
                     filenames = [f for f in listdir(directory_path) if isfile(join(directory_path,f)) and f.startswith(args[2])]
-                    print("Loading", filenames)
+                    print("Loading", filenames, "\n")
                     testdata = []
                     for i, f in enumerate(filenames):
                         newdata = loadRun(f)
@@ -311,11 +398,8 @@ def main():
                         else:
                             testdata.append(newdata)
                             if len(testdata) == 1:
-                                dt = testdata[0]["dt"]
                                 test_type = testdata[0]["test_type"]
                             else:
-                                if not testdata[i]["dt"] == dt:
-                                    print("mismatched log timestep was", dt, "but is", testdata[i]["dt"], "for", f)
                                 if not testdata[i]["test_type"] == test_type:
                                     print("mismatched test_type", test_type, testdata[i]["test_type"], "for", f)
                 else:
@@ -328,7 +412,7 @@ def main():
             if len(testdata) > 0:
                 if test_type == "motor":
                     params, results = examineMotor(testdata, model)
-                    graphMotorResults(testdata, params, results)
+                    graphMotorResults(params, results)
         elif command == "saveparams":
             if len(args) > 1:
                 saveParams(params, args[1])
