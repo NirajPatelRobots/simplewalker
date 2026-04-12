@@ -11,7 +11,9 @@ Requirements:
 - C++ 17
 - cmake 3.23+
 - Eigen 3.4.8
-- python 3.7
+- python 3.11
+    - main computer requires pyserial
+    - base python dependencies handled by uv
 - rapidxml
 - googletest 1.17 (installed by cmake)
 - wiringPi (`apt-get install libwiringpi-dev` to build on ubuntu)
@@ -56,9 +58,18 @@ to make and run the main program.
 
 The built executables are simplewalker, test_localization, unittests, and collect_sensor_cal_data.
 
+
+## Calibration
+### IMU Calibration
 collect_sensor_cal_data saves files in `data/stationary_calibration_[number].log`.
 Copy these to the base computer and run `sensorAnalysis.py` on them to get sensor calibration values.
 
+### Motor Calibration
+- To collect motor calibration data, run `python3 runMotorCalibration.py` on the main computer (SBC). 
+- Copy that data to the Base computer with `rsync -zic pi@raspberrypi:/home/pi/simplewalker/data/*.motortest ./data/`.
+- To run the calibration and get motor parameters, run `uv run --extra calibration calibrate/calibrate.py [file_glob]`
+- To run the interactive calibration with a UI, run `uv run --extra interactive_calibration calibrate/interactive_calibrate.py`
+- To run the motor calibration as a notebook, run `uv run -w jupyter -w ipympl --extra interactive_calibration jupyter lab`
 
 ---
 Niraj made this

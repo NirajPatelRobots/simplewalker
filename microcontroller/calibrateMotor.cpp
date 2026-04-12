@@ -1,10 +1,11 @@
 /* calibrate the DC motor, reporting voltage and angle measurements.
 Created October 2021, reworked late 2023
 TODO:
-    leg calibration
-    take time measurements for better timing
-    remove voltage causality time shift, do that in analysis?
     error if can't return to start
+        detect wrong direction
+    symmetric excitation voltage
+    measure battery voltage variability?
+    make sin and square sections of excitation voltage more similar?
     */
 
 
@@ -173,17 +174,20 @@ public:
 
         return_motor_to_start();
         status = MOTORCAL_RUNNING;
+        startup_stationary_samples = floor(1.0 / instructions->dt);
         absolute_time_t looptarget = get_absolute_time();
+        absolute_time_t start_time = looptarget;
         while(++i < startup_stationary_samples) {
             angle = read_angle();
             angVel = calc_angvel(angle);
-            report_result(angle, angVel, V, instructions->dt * i);
-            sleep_ms(floor(instructions->dt*1000));
+            report_result(angle, angVel, V, (looptarget - start_time) * 1e-6);
+            looptarget = delayed_by_us(looptarget, (uint64_t)(instructions->dt * 1e6));
+            sleep_until(looptarget);
         }
         bool input_finished;
         do {
             if (instructions->frequency <= 0.001) {
-                input_finished = (i * instructions->dt > const_voltage_duration);
+                input_finished = ((i - startup_stationary_samples) * instructions->dt > const_voltage_duration);
                 V = instructions->amplitude;
             } else if (fabs(instructions->amplitude) < 0.001) {
                 input_finished = deadbandGenerator.measure_deadband(angVel, V);
@@ -195,15 +199,17 @@ public:
             if (!safely_set_motor(V, angle)) return -1;
             angle = read_angle();
             angVel = calc_angvel(angle);
-            report_result(angle, angVel, lastV, instructions->dt * i);
+            report_result(angle, angVel, lastV, (looptarget - start_time) * 1e-6);
             i++;
             lastV = V; // shift i+1 because causality. So V[i] affects angle[i]
             looptarget = delayed_by_us(looptarget, (uint64_t)(instructions->dt * 1e6));
             sleep_until(looptarget);
         } while(!input_finished);
+        sleep_us(floor(instructions->dt * 1e6));
         printf("finished calibration\n");
         status = MOTORCAL_IDLE;
         motors_IO->set_motor_voltage(instructions->motorNum, 0);
+        sleep_us(floor(instructions->dt * 1e6));
         return 0;
     }
 
@@ -285,10 +291,11 @@ int main() {
             calibrator.calibrate_motor();
         } else {
             calibrator.instructions->dt = 0.5;
+            float battery_voltage = calibrator.ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL);
             float angle = calibrator.read_angle();
             float angVel = calibrator.calc_angvel(angle);
             calibrator.motors_IO->set_motor_voltage(calibrator.instructions->motorNum, 0);
-            calibrator.report_result(angle, angVel, 0, to_us_since_boot(get_absolute_time()) * 1e-6);
+            calibrator.report_result(angle, angVel, battery_voltage, to_us_since_boot(get_absolute_time()) * 1e-6 + 1000);
             sleep_ms(500);
         }
     }

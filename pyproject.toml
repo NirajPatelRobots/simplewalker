@@ -1,0 +1,20 @@
+[project]
+name = "simplewalker"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "Two-legged walking robot"
+readme = "README.md"
+dependencies = [
+    "numpy>=2.0",
+]
+
+[project.optional-dependencies]
+calibration = [
+    "scipy>=1.13",
+]
+
+interactive_calibration = [
+    "matplotlib>=3.9",
+    "pillow>=9.3",
+    "scipy>=1.13",
+]

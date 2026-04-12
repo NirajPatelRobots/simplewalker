@@ -4,7 +4,10 @@ Work with the motor controller to take data to calibrate the motor.
 The motor controller has to run calibrate_motor.
 TODO:
     remove local version?
-    receive data from controller
+    receive binary data from controller
+    remove angvel from text comm (removed from MotorCalibrationStateMsg)
+    compare reported controller time with system time?
+    way to cue up multiple calibration runs from cmd line or file
 
 Created Jun 2021, reworked late 2023
 @author: Niraj
@@ -78,21 +81,10 @@ def checkMotorPerformance(motorNum, dt, filename = None, frequency_scale = 1, am
     return V, angle
 
 
-def saveRun(filename, V_, angle_, motorNum, dt, test_type="motor"):
+def saveRun(filename, V_, angle_, motorNum, t_, test_type="motor"):
     with open("data" + sep + "m" +str(motorNum) + '_' + filename +".motortest", 'wb') as file:
-        np.savez(file, V = V_, angle = angle_, dt=dt, test_type=test_type)
-    print("saved V", V_.shape, "angle", angle_.shape)
-
-def loadRun(filename):
-    try:
-        with open("data" + sep + filename +".motortest", 'rb') as file:
-            data = np.load(file, allow_pickle=True)
-            V = data['V']
-            angle = data['angle']
-            return V, angle
-    except:
-        print("Load failed")
-        return np.array([]), np.array([])
+        np.savez(file, V=V_, angle=angle_, t=t_, test_type=test_type)
+        print("saved V, angle, t", t_.shape, "as", file.name)
 
 def excitationVoltage(frequency_scale, amplitude_scale):
     """return an array of voltages.
@@ -120,6 +112,25 @@ def excitationVoltage(frequency_scale, amplitude_scale):
     return V
 
 
+
+class ControllerSerial(serial.Serial):
+    def __init__(self, connect=True):
+        super(ControllerSerial, self).__init__()
+        if connect:
+            self.connect()
+
+    def connect(self) -> None:
+        super(ControllerSerial, self).__init__(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
+                                               stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
+        if self.is_open:
+            print("Connected to", self.name)
+        else:
+            print("Could not connect to", self.name)
+
+    def readstr(self) -> str:
+        return self.read(2048).decode().replace("\r", "")
+
+
 def make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, send_skip_iterations,
                                         max_displacement, min_displacement, text_output) -> bytes:
     return struct.pack("<hhfffffhh", 0x0D11, motorNum, amp_scale, freq_scale, dt, max_displacement, min_displacement,
@@ -131,51 +142,51 @@ def parse_MotorCalibrationStateMessage(message:bytes):
     return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
 
 
-def print_from_micro(ser: serial.Serial, max_lines: int):
+def print_from_micro(ser: ControllerSerial, max_lines: int):
     text = ""
     regex = re.compile(r"(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+)$", flags=re.MULTILINE)
-    voltage, angle = ([], [])
-    last_time = 0
+    voltage, angle, timestamp = ([], [], [])
     is_finished = False
+    should_record = True
     for lines_read in range(max_lines):
-        text += ser.read(2048).decode().replace("\r", "")
+        text += ser.readstr()
         while len(text) and "\n" in text:
             regex_match = regex.match(text)
             if regex_match:
                 text = text[regex_match.end()+1:]
                 line_data = regex_match.group().split(',')
-                print("got [time, voltage, angle, angvel]:", line_data)
-                voltage.append(float(regex_match.group(2)))
-                angle.append(float(regex_match.group(3)))
-                # this_time = float(regex_match.group(1))
-                # if this_time - last_time > 2:
-                #     voltage, angle = ([], [])
-                # last_time = this_time
+                if should_record:
+                    print("got [time, voltage, angle, angvel]:", line_data)
+                    voltage.append(float(regex_match.group(2)))
+                    angle.append(float(regex_match.group(3)))
+                    timestamp.append(float(regex_match.group(1)))
+                else:
+                    print("see [time, voltage, angle, angvel]:", line_data)
             else:
                 newlineplace = text.find('\n')
                 print("|Other text|>", text[:newlineplace], "<|Other text|")
                 is_finished = "finished calibration" in str(text[:newlineplace]) or "was terminated" in str(text[:newlineplace])
+                if "Returning motor to start" in str(text[:newlineplace]):
+                    should_record = False
+                elif "Motor at start" in str(text[:newlineplace]):
+                    should_record = True
                 text = text[newlineplace+1:]
         if is_finished:
             break
     print(text)
-    return np.array(voltage), np.array(angle)
+    return np.array(voltage), np.array(angle), np.array(timestamp)
 
 
 def main():
     """run the tests with a text UI"""
     if not RUN_LOCAL:
-        ser = serial.Serial(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
-                            stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
-        if ser.is_open:
-            print("Connected to", ser.name)
-        else:
-            print("Could not connect to", ser.name)
-            return
+        ser = ControllerSerial()
     print("Motor test. Choose one of:",
           "run ['frequency_scale', ['amplitude_scale', ['filename']]]",
           "motornum number (0: R motor 1, 1: R motor 2, 2: L motor 1, 3: L motor 2)",
           "max_angle (float) or min_angle (float)",
+          "dt (float)",
+          "ls [file_prefix]",
           "save [filename]",
           "code", sep = "\n ")
     freq_scale = 1.
@@ -185,8 +196,12 @@ def main():
     min_angle = -1
     V = np.array([])
     angle = np.array([])
-    dt = 0.01  # seconds
+    dt = 0.002  # seconds
     filename = None
+    timestamp = np.array([])
+
+    def motortest_filename_tag() -> str:
+        return f"_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
     
     while True:
         args = input(">>> ").split()
@@ -203,8 +218,6 @@ def main():
                     amp_scale = float(args[2])
                     if len(args) > 3:
                         filename = args[3]
-                    else:
-                        filename = None
             if RUN_LOCAL:
                 V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
             else:
@@ -213,15 +226,18 @@ def main():
                 ser.reset_input_buffer()
                 ser.write(message)
                 print("sent:", message)
-                V, angle = print_from_micro(ser, 60)
-                print("got V", V.shape, "angle", angle.shape)
+                V, angle, timestamp = print_from_micro(ser, 240)
+                print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
+                if filename:
+                    saveRun(filename + motortest_filename_tag(), V, angle, motorNum, timestamp)
         elif command == "motornum":
             try:
                 motorNum = int(args[1])
             except:
                 print("Invalid motor number")
-        elif command == "save" and len(args) > 1:
-            saveRun(args[1], V, angle, motorNum, dt)
+        elif command == "save":
+            filename = (args[1] if len(args) > 1 else "")
+            saveRun(filename + motortest_filename_tag(), V, angle, motorNum, timestamp)
         elif command == "dt":
             if len(args) > 1:
                 dt = float(args[1])
@@ -234,6 +250,10 @@ def main():
             if len(args) > 1:
                 min_angle = float(args[1])
             print("min angle:", min_angle)
+        elif command == "ls":
+            import glob
+            ls_path = "data" + sep + (args[1] if len(args) > 1 else "") + "*.motortest"
+            print([d[5:-10] for d in glob.glob(ls_path)])
         elif command.startswith("exit"):
             ser.close()
             break
