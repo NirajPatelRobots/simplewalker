@@ -6,12 +6,13 @@ on:
       - .github/workflows/build-simplewalker-microcontroller.yml
       - microcontroller/**.*pp
       - microcontroller/**.h
+      - microcontroller/**CMakeLists.txt
       - communication/communication.*
       - communication/messages.h
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
@@ -32,7 +33,7 @@ jobs:
 
 
   build_IMU_lib_from_pico-examples:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
@@ -59,7 +60,7 @@ jobs:
 
 
   build_with_IMU:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: build_IMU_lib_from_pico-examples
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
