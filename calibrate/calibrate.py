@@ -15,7 +15,6 @@ TODO:
     graph individual variable contributions to model (use X matrix)
     think more about inductance (can model with 3rd derivative of angle)
     way to run with saved parameters
-    check in data and run calibrate in CI
     more detailed cmd line main() with model, parameter output (new file?)
     electrically isolate angle sensors to reduce noise?
 

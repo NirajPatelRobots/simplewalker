@@ -1,0 +1,38 @@
+# Run motor calibration with checked-in motor calibration data
+name: Calibrate Motor
+
+on:
+  push:
+    paths:
+      - .github/workflows/calibrate-motor.yml
+      - data/motortestdata.zip
+      - calibrate/calibrate.py
+      - pyproject.toml
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-slim
+    strategy:
+      matrix:
+        include:
+          - python-version: ""
+            dependency-resolution: "highest"
+          - python-version: "3.11"
+            dependency-resolution: "lowest"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            calibrate/calibrate.py
+            pyproject.toml
+            data/motortestdata.zip
+          sparse-checkout-cone-mode: false
+      - name: Unzip motor test data
+        run: unzip -d data/ data/motortestdata.zip
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          resolution-strategy: ${{ matrix.dependency-resolution }}
+      - name: calibrate
+        run: uv run --extra calibration calibrate/calibrate.py data/*.motortest >> $GITHUB_STEP_SUMMARY
