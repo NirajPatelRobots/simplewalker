@@ -71,5 +71,12 @@ Copy these to the base computer and run `sensorAnalysis.py` on them to get senso
 - To run the interactive calibration with a UI, run `uv run --extra interactive_calibration calibrate/interactive_calibrate.py`
 - To run the motor calibration as a notebook, run `uv run -w jupyter -w ipympl --extra interactive_calibration jupyter lab`
 
+
+## CI
+`Build Simplewalker` and `Build Simplewalker Microcontroller` jobs do what it sounds like they do.
+`Build Simplewalker` also runs unit tests and test_localization, which is printed to job results.
+
+`Calibrate Motor` runs motor calibration on checked-in motor test data and prints results to job results.
+
 ---
 Niraj made this

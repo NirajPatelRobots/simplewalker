@@ -3,9 +3,9 @@ UI for experimenting with calibration
 Interactive command line and graphs
 TODO:
     change filter parameters
-    graph fourier transform of angle with filter response
 """
 from scipy import signal, stats
+from scipy.fft import rfft
 import matplotlib.pyplot as plt
 from os import listdir
 from os.path import isfile, join, dirname
@@ -22,6 +22,8 @@ def graphMotorResults(results):
     graph_acc_predict(results)
     graph_time_error(results)
     graph_error_stats(results)
+    graph_signal_filter_frequencies(results, "angle", 'rad', 10, x_max_filter_cutoff_multipler=1.5)
+    graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, x_max_filter_cutoff_multipler=1.5)
     plt.show()
 
 
@@ -116,10 +118,64 @@ def graph_error_stats(results):
 
 def graph_time_error(results):
     plt.figure(8, clear=True)
-    plt.plot(np.diff(results["t"]), '.')
+    plt.plot(results["diff_t"], '.')
     plt.title("Time Jitter")
     plt.ylabel("Change in time [s]")
     plt.grid()
+
+def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_cutoff_multipler=None):
+    freqs = results["fft_freqs"]
+    if results["fft_freqs"] is None:
+        print(f'timestep is too variable for fft. Implement slow fourier transforms. {results["dt_std_dev"]=}')
+        return
+    name_f = name + "_f"
+    window = signal.windows.blackman(results["N"])
+    data_fourier = rfft(results[name] * window)
+    filtered_fourier = rfft(results[name_f] * window)
+    data_mag = 2.0/results["N"] * np.abs(data_fourier)
+    filtered_mag = 2.0/results["N"] * np.abs(filtered_fourier)
+    num_avg = 100
+    data_mag_smooth = np.convolve(data_mag, np.ones(num_avg), 'same') / num_avg
+    try:
+        w, h = signal.freqz_sos(lowpass_sos, fs=1/results["dt"])
+    except AttributeError:
+        w, h = signal.sosfreqz(lowpass_sos, fs=1/results["dt"])
+
+    fig, axs = plt.subplots(num=num, nrows=3, sharex='all', figsize=(8, 10), clear=True)
+    axs[0].plot(freqs, data_mag_smooth, 'C1', zorder=4, label="moving avg")
+    axs[0].set_ylim(axs[0].get_ylim())
+    axs[0].plot(freqs, data_mag, '.', color='C2', label=name)
+    axs[0].plot(freqs, filtered_mag, '.', color='C3', label=name_f)
+    twin_ax0 = axs[0].twinx()
+    twin_ax0.plot(w, np.abs(h), 'b', label='filter')
+    twin_ax0.set_ylabel("Filter Magnitude (blue)")
+    axs[0].set_ylabel(f"Signal Magnitude [{unit}]")
+
+    axs[1].plot(freqs, 20 * np.log10(data_mag_smooth), 'C1', zorder=4, label="moving avg")
+    axs[1].set_ylim(axs[1].get_ylim())
+    axs[1].plot(freqs, 20 * np.log10(data_mag), '.', color='C2', label=name)
+    axs[1].plot(freqs, 20 * np.log10(filtered_mag), '.', color='C3', label=name_f)
+    twin_ax1 = axs[1].twinx()
+    twin_ax1.plot(w, 20 * np.log10(np.abs(h)), 'b', label='filter')
+    twin_ax1.set_ylabel("Filter Amplitude (blue) [dB]")
+    axs[1].set_ylabel("Signal Amplitude [dB]")
+
+    axs[2].plot(freqs, np.unwrap(np.angle(data_fourier)), 'g', label=name)
+    axs[2].set_ylim(axs[2].get_ylim())
+    axs[2].plot(freqs, np.unwrap(np.angle(filtered_fourier)), 'r', label=name_f)  # goodbye
+    twin_ax2 = axs[2].twinx()
+    twin_ax2.plot(w, np.unwrap(np.angle(h)), 'b', label='filter')
+    twin_ax2.set_ylabel("Filter Angle (blue) [rad]")
+    axs[2].set_ylabel("Signal Angles [rad]")
+
+    axs[2].set_xlabel("frequency [Hz]")
+    axs[0].set_title(f"Fourier Transform ({name})")
+    axs[0].legend()
+    for i in range(3):
+        axs[i].grid()
+        axs[i].axvline(1 / results["filter_period"], color='k', linestyle='--', label="filter cutoff")
+        if x_max_filter_cutoff_multipler:
+            axs[i].set_xlim(left=0, right=x_max_filter_cutoff_multipler / results["filter_period"])
 
 
 def main():

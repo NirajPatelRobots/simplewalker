@@ -2,11 +2,15 @@
 """
 TODO:
     more digital filter tuning (IIR vs FIR?)
+        organize filter data
     slowness:
         look at slowness factor (coulomb (and/or static?) fric too high)
         graph slowness factor and acceleration?
         some way to compare slowness functions for static and const friction? (sub-model)
     some way to deal with nonlinear parameters, like slowness threshold
+    why a spike around 13-13.5Hz = 74-77ms?
+    measure battery voltage during calibration
+    remove angle upspikes
     better model sticky stops. Spring that stores and releases energy?
     clean up and organize
         organized model definition
@@ -24,12 +28,19 @@ Created Jun 2021
 
 import numpy as np
 from scipy import signal
+from scipy.fft import rfftfreq
 import time
 
 FILT_N = 60
 FILT_ORDER = 6
 FILT_FCN = 'butter'  # 'cheby'
 FILT_RIPPLE = 0.5  # only applies to cheby filters
+if FILT_FCN == 'cheby':
+    lowpass_sos = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'lowpass', output='sos')
+    hipass_sos  = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'hipass',  output='sos')
+else:
+    lowpass_sos = signal.butter(FILT_ORDER, 1/FILT_N, 'lowpass', output='sos')
+    hipass_sos  = signal.butter(FILT_ORDER, 1/FILT_N, 'lowpass', output='sos')
 
 
 def examineMotor(testdata, model = None, params = None):
@@ -46,24 +57,27 @@ def examineMotor(testdata, model = None, params = None):
         results["filter_period"] = testdata[0]["t"][FILT_N] - testdata[0]["t"][0]
         for this_data in testdata:
             clean_up_test_data(this_data, results)
-            this_data["vel"] = np.concatenate(([0], np.diff(this_data["angle"]) / np.diff(this_data["t"])))
-            this_data["acc"] = np.concatenate(([0], np.diff(this_data["vel"]) / np.diff(this_data["t"])))
+            this_data["vel"] = derivative(this_data, "angle")
+            this_data["acc"] = derivative(this_data, "vel")
             this_t = cut_first(this_data["t"])
             new_start_t = results["t"][-1] + (this_t[1] - this_t[0]) if len(results["t"]) > 0 else 0.
             results["t"] = np.concatenate((results["t"], this_t - this_t[0] + new_start_t))
             for m in ["V", "angle", "vel", "acc"]:
                 results[m] = np.concatenate((results[m], cut_first(this_data[m])))
                 results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m])))
-        if np.any(np.diff(results["t"]) <= 0):
-            raise ValueError("ERROR: time stops or goes backwards", np.flatnonzero(np.diff(results["t"]) <= 0))
+        results["diff_t"] = np.diff(results["t"])
+        if np.any(results["diff_t"] <= 0):
+            raise ValueError("ERROR: time stops or goes backwards", np.flatnonzero(results["diff_t"] <= 0))
 
         spiky_angle_noise = round(np.std(filter_data(results["spiky_angle"], type='high')) * 1000, 3)
         clean_angle_noise = round(np.std(filter_data(results['angle'], type='high')) * 1000, 3)
-        print(f"Angle noise std_dev [mm/s^2]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
+        print(f"Angle noise std_dev [mrad/s^2]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
-        results["dt"] = dt
         results["N"] = np.size(results["V_f"])
         return results
+
+    def derivative(data, name):
+        return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
 
     def make_independent_variable(results, model):
         """make array used for the independent variable in regression"""
@@ -85,7 +99,7 @@ def examineMotor(testdata, model = None, params = None):
             elif mod == "Vsq":
                 X = np.hstack((X, (np.abs(V_f) * V_f).reshape(-1,1)))
             elif mod == "theta_3dot":   # alternate strategy to modeling current
-                X = np.hstack((X, (np.concatenate((np.diff(results["acc_f"]), [0])) / dt).reshape(-1,1)))
+                X = np.hstack((X, derivative(results, "acc_f").reshape(-1,1)))
             elif mod == "knee_leg_weight_2":
                 X = np.hstack((X, -np.sin(results["angle_f"]).reshape(-1,1)))
             elif mod == "hip_leg_weight_1":
@@ -126,10 +140,14 @@ def examineMotor(testdata, model = None, params = None):
         acc_f_nan = np.where(np.abs(accel_error) < results["outlier_thresh"], results["acc_f"], np.nan)
         results["avg_acc_no_outliers"] = np.nanmean(np.abs(acc_f_nan))
         results["R^2_no_outliers"] = 1 - np.nansum(results["accel_error_nan"]**2) / np.nansum(acc_f_nan**2)
+        results["dt"] = float(np.mean(results["diff_t"]))
+        results["dt_std_dev"] = float(np.std(np.where(results["diff_t"] > 10 * results["dt"], results["dt"], results["diff_t"])))
+        results["fft_freqs"] = None
+        if results["dt_std_dev"] / results["dt"] < 0.01:  # if dt is stable to within 1% precision
+            results["fft_freqs"] = rfftfreq(results["N"], results["dt"])
 
     if len(testdata) == 0:
         raise ValueError("No testdata")
-    dt = testdata[0]["dt"] if "dt" in testdata[0] else (testdata[0]["t"][1] - testdata[0]["t"][0])
     if params is None:
         params = {}
     if model is None:
@@ -147,7 +165,8 @@ def examineMotor(testdata, model = None, params = None):
 
 
 def printMotorResults(params, results):
-    print("Filter nyquist period [s]:", round(2 * results["filter_period"], 3), "dt:", results["dt"])
+    print("Filter nyquist period [s]:", round(2 * results["filter_period"], 3),
+          f'dt: {results["dt"]:.3}, dt std dev: {results["dt_std_dev"]:.2e}')
     print("Parameters:", params, end="\n\n")
     print("Average error =", round(np.average(np.abs(results["accel_error"])), 3), "rad/s^2, Average acceleration",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
@@ -180,10 +199,10 @@ def cut_first(data, n=FILT_N * 4):
 def filter_data(data, type='lowpass'):
     n_suspicious_filtered = FILT_N * 2
     padded_data = np.concatenate((np.average(data[:n_suspicious_filtered]) * np.ones(n_suspicious_filtered), data))
-    if FILT_FCN == 'cheby':
-        filtered = signal.sosfilt(signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, type, output='sos'), padded_data)
+    if type == 'lowpass' or type == 'low':
+        filtered = signal.sosfilt(lowpass_sos, padded_data)
     else:
-        filtered = signal.sosfilt(signal.butter(FILT_ORDER, 1/FILT_N, type, output='sos'), padded_data)
+        filtered = signal.sosfilt(hipass_sos, padded_data)
     filtered = filtered[n_suspicious_filtered:]
     if type == 'lowpass' or type == 'low':
         filtered = cut_first(filtered)
