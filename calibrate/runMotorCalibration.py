@@ -16,6 +16,7 @@ Created Jun 2021, reworked late 2023
 
 import numpy as np
 from os.path import sep
+import time
 import sys
 import json
 import types
@@ -58,37 +59,30 @@ def parse_MotorCalibrationStateMessage(message:bytes):
     return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
 
 
-def print_from_micro(ser: ControllerSerial, max_lines: int):
+def print_from_micro(ser: ControllerSerial):
     text = ""
     regex = re.compile(r"(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+)$", flags=re.MULTILINE)
     voltage, angle, timestamp = ([], [], [])
     is_finished = False
-    should_record = True
-    for lines_read in range(max_lines):
+    lines_read = 0
+    while not is_finished:
         text += ser.readstr()
+        lines_read += 1
         while len(text) and "\n" in text:
             regex_match = regex.match(text)
             if regex_match:
                 text = text[regex_match.end()+1:]
-                line_data = regex_match.group().split(',')
-                if should_record:
-                    print("got [time, voltage, angle, angvel]:", line_data)
-                    voltage.append(float(regex_match.group(2)))
-                    angle.append(float(regex_match.group(3)))
-                    timestamp.append(float(regex_match.group(1)))
-                else:
-                    print("see [time, voltage, angle, angvel]:", line_data)
+                this_time = float(regex_match.group(1))
+                print("t = ", this_time, "   ", end='\r')
+                is_finished = (this_time > 1000)
+                voltage.append(float(regex_match.group(2)))
+                angle.append(float(regex_match.group(3)))
+                timestamp.append(this_time)
             else:
                 newlineplace = text.find('\n')
                 print("|Other text|>", text[:newlineplace], "<|Other text|")
                 is_finished = "finished calibration" in str(text[:newlineplace]) or "was terminated" in str(text[:newlineplace])
-                if "Returning motor to start" in str(text[:newlineplace]):
-                    should_record = False
-                elif "Motor at start" in str(text[:newlineplace]):
-                    should_record = True
                 text = text[newlineplace+1:]
-        if is_finished:
-            break
     print(text)
     return np.array(voltage), np.array(angle), np.array(timestamp)
 
@@ -102,16 +96,22 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
         series_config = json.loads(infile.read())
     ser.reset_input_buffer()
     for run in series_config["runs"]:
-        print(run)
-        amp_scale = run["amp_scale"]
-        freq_scale = run["freq_scale"]
-        if "dry_run" in series_config and series_config["dry_run"] is True:
-            continue
-        ser.write(make_MotorCalibrationTriggerMessage(series_config["motorNum"], amp_scale, freq_scale,
-                              series_config["dt"], 0, series_config["max_angle"], series_config["min_angle"], True))
-        V, angle, timestamp = print_from_micro(ser, 240)
-        print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
-        saveRun(series_name + motortest_filename_tag(amp_scale, freq_scale), V, angle, series_config["motorNum"], timestamp)
+        print(run["type"], "run")
+        for amp_scale in run["amp_scales"]:
+            for freq_scale in run["freq_scales"]:
+                filename = series_name + motortest_filename_tag(amp_scale, freq_scale)
+                print("\tRunning:", filename)
+                if "dry_run" in series_config and series_config["dry_run"] is True:
+                    continue
+                time.sleep(0.5)
+                ser.reset_input_buffer()
+                ser.write(make_MotorCalibrationTriggerMessage(series_config["motorNum"], amp_scale, freq_scale,
+                                      series_config["dt"], 0, series_config["max_angle"], series_config["min_angle"], True))
+                V, angle, timestamp = print_from_micro(ser)
+                print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
+                saveRun(filename, V, angle, series_config["motorNum"], timestamp)
+                time.sleep(0.5)
+                ser.reset_input_buffer()
 
 
 def interactive_main():
@@ -142,7 +142,8 @@ def interactive_main():
         command = command.strip().lower()
         if command == "":
             ser.reset_input_buffer()
-            print_from_micro(ser, 6)
+            for _ in range(6):
+                print_from_micro(ser)
         elif command == "run":
             if len(args) > 1:
                 freq_scale = float(args[1])
@@ -155,7 +156,7 @@ def interactive_main():
             ser.reset_input_buffer()
             ser.write(message)
             print("sent:", message)
-            V, angle, timestamp = print_from_micro(ser, 240)
+            V, angle, timestamp = print_from_micro(ser)
             print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
             if filename:
                 saveRun(filename + motortest_filename_tag(amp_scale, freq_scale), V, angle, motorNum, timestamp)
