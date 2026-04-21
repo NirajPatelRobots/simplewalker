@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """
+Library and cli for motor calibration
 TODO:
     more digital filter tuning (IIR vs FIR?)
         organize filter data
@@ -9,17 +10,17 @@ TODO:
         some way to compare slowness functions for static and const friction? (sub-model)
     some way to deal with nonlinear parameters, like slowness threshold
     why a spike around 13-13.5Hz = 74-77ms?
+    are the boundaries between tests a problem? They show up on high-freq graph.
     measure battery voltage during calibration
-    remove angle upspikes
     better model sticky stops. Spring that stores and releases energy?
     clean up and organize
         organized model definition
             Dict[model_name: (function(results: Dict) -> np.array)] ?
                 ex "Vsq": (lambda results: return np.abs(results["V_f"]) * results["V_f"])
+        more detailed cmd line main() with model, parameter output (new file?)
     graph individual variable contributions to model (use X matrix)
     think more about inductance (can model with 3rd derivative of angle)
     way to run with saved parameters
-    more detailed cmd line main() with model, parameter output (new file?)
     electrically isolate angle sensors to reduce noise?
 
 Created Jun 2021
@@ -37,10 +38,10 @@ FILT_FCN = 'butter'  # 'cheby'
 FILT_RIPPLE = 0.5  # only applies to cheby filters
 if FILT_FCN == 'cheby':
     lowpass_sos = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'lowpass', output='sos')
-    hipass_sos  = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'hipass',  output='sos')
+    hipass_sos  = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'highpass',  output='sos')
 else:
     lowpass_sos = signal.butter(FILT_ORDER, 1/FILT_N, 'lowpass', output='sos')
-    hipass_sos  = signal.butter(FILT_ORDER, 1/FILT_N, 'lowpass', output='sos')
+    hipass_sos  = signal.butter(FILT_ORDER, 1/FILT_N, 'highpass', output='sos')
 
 
 def examineMotor(testdata, model = None, params = None):
@@ -68,9 +69,10 @@ def examineMotor(testdata, model = None, params = None):
         results["diff_t"] = np.diff(results["t"])
         if np.any(results["diff_t"] <= 0):
             raise ValueError("ERROR: time stops or goes backwards", np.flatnonzero(results["diff_t"] <= 0))
-
-        spiky_angle_noise = round(np.std(filter_data(results["spiky_angle"], type='high')) * 1000, 3)
-        clean_angle_noise = round(np.std(filter_data(results['angle'], type='high')) * 1000, 3)
+        results["spiky_angle_hf"] = filter_data(results["spiky_angle"], type='high')
+        results["angle_hf"] = filter_data(results["angle"], type='high')
+        spiky_angle_noise = round(np.std(results["spiky_angle_hf"]) * 1000, 3)
+        clean_angle_noise = round(np.std(results["angle_hf"]) * 1000, 3)
         print(f"Angle noise std_dev [mrad/s^2]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
@@ -165,9 +167,10 @@ def examineMotor(testdata, model = None, params = None):
 
 
 def printMotorResults(params, results):
-    print("Filter nyquist period [s]:", round(2 * results["filter_period"], 3),
-          f'dt: {results["dt"]:.3}, dt std dev: {results["dt_std_dev"]:.2e}')
+    print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s;'
+          f' total data runtime: {np.max(results["t"]):.0f} s')
     print("Parameters:", params, end="\n\n")
+    print(f'Filter nyquist period [s]: {2 * results["filter_period"]:.3}')
     print("Average error =", round(np.average(np.abs(results["accel_error"])), 3), "rad/s^2, Average acceleration",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
@@ -211,45 +214,41 @@ def filter_data(data, type='lowpass'):
 
 def clean_up_test_data(this_data, results):
     # the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
-    def remove_angle_downspikes(this_data, results):
-        min_drop_start_size = 0.001
+    def remove_spikes(angle: np.ndarray, down=True, min_spike_start_size=0.001, max_spike_width=4):
         # min_drop_start_size = 0.004  # between 1 and 2 ticks
         # max_drop_size = 0.02   # between 6 and 7 ticks
-        max_drop_width = 4
-
-        future_length = max_drop_width + 1
-        angle = this_data["angle"]
+        future_length = max_spike_width + 1
         prev_angle = np.roll(angle, 1)
         prev_angle[0] = prev_angle[1]
         # distance from previous angle to this angle and several future angles. [:,i] is i samples in the future.
         change_from_prev_angle = np.empty((len(angle), future_length))
         for i in range(future_length):
             change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
-        is_down_from_prev = change_from_prev_angle < -min_drop_start_size
+        if down:
+            is_away_from_prev = change_from_prev_angle < -min_spike_start_size
+        else:
+            is_away_from_prev = change_from_prev_angle > min_spike_start_size
 
-        clean_angle = angle.copy()
-        for width in range(1, max_drop_width + 1):
-            all_samples_down_from_prev = np.all(is_down_from_prev[:, 0:width], axis=1)
+        for width in range(1, max_spike_width + 1):
+            all_samples_away_from_prev = np.all(is_away_from_prev[:, 0:width], axis=1)
             change_across_spike = change_from_prev_angle[:, width]
-            ends_going_up = (change_from_prev_angle[:, width-1] < change_across_spike)
-            is_start_of_spike = (all_samples_down_from_prev & ends_going_up)
+            if down:
+                ends_going_back = (change_from_prev_angle[:, width-1] < change_across_spike)
+            else:
+                ends_going_back = (change_from_prev_angle[:, width-1] > change_across_spike)
+            is_start_of_spike = (all_samples_away_from_prev & ends_going_back)
             for index_in_spike in range(width):
                 is_this_index_in_spike = np.roll(is_start_of_spike, index_in_spike)
                 interpolated_value_unshifted = (index_in_spike + 1) / (width + 1) * change_across_spike + prev_angle
                 interpolated_value = np.roll(interpolated_value_unshifted, index_in_spike)
-                clean_angle = np.where(is_this_index_in_spike, interpolated_value, clean_angle)
-        # clean angle is now clean, replace testdata with it and save results["spiky_angle"]
-        if "spiky_angle" in results:
-            results["spiky_angle"] = np.concatenate((results["spiky_angle"], cut_first(angle)))
-        else:
-            results["spiky_angle"] = cut_first(angle)
-        this_data["angle"] = clean_angle
+                angle = np.where(is_this_index_in_spike, interpolated_value, angle)
+        return angle
 
-    def remove_idle_messages(this_data):
-        index_first = np.flatnonzero(this_data["t"] < 100)[0]
+    def remove_idle_messages(this_data, t_max=100):
+        index_first = np.flatnonzero(this_data["t"] < t_max)[0]
         for m in ["V", "angle", "t"]:
             this_data[m] = this_data[m][index_first:]
-        high_t = np.flatnonzero(this_data["t"] > 100)
+        high_t = np.flatnonzero(this_data["t"] > t_max)
         index_last = high_t[0] if len(high_t) > 0 else len(this_data["t"])
         if index_first > 0 or len(this_data['angle']) > index_last:
             print(f"Cut off first {index_first}, last {len(this_data['angle']) - index_last}, now {index_last}")
@@ -258,7 +257,13 @@ def clean_up_test_data(this_data, results):
 
     startTime = time.time()
     remove_idle_messages(this_data)
-    remove_angle_downspikes(this_data, results)
+    # save "spiky_angle" so we can overwrite testdata["angle"] with clean_angle
+    if "spiky_angle" in results:
+        results["spiky_angle"] = np.concatenate((results["spiky_angle"], cut_first(this_data["angle"])))
+    else:
+        results["spiky_angle"] = cut_first(this_data["angle"])
+    this_data["angle"] = remove_spikes(this_data["angle"], down=False, max_spike_width=2)
+    this_data["angle"] = remove_spikes(this_data["angle"])
     duration = time.time() - startTime
     results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration
 

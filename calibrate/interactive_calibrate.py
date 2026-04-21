@@ -22,6 +22,7 @@ def graphMotorResults(results):
     graph_acc_predict(results)
     graph_time_error(results)
     graph_error_stats(results)
+    graph_high_freq(results)
     graph_signal_filter_frequencies(results, "angle", 'rad', 10, x_max_filter_cutoff_multipler=1.5)
     graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, x_max_filter_cutoff_multipler=1.5)
     plt.show()
@@ -45,6 +46,7 @@ def graph_V_and_angle_and_derivatives(results):
     plt.subplot(413, sharex=ax)
     plt.ylabel("Velocity [rad/s]")
     plt.plot(results["t"], results["vel"], '.', results["t"], results["vel_f"])
+    plt.ylim(np.min(results["vel_f"]) * 1.1, np.max(results["vel_f"]) * 1.1)
     plt.grid()
     ax = plt.subplot(414, sharex=ax)
     plt.ylabel("Acceleration [rad/s^2]")
@@ -176,6 +178,15 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_
         axs[i].axvline(1 / results["filter_period"], color='k', linestyle='--', label="filter cutoff")
         if x_max_filter_cutoff_multipler:
             axs[i].set_xlim(left=0, right=x_max_filter_cutoff_multipler / results["filter_period"])
+
+def graph_high_freq(results):
+    plt.figure(9, clear=True)
+    plt.plot(results["t"], results["spiky_angle_hf"], '.', label="spiky_angle")
+    plt.plot(results["t"], results["angle_hf"], '.', label="angle")
+    plt.title("High Frequency")
+    plt.ylabel("Angle [rad]")
+    plt.legend()
+    plt.grid()
 
 
 def main():
