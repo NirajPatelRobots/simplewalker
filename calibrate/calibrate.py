@@ -268,11 +268,16 @@ def clean_up_test_data(this_data, results):
     results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration
 
 
+def moving_avg(data, n_samples=1):
+    return np.concatenate((np.zeros(n_samples-1),     np.convolve(data, np.ones(n_samples), 'valid') / n_samples))
+
 # continuous number [0,1] where 1 means it's slow enough for static friction
-def slowness_factor_continuous(vel, speed_thresh = 0.06):
-    #return filter_data(np.where(np.abs(vel) < speed_thresh, (speed_thresh - np.abs(vel)) / speed_thresh, 0), 4)
-    return np.arctan((np.abs(vel) < speed_thresh) * 20 - 10) / np.pi + 0.5
+def slowness_factor_continuous(vel, speed_thresh=0.06, steepness=6, moving_avg_samples=20):
+    # arctangent is useful because it has a flat response in both limits
+    # return np.arctan((np.abs(vel) < speed_thresh) * 20 - 10) / np.pi + 0.5
     # return np.arctan(speed_thresh / np.abs(vel)) / np.pi * 2
+    speed = moving_avg(np.abs(vel), moving_avg_samples)
+    return np.arctan((speed_thresh - speed) * steepness / speed_thresh) / np.pi + 0.5
     # return np.clip(speed_thresh / np.abs(vel), 0., 1.)
 
 
