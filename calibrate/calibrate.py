@@ -11,7 +11,6 @@ TODO:
     some way to deal with nonlinear parameters, like slowness threshold
     angle noise wrong, high-freq graph big oscillations because filter after stitch. Do high-freq filter before stitch.
     measure battery voltage during calibration
-    interpolate angle value quantization after spike removal
     better model sticky stops. Spring that stores and releases energy?
     clean up and organize
         organized model definition
@@ -36,6 +35,8 @@ FILT_N = 60
 FILT_ORDER = 6
 FILT_FCN = 'butter'  # 'cheby'
 FILT_RIPPLE = 0.5  # only applies to cheby filters
+FILT_MOVING_AVG_N = 10  # mostly to counter value quantization. After spike removal, before lowpass.
+assert(FILT_MOVING_AVG_N < FILT_N)
 if FILT_FCN == 'cheby':
     lowpass_sos = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'lowpass', output='sos')
     hipass_sos  = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'highpass',  output='sos')
@@ -270,6 +271,7 @@ def clean_up_test_data(this_data, results):
     this_data["angle"] = remove_spikes(this_data["angle"], [False], max_up_spike_width=2)
     this_data["angle"] = remove_spikes(this_data["angle"], [True], max_down_spike_width=4)
     # this_data["angle"] = remove_spikes(this_data["angle"], [False, True], recalc_change=True)
+    this_data["angle"] = moving_avg(this_data["angle"], n_samples=FILT_MOVING_AVG_N, pad_val=this_data["angle"][0])
     duration = time.time() - startTime
     results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration
 
