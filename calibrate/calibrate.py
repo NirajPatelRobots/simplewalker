@@ -9,9 +9,9 @@ TODO:
         graph slowness factor and acceleration?
         some way to compare slowness functions for static and const friction? (sub-model)
     some way to deal with nonlinear parameters, like slowness threshold
-    why a spike around 13-13.5Hz = 74-77ms?
-    are the boundaries between tests a problem? They show up on high-freq graph.
+    angle noise wrong, high-freq graph big oscillations because filter after stitch. Do high-freq filter before stitch.
     measure battery voltage during calibration
+    interpolate angle value quantization after spike removal
     better model sticky stops. Spring that stores and releases energy?
     clean up and organize
         organized model definition
@@ -73,7 +73,7 @@ def examineMotor(testdata, model = None, params = None):
         results["angle_hf"] = filter_data(results["angle"], type='high')
         spiky_angle_noise = round(np.std(results["spiky_angle_hf"]) * 1000, 3)
         clean_angle_noise = round(np.std(results["angle_hf"]) * 1000, 3)
-        print(f"Angle noise std_dev [mrad/s^2]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
+        print(f"Angle noise std_dev [mrad]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
         return results
@@ -213,35 +213,40 @@ def filter_data(data, type='lowpass'):
 
 
 def clean_up_test_data(this_data, results):
-    # the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
-    def remove_spikes(angle: np.ndarray, down=True, min_spike_start_size=0.001, max_spike_width=4):
-        # min_drop_start_size = 0.004  # between 1 and 2 ticks
-        # max_drop_size = 0.02   # between 6 and 7 ticks
-        future_length = max_spike_width + 1
+    """ the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
+    down: [True] to remove downspikes only, [True, False] to remove down then up for each width.
+    recalc change is whether to recalculate changes after every spike removal. might remove this."""
+    def remove_spikes(angle: np.ndarray, down: list[bool], recalc_change=False,
+                      min_spike_start_size=0.001, max_up_spike_width=4, max_down_spike_width=4):
+        future_length = max(max_up_spike_width, max_down_spike_width) + 1
         prev_angle = np.roll(angle, 1)
         prev_angle[0] = prev_angle[1]
         # distance from previous angle to this angle and several future angles. [:,i] is i samples in the future.
         change_from_prev_angle = np.empty((len(angle), future_length))
-        for i in range(future_length):
-            change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
-        if down:
-            is_away_from_prev = change_from_prev_angle < -min_spike_start_size
-        else:
-            is_away_from_prev = change_from_prev_angle > min_spike_start_size
-
-        for width in range(1, max_spike_width + 1):
-            all_samples_away_from_prev = np.all(is_away_from_prev[:, 0:width], axis=1)
-            change_across_spike = change_from_prev_angle[:, width]
-            if down:
-                ends_going_back = (change_from_prev_angle[:, width-1] < change_across_spike)
-            else:
-                ends_going_back = (change_from_prev_angle[:, width-1] > change_across_spike)
-            is_start_of_spike = (all_samples_away_from_prev & ends_going_back)
-            for index_in_spike in range(width):
-                is_this_index_in_spike = np.roll(is_start_of_spike, index_in_spike)
-                interpolated_value_unshifted = (index_in_spike + 1) / (width + 1) * change_across_spike + prev_angle
-                interpolated_value = np.roll(interpolated_value_unshifted, index_in_spike)
-                angle = np.where(is_this_index_in_spike, interpolated_value, angle)
+        if not recalc_change:
+            for i in range(future_length):
+                change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
+        for width in range(1, future_length):
+            for is_down in down:
+                if width > (max_down_spike_width if is_down else max_up_spike_width):
+                    continue
+                if recalc_change:
+                    for i in range(future_length):
+                        change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
+                change_across_spike = change_from_prev_angle[:, width]
+                if is_down:
+                    is_away_from_prev = change_from_prev_angle < -min_spike_start_size
+                    ends_going_back = (change_from_prev_angle[:, width-1] < change_across_spike)
+                else:
+                    is_away_from_prev = change_from_prev_angle > min_spike_start_size
+                    ends_going_back = (change_from_prev_angle[:, width-1] > change_across_spike)
+                all_samples_away_from_prev = np.all(is_away_from_prev[:, 0:width], axis=1)
+                is_start_of_spike = (all_samples_away_from_prev & ends_going_back)
+                for index_in_spike in range(width):
+                    is_this_index_in_spike = np.roll(is_start_of_spike, index_in_spike)
+                    interpolated_value_unshifted = (index_in_spike + 1) / (width + 1) * change_across_spike + prev_angle
+                    interpolated_value = np.roll(interpolated_value_unshifted, index_in_spike)
+                    angle = np.where(is_this_index_in_spike, interpolated_value, angle)
         return angle
 
     def remove_idle_messages(this_data, t_max=100):
@@ -262,14 +267,15 @@ def clean_up_test_data(this_data, results):
         results["spiky_angle"] = np.concatenate((results["spiky_angle"], cut_first(this_data["angle"])))
     else:
         results["spiky_angle"] = cut_first(this_data["angle"])
-    this_data["angle"] = remove_spikes(this_data["angle"], down=False, max_spike_width=2)
-    this_data["angle"] = remove_spikes(this_data["angle"])
+    this_data["angle"] = remove_spikes(this_data["angle"], [False], max_up_spike_width=2)
+    this_data["angle"] = remove_spikes(this_data["angle"], [True], max_down_spike_width=4)
+    # this_data["angle"] = remove_spikes(this_data["angle"], [False, True], recalc_change=True)
     duration = time.time() - startTime
     results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration
 
 
-def moving_avg(data, n_samples=1):
-    return np.concatenate((np.zeros(n_samples-1),     np.convolve(data, np.ones(n_samples), 'valid') / n_samples))
+def moving_avg(data, n_samples=1, pad_val=0):
+    return np.concatenate((np.ones(n_samples-1) * pad_val, np.convolve(data, np.ones(n_samples), 'valid') / n_samples))
 
 # continuous number [0,1] where 1 means it's slow enough for static friction
 def slowness_factor_continuous(vel, speed_thresh=0.06, steepness=6, moving_avg_samples=20):
@@ -299,7 +305,7 @@ def main():
     if len(sys.argv) < 2:
         raise ValueError("First arg should be file pattern")
     import glob
-    testdata = [loadRun(f) for i in range(1, len(sys.argv)) for f in glob.glob(sys.argv[i])]
+    testdata = [loadRun(f) for f in sorted([f for i in range(1, len(sys.argv)) for f in glob.glob(sys.argv[i])])]  # :P
     print("Files:", [data["filename"] for data in testdata])
     params, results = examineMotor(testdata, model=['static_fric', 'const_opposing_fric'])
     printMotorResults(params, results)
