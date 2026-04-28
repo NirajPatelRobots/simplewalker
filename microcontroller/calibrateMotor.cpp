@@ -20,11 +20,10 @@ TODO:
 
 class ExcitationVoltageGenerator {
 public:
-    int place, loop_num, extra_count;
+    int place, loop_num;
 void reset_state() {
     place = 0;
     loop_num = 0;
-    extra_count = 0;
 }
 /* Choose voltage for test input to the motor.
 output is float *V, returns 0 if waveform continues, 1 if it's finished
@@ -32,23 +31,16 @@ Starts at counter = 0, creates a waveform over each time it's called
 Made up of a sinusoid then a square wave */
 int excitationVoltage(float frequency_scale, float amplitude_scale, float *V) {
     float freq = 200. * frequency_scale, amp = amplitude_scale;
-    float wiggle_amp = 0.0 * amp, wiggle_freq = 0.7 * freq / amp;
-    int num_loops = 6, num_square = 3, square_length = (int)(0.25 / frequency_scale);
-
-    if ( loop_num < num_loops) { // loops
-        float loop_amp = (float)(loop_num+1)/(num_loops+1) * amp;
-        float loop_freq = freq / loop_amp;
+    int num_loops = 6, num_square = 3, square_length = (int)(0.5 / frequency_scale);
+    if (loop_num < 2 * num_loops) {
+        float loop_amp = amp;
+        if (loop_num < num_loops)
+            loop_amp *= (float)(loop_num+1)/(num_loops+1);
+        else
+            loop_amp *= (1.0-(float)(loop_num-num_loops+1)/(num_loops+1));
+        float loop_freq = freq / abs(loop_amp);
         if (loop_num % 2 == 1) loop_amp *= -1;
         *V = loop_amp * sin(loop_freq * 0.01 * place);
-        if (place++ >= 314.0 / loop_freq) {
-            place = 0;
-            loop_num++;
-        }
-    } else if (loop_num < 2 * num_loops) { // loops with wiggles
-        float loop_amp = (1.0-(float)(loop_num-num_loops+1)/(num_loops+1)) * amp;
-        float loop_freq = freq / loop_amp;
-        if (loop_num % 2 == 1) loop_amp *= -1;
-        *V = loop_amp * sin(loop_freq * 0.01 * place) + wiggle_amp * sin(wiggle_freq * extra_count++);
         if (place++ >= 314.0 / loop_freq) {
             place = 0;
             loop_num++;

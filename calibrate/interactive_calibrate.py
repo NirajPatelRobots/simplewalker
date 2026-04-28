@@ -2,7 +2,6 @@
 UI for experimenting with calibration
 Interactive command line and graphs
 TODO:
-    change filter parameters
 """
 from scipy import signal, stats
 from scipy.fft import rfft
@@ -15,15 +14,18 @@ from calibrate import *
 
 
 def graphMotorResults(results):
+    # plt.style.use('dark_background')
     graph_V_and_angle_and_derivatives(results)
-    graph_3d_acc_V_vel(results)
+    # graph_3d_acc_V_vel(results)
     graph_torque_ripple(results)
     graph_slowness(results)
     graph_acc_predict(results)
     graph_time_error(results)
-    graph_error_stats(results)
-    graph_signal_filter_frequencies(results, "angle", 'rad', 10, x_max_filter_cutoff_multipler=1.5)
+    # graph_error_stats(results)
+    graph_high_freq(results)
+    graph_signal_filter_frequencies(results, "angle", 'rad', 10, x_max_filter_cutoff_multipler=1.5, also="spiky_angle")
     graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, x_max_filter_cutoff_multipler=1.5)
+    graph_signal_filter_frequencies(results, "V", 'Volts', 12, x_max_filter_cutoff_multipler=1.5)
     plt.show()
 
 
@@ -45,6 +47,7 @@ def graph_V_and_angle_and_derivatives(results):
     plt.subplot(413, sharex=ax)
     plt.ylabel("Velocity [rad/s]")
     plt.plot(results["t"], results["vel"], '.', results["t"], results["vel_f"])
+    plt.ylim(np.min(results["vel_f"]) * 1.1, np.max(results["vel_f"]) * 1.1)
     plt.grid()
     ax = plt.subplot(414, sharex=ax)
     plt.ylabel("Acceleration [rad/s^2]")
@@ -86,6 +89,7 @@ def graph_slowness(results):
     plt.figure(5, clear=True)
     plt.plot(results["t"], np.abs(results["vel_f"]), results["t"],
              slowness_factor_continuous(results["vel_f"]))
+    plt.legend(["speed", "slowness"])
     plt.title("Speed and Slowness Factor")
     plt.xlabel("time [s]")
     plt.ylabel("Speed [rad/s] and Slowness [arb. units]")
@@ -123,7 +127,7 @@ def graph_time_error(results):
     plt.ylabel("Change in time [s]")
     plt.grid()
 
-def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_cutoff_multipler=None):
+def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_cutoff_multipler=None, also=None):
     freqs = results["fft_freqs"]
     if results["fft_freqs"] is None:
         print(f'timestep is too variable for fft. Implement slow fourier transforms. {results["dt_std_dev"]=}')
@@ -132,10 +136,12 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_
     window = signal.windows.blackman(results["N"])
     data_fourier = rfft(results[name] * window)
     filtered_fourier = rfft(results[name_f] * window)
+    also_fourier = rfft(results[also] * window) if also is not None else None
     data_mag = 2.0/results["N"] * np.abs(data_fourier)
     filtered_mag = 2.0/results["N"] * np.abs(filtered_fourier)
-    num_avg = 100
-    data_mag_smooth = np.convolve(data_mag, np.ones(num_avg), 'same') / num_avg
+    also_mag = 2.0/results["N"] * np.abs(also_fourier) if also is not None else None
+    data_mag_smooth = moving_avg(data_mag, 100, np.nan)
+    also_mag_smooth = moving_avg(also_mag, 100, np.nan) if also is not None else None
     try:
         w, h = signal.freqz_sos(lowpass_sos, fs=1/results["dt"])
     except AttributeError:
@@ -146,6 +152,9 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_
     axs[0].set_ylim(axs[0].get_ylim())
     axs[0].plot(freqs, data_mag, '.', color='C2', label=name)
     axs[0].plot(freqs, filtered_mag, '.', color='C3', label=name_f)
+    if also is not None:
+        axs[0].plot(freqs, also_mag, '.', color='C4', zorder=1, label=also)
+        axs[0].plot(freqs, also_mag_smooth, color='C5', zorder=3, label=also+'_avg')
     twin_ax0 = axs[0].twinx()
     twin_ax0.plot(w, np.abs(h), 'b', label='filter')
     twin_ax0.set_ylabel("Filter Magnitude (blue)")
@@ -155,6 +164,9 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_
     axs[1].set_ylim(axs[1].get_ylim())
     axs[1].plot(freqs, 20 * np.log10(data_mag), '.', color='C2', label=name)
     axs[1].plot(freqs, 20 * np.log10(filtered_mag), '.', color='C3', label=name_f)
+    if also is not None:
+        axs[1].plot(freqs, 20 * np.log10(also_mag), '.', color='C4', zorder=1, label=also)
+        axs[1].plot(freqs, 20 * np.log10(also_mag_smooth), color='C5', zorder=3, label=also+'avg')
     twin_ax1 = axs[1].twinx()
     twin_ax1.plot(w, 20 * np.log10(np.abs(h)), 'b', label='filter')
     twin_ax1.set_ylabel("Filter Amplitude (blue) [dB]")
@@ -168,14 +180,23 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_
     twin_ax2.set_ylabel("Filter Angle (blue) [rad]")
     axs[2].set_ylabel("Signal Angles [rad]")
 
-    axs[2].set_xlabel("frequency [Hz]")
-    axs[0].set_title(f"Fourier Transform ({name})")
-    axs[0].legend()
     for i in range(3):
         axs[i].grid()
         axs[i].axvline(1 / results["filter_period"], color='k', linestyle='--', label="filter cutoff")
         if x_max_filter_cutoff_multipler:
             axs[i].set_xlim(left=0, right=x_max_filter_cutoff_multipler / results["filter_period"])
+    axs[2].set_xlabel("frequency [Hz]")
+    axs[0].set_title(f"Fourier Transform ({name})")
+    axs[0].legend()
+
+def graph_high_freq(results):
+    plt.figure(9, clear=True)
+    plt.plot(results["t"], results["spiky_angle_hf"], '.', label="spiky_angle")
+    plt.plot(results["t"], results["angle_hf"], '.', label="angle")
+    plt.title("High Frequency")
+    plt.ylabel("Angle [rad]")
+    plt.legend()
+    plt.grid()
 
 
 def main():
@@ -207,7 +228,7 @@ def main():
             continue
         elif command == "examine":
             if len(args) > 1:
-                filenames = [f for f in listdir(data_path) if isfile(join(data_path,f)) and f.startswith(args[1])]
+                filenames = sorted([f for f in listdir(data_path) if isfile(join(data_path,f)) and f.startswith(args[1])])
                 print("Loading", filenames, "\n")
                 testdata = []
                 for i, f in enumerate(filenames):

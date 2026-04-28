@@ -2,116 +2,33 @@
 """
 Work with the motor controller to take data to calibrate the motor.
 The motor controller has to run calibrate_motor.
+Can run interactively or read from a json file.
 TODO:
-    remove local version?
     receive binary data from controller
     remove angvel from text comm (removed from MotorCalibrationStateMsg)
+    measure battery voltage during calibration
+    different excitation voltage patterns
     compare reported controller time with system time?
-    way to cue up multiple calibration runs from cmd line or file
 
 Created Jun 2021, reworked late 2023
 @author: Niraj
 """
 
 import numpy as np
-import time
 from os.path import sep
+import time
+import sys
+import json
 import types
 import re
-
-RUN_LOCAL = False # if RUN_LOCAL, then the computer running this code is controlling the motors. IF RUN_LOCAL is False, then this code sends and receives information from a microcontroller
-
-if RUN_LOCAL:
-    import motorControl
-    import sensorReader
-else:
-    import serial
-    import struct
-
-def checkMotorPerformance(motorNum, dt, filename = None, frequency_scale = 1, amplitude_scale = 1):
-    """test the motor by setting voltages and sensing position.
-    motorNum 0 to 3 is which motor to read from and send to
-    dt is the time [seconds]
-    filename is file name to save the data to.
-    frequency_scale and amplitude_scale scale the input voltage waveform"""
-    centerVal = np.pi/2 # rad
-    kp = 0.002
-    maxDisplacement = 0.45 * np.pi # rad
-    
-    motors = motorControl.MotorController()
-    sensors = sensorReader.SensorReader()
-    V = excitationVoltage(frequency_scale*dt, amplitude_scale)
-    N = np.size(V)
-    angle = np.empty(N-1)
-    
-    # return to start
-    numInRange = 0
-    while numInRange < 10:
-        angle[0] = sensors.readAngles()[motorNum]
-        V_set = kp * (centerVal - angle[0])
-        motors.setMotor(V_set, motorNum)
-        if np.abs(centerVal - angle[0]) < 0.01:
-            numInRange += 1
-        else:
-            numInRange = 0
-        time.sleep(dt)
-    
-    print("At start position,", N, "samples,", N*dt, "s")
-    startTime = time.perf_counter()
-    for i in range(1, N):
-        V_bat = sensors.readBatteryVoltage()
-        angle[i-1] = sensors.readAngles()[motorNum] # shift i-1 because causality. So V[i] affects angle[i]
-        if V[i] > V_bat: # account for voltage clipping
-            V[i] = V_bat
-        elif V[i] < -V_bat:
-            V[i] = -V_bat
-        motors.setMotor(V[i] / V_bat, motorNum)
-        if np.abs(angle[i-1] - centerVal) > maxDisplacement:
-            angle = angle[:i]
-            V = V[:i+1]
-            print("Angle out of range, terminating test")
-            break
-        time.sleep(dt)
-    V = V[:-1] # unused because of shift
-    runTime = time.perf_counter() - startTime
-    print("Test run time:", round(runTime, 2), "s, loop takes ", round(runTime/N, 2), "s, code takes", round(1000*(runTime/N - dt), 3), "ms)")
-    
-    if not filename is None:
-        saveRun(filename, V, angle, motorNum, dt)
-    return V, angle
+import serial
+import struct
 
 
 def saveRun(filename, V_, angle_, motorNum, t_, test_type="motor"):
     with open("data" + sep + "m" +str(motorNum) + '_' + filename +".motortest", 'wb') as file:
         np.savez(file, V=V_, angle=angle_, t=t_, test_type=test_type)
         print("saved V, angle, t", t_.shape, "as", file.name)
-
-def excitationVoltage(frequency_scale, amplitude_scale):
-    """return an array of voltages.
-    The voltages are sent to the motor and used to determine parameters."""
-    def _voltageLoop(maxChange, maxVal):
-        """returns an array of voltages starting and ending at zero"""
-        freq = maxChange / abs(maxVal)
-        t = np.arange(0., np.pi/freq, 0.01)
-        return maxVal * np.sin(freq*t)
-    
-    num_loops = 20
-    num_square = 5
-    freq = 1000. * frequency_scale
-    amp = 1. * amplitude_scale
-    
-    length = int(200./freq)
-    V = np.zeros((2*length))
-    for i in range(num_loops):
-        loop_amp = (i+1)/(num_loops+1) * amp * (-1. if i%2 == 1 else 1.)
-        V = np.concatenate((V, _voltageLoop(freq, loop_amp)))
-    V = np.concatenate((V, -V[::-1]))
-    for i in range(num_square):
-        V = np.concatenate((V, amp*np.ones(length), -amp*np.ones(2*length), amp*np.ones(length)))
-    V = np.concatenate((V, np.zeros((length))))
-    return V
-
-
 
 class ControllerSerial(serial.Serial):
     def __init__(self, connect=True):
@@ -142,45 +59,64 @@ def parse_MotorCalibrationStateMessage(message:bytes):
     return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
 
 
-def print_from_micro(ser: ControllerSerial, max_lines: int):
+def print_from_micro(ser: ControllerSerial):
     text = ""
     regex = re.compile(r"(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+)$", flags=re.MULTILINE)
     voltage, angle, timestamp = ([], [], [])
     is_finished = False
-    should_record = True
-    for lines_read in range(max_lines):
+    lines_read = 0
+    while not is_finished:
         text += ser.readstr()
+        lines_read += 1
         while len(text) and "\n" in text:
             regex_match = regex.match(text)
             if regex_match:
                 text = text[regex_match.end()+1:]
-                line_data = regex_match.group().split(',')
-                if should_record:
-                    print("got [time, voltage, angle, angvel]:", line_data)
-                    voltage.append(float(regex_match.group(2)))
-                    angle.append(float(regex_match.group(3)))
-                    timestamp.append(float(regex_match.group(1)))
-                else:
-                    print("see [time, voltage, angle, angvel]:", line_data)
+                this_time = float(regex_match.group(1))
+                print("t = ", this_time, "   ", end='\r')
+                is_finished = (this_time > 1000)
+                voltage.append(float(regex_match.group(2)))
+                angle.append(float(regex_match.group(3)))
+                timestamp.append(this_time)
             else:
                 newlineplace = text.find('\n')
                 print("|Other text|>", text[:newlineplace], "<|Other text|")
                 is_finished = "finished calibration" in str(text[:newlineplace]) or "was terminated" in str(text[:newlineplace])
-                if "Returning motor to start" in str(text[:newlineplace]):
-                    should_record = False
-                elif "Motor at start" in str(text[:newlineplace]):
-                    should_record = True
                 text = text[newlineplace+1:]
-        if is_finished:
-            break
     print(text)
     return np.array(voltage), np.array(angle), np.array(timestamp)
 
+def motortest_filename_tag(amp_scale, freq_scale) -> str:
+    return f"_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
 
-def main():
+
+def run_tests_from_file_input(infile_name: str, series_name: str):
+    ser = ControllerSerial()
+    with open(infile_name) as infile:
+        series_config = json.loads(infile.read())
+    ser.reset_input_buffer()
+    for run in series_config["runs"]:
+        print(run["type"], "run")
+        for amp_scale in run["amp_scales"]:
+            for freq_scale in run["freq_scales"]:
+                filename = series_name + motortest_filename_tag(amp_scale, freq_scale)
+                print("\tRunning:", filename)
+                if "dry_run" in series_config and series_config["dry_run"] is True:
+                    continue
+                time.sleep(0.5)
+                ser.reset_input_buffer()
+                ser.write(make_MotorCalibrationTriggerMessage(series_config["motorNum"], amp_scale, freq_scale,
+                                      series_config["dt"], 0, series_config["max_angle"], series_config["min_angle"], True))
+                V, angle, timestamp = print_from_micro(ser)
+                print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
+                saveRun(filename, V, angle, series_config["motorNum"], timestamp)
+                time.sleep(0.5)
+                ser.reset_input_buffer()
+
+
+def interactive_main():
     """run the tests with a text UI"""
-    if not RUN_LOCAL:
-        ser = ControllerSerial()
+    ser = ControllerSerial()
     print("Motor test. Choose one of:",
           "run ['frequency_scale', ['amplitude_scale', ['filename']]]",
           "motornum number (0: R motor 1, 1: R motor 2, 2: L motor 1, 3: L motor 2)",
@@ -199,18 +135,15 @@ def main():
     dt = 0.002  # seconds
     filename = None
     timestamp = np.array([])
-
-    def motortest_filename_tag() -> str:
-        return f"_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
     
     while True:
         args = input(">>> ").split()
         command = args[0] if len(args) > 0 else "" #command is first, the rest of the args are available if needed
         command = command.strip().lower()
         if command == "":
-            if not RUN_LOCAL:
-                ser.reset_input_buffer()
-                print_from_micro(ser, 6)
+            ser.reset_input_buffer()
+            for _ in range(6):
+                print_from_micro(ser)
         elif command == "run":
             if len(args) > 1:
                 freq_scale = float(args[1])
@@ -218,18 +151,15 @@ def main():
                     amp_scale = float(args[2])
                     if len(args) > 3:
                         filename = args[3]
-            if RUN_LOCAL:
-                V, angle = checkMotorPerformance(motorNum, dt, filename, freq_scale, amp_scale)
-            else:
-                message = make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, 0,
-                                                              max_angle, min_angle, True)
-                ser.reset_input_buffer()
-                ser.write(message)
-                print("sent:", message)
-                V, angle, timestamp = print_from_micro(ser, 240)
-                print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
-                if filename:
-                    saveRun(filename + motortest_filename_tag(), V, angle, motorNum, timestamp)
+            message = make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, 0,
+                                                          max_angle, min_angle, True)
+            ser.reset_input_buffer()
+            ser.write(message)
+            print("sent:", message)
+            V, angle, timestamp = print_from_micro(ser)
+            print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
+            if filename:
+                saveRun(filename + motortest_filename_tag(amp_scale, freq_scale), V, angle, motorNum, timestamp)
         elif command == "motornum":
             try:
                 motorNum = int(args[1])
@@ -237,7 +167,7 @@ def main():
                 print("Invalid motor number")
         elif command == "save":
             filename = (args[1] if len(args) > 1 else "")
-            saveRun(filename + motortest_filename_tag(), V, angle, motorNum, timestamp)
+            saveRun(filename + motortest_filename_tag(amp_scale, freq_scale), V, angle, motorNum, timestamp)
         elif command == "dt":
             if len(args) > 1:
                 dt = float(args[1])
@@ -267,4 +197,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) == 3:
+        run_tests_from_file_input(sys.argv[1], sys.argv[2])
+    elif len(sys.argv) == 1:
+        interactive_main()
+    else:
+        raise ValueError("Run without args for interactive mode or with 2 args: input_filename, output_filename_tag")

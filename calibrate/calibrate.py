@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 """
+Library and cli for motor calibration
 TODO:
     more digital filter tuning (IIR vs FIR?)
-        organize filter data
     slowness:
         look at slowness factor (coulomb (and/or static?) fric too high)
         graph slowness factor and acceleration?
         some way to compare slowness functions for static and const friction? (sub-model)
     some way to deal with nonlinear parameters, like slowness threshold
-    why a spike around 13-13.5Hz = 74-77ms?
+    angle noise wrong, high-freq graph big oscillations because filter after stitch. Do high-freq filter before stitch.
     measure battery voltage during calibration
-    remove angle upspikes
     better model sticky stops. Spring that stores and releases energy?
     clean up and organize
         organized model definition
@@ -19,7 +18,6 @@ TODO:
     graph individual variable contributions to model (use X matrix)
     think more about inductance (can model with 3rd derivative of angle)
     way to run with saved parameters
-    more detailed cmd line main() with model, parameter output (new file?)
     electrically isolate angle sensors to reduce noise?
 
 Created Jun 2021
@@ -29,21 +27,31 @@ Created Jun 2021
 import numpy as np
 from scipy import signal
 from scipy.fft import rfftfreq
+from dataclasses import dataclass
 import time
 
-FILT_N = 60
-FILT_ORDER = 6
-FILT_FCN = 'butter'  # 'cheby'
-FILT_RIPPLE = 0.5  # only applies to cheby filters
-if FILT_FCN == 'cheby':
-    lowpass_sos = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'lowpass', output='sos')
-    hipass_sos  = signal.cheby1(FILT_ORDER, FILT_RIPPLE, 1/FILT_N, 'hipass',  output='sos')
-else:
-    lowpass_sos = signal.butter(FILT_ORDER, 1/FILT_N, 'lowpass', output='sos')
-    hipass_sos  = signal.butter(FILT_ORDER, 1/FILT_N, 'lowpass', output='sos')
+@dataclass
+class FilterParams:
+    T: int = None
+    N: int = 60
+    order: int = 6
+    fcn: str = "butter"   # 'cheby'
+    ripple: float = 0.5  # only applies to cheby filters
+    def __post_init__(self):
+        self.set_N(self.N if self.N is not None else 60)
+    def set_N(self, N: int | None, t_data: np.ndarray = None):
+        if N is None:
+            N = np.argmax(t_data > self.T) - 1
+        self.N = N
+        if self.fcn == 'cheby':
+            self.lowpass_sos = signal.cheby1(self.order, self.ripple, 1/N, 'lowpass',  output='sos')
+            self.hipass_sos  = signal.cheby1(self.order, self.ripple, 1/N, 'highpass', output='sos')
+        else:
+            self.lowpass_sos = signal.butter(self.order, 1/N, 'lowpass', output='sos')
+            self.hipass_sos  = signal.butter(self.order, 1/N, 'highpass', output='sos')
 
 
-def examineMotor(testdata, model = None, params = None):
+def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()):
     """return the model parameters (dict) of a motor.
     and the results of the examination (dict)
     V is 1D array of driving voltage, angle is same size array of sensed angle.
@@ -52,26 +60,29 @@ def examineMotor(testdata, model = None, params = None):
     Motor model d2(angle)/dt2 = param[V] * V + param[omega] * d(angle)/dt
     model is a list of strings naming additional model dynamics"""
 
-    def filter_and_derivative(testdata):
+    def filter_and_derivative_and_assemble(testdata, filter_params) -> dict[str, np.ndarray | float]:
         results = {m: np.empty(0) for m in [m + f for m in ["V", "angle", "vel", "acc"] for f in ("", "_f")] + ["t"]}
-        results["filter_period"] = testdata[0]["t"][FILT_N] - testdata[0]["t"][0]
         for this_data in testdata:
-            clean_up_test_data(this_data, results)
+            if filter_params.T is not None:
+                filter_params.set_N(N=None, t_data=this_data["t"])
+            results["filter_period"] = this_data["t"][filter_params.N] - this_data["t"][0]
+            clean_up_test_data(this_data, results, filter_params)
             this_data["vel"] = derivative(this_data, "angle")
             this_data["acc"] = derivative(this_data, "vel")
-            this_t = cut_first(this_data["t"])
+            this_t = cut_first(this_data["t"], filter_params)
             new_start_t = results["t"][-1] + (this_t[1] - this_t[0]) if len(results["t"]) > 0 else 0.
             results["t"] = np.concatenate((results["t"], this_t - this_t[0] + new_start_t))
             for m in ["V", "angle", "vel", "acc"]:
-                results[m] = np.concatenate((results[m], cut_first(this_data[m])))
-                results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m])))
+                results[m] = np.concatenate((results[m], cut_first(this_data[m], filter_params)))
+                results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m], filter_params)))
         results["diff_t"] = np.diff(results["t"])
         if np.any(results["diff_t"] <= 0):
             raise ValueError("ERROR: time stops or goes backwards", np.flatnonzero(results["diff_t"] <= 0))
-
-        spiky_angle_noise = round(np.std(filter_data(results["spiky_angle"], type='high')) * 1000, 3)
-        clean_angle_noise = round(np.std(filter_data(results['angle'], type='high')) * 1000, 3)
-        print(f"Angle noise std_dev [mrad/s^2]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
+        results["spiky_angle_hf"] = filter_data(results["spiky_angle"], filter_params, type='high')
+        results["angle_hf"] = filter_data(results["angle"], filter_params, type='high')
+        spiky_angle_noise = round(np.std(results["spiky_angle_hf"]) * 1000, 3)
+        clean_angle_noise = round(np.std(results["angle_hf"]) * 1000, 3)
+        print(f"Angle noise std_dev [mrad]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
         return results
@@ -79,8 +90,8 @@ def examineMotor(testdata, model = None, params = None):
     def derivative(data, name):
         return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
 
+    """make array used for the independent variable in regression"""
     def make_independent_variable(results, model):
-        """make array used for the independent variable in regression"""
         V_f = results["V_f"]
         vel_f = results["vel_f"]
         X = np.hstack((V_f.reshape(-1,1), vel_f.reshape(-1,1)))
@@ -124,9 +135,18 @@ def examineMotor(testdata, model = None, params = None):
             return determine_params(X_clean, acc_f_clean, results, remove_outliers=False)
         else:
             return paramArr
-        
-    def assign_parameters(param_array, params, model):
+
+    def test_loaded_params(X, model, params, results):
+        print(params)
+        paramArr = [params[m] for m in model]
+        results["accel_predic"] = X @ paramArr
+        accel_error = results["acc_f"] - results["accel_predic"]
+        results["outlier_thresh"] = 3 * np.std(accel_error)
+        results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
+
+    def assign_parameters(param_array, model):
         """assigns parameters based on regression outputs and model"""
+        params = {}
         for mod, param in zip(["V", "omega"] + model, param_array, strict=True):
             params[mod] = float(param)
         return params
@@ -148,26 +168,28 @@ def examineMotor(testdata, model = None, params = None):
 
     if len(testdata) == 0:
         raise ValueError("No testdata")
-    if params is None:
-        params = {}
     if model is None:
         model = []
-    results = filter_and_derivative(testdata)
+    results = filter_and_derivative_and_assemble(testdata, filter_params)
     
     # use Linear Least Squares regression to determine parameters
     X = make_independent_variable(results, model)
-    startTime = time.perf_counter()
-    paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
-    print("Parameter determination took", time.perf_counter() - startTime, "s")
-    params = assign_parameters(paramArr, params, model)
+    if params is None:
+        startTime = time.perf_counter()
+        paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
+        print("Parameter determination took", time.perf_counter() - startTime, "s")
+        params = assign_parameters(paramArr, model)
+    else:
+        test_loaded_params(X, model, params, results)
     calc_result_stats(results)
     return params, results
 
 
 def printMotorResults(params, results):
-    print("Filter nyquist period [s]:", round(2 * results["filter_period"], 3),
-          f'dt: {results["dt"]:.3}, dt std dev: {results["dt_std_dev"]:.2e}')
+    print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s;'
+          f' total data runtime: {np.max(results["t"]):.0f} s')
     print("Parameters:", params, end="\n\n")
+    print(f'Filter nyquist period [s]: {2 * results["filter_period"]:.3}')
     print("Average error =", round(np.average(np.abs(results["accel_error"])), 3), "rad/s^2, Average acceleration",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
@@ -193,107 +215,106 @@ def loadRun(filename):
     except Exception as e:
         print("Load failed:", filename, " because \n", e)
 
-def cut_first(data, n=FILT_N * 4):
-    return data[n:]
+def cut_first(data, filter_params):
+    return data[filter_params.N * 4:]
 
-def filter_data(data, type='lowpass'):
-    n_suspicious_filtered = FILT_N * 2
+def filter_data(data, filter_params=FilterParams(), type='lowpass'):
+    n_suspicious_filtered = filter_params.N * 2
     padded_data = np.concatenate((np.average(data[:n_suspicious_filtered]) * np.ones(n_suspicious_filtered), data))
     if type == 'lowpass' or type == 'low':
-        filtered = signal.sosfilt(lowpass_sos, padded_data)
+        filtered = signal.sosfilt(filter_params.lowpass_sos, padded_data)
     else:
-        filtered = signal.sosfilt(hipass_sos, padded_data)
+        filtered = signal.sosfilt(filter_params.hipass_sos, padded_data)
     filtered = filtered[n_suspicious_filtered:]
     if type == 'lowpass' or type == 'low':
-        filtered = cut_first(filtered)
+        filtered = cut_first(filtered, filter_params)
     return filtered
 
 
-def clean_up_test_data(this_data, results):
-    # the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
-    def remove_angle_downspikes(this_data, results):
-        min_drop_start_size = 0.001
-        # min_drop_start_size = 0.004  # between 1 and 2 ticks
-        # max_drop_size = 0.02   # between 6 and 7 ticks
-        max_drop_width = 4
-
-        future_length = max_drop_width + 1
-        angle = this_data["angle"]
+def clean_up_test_data(this_data, results, filter_params):
+    """ the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
+    down: [True] to remove downspikes only, [True, False] to remove down then up for each width.
+    recalc change is whether to recalculate changes after every spike removal. might remove this."""
+    def remove_spikes(angle: np.ndarray, down: list[bool], recalc_change=False,
+                      min_spike_start_size=0.001, max_up_spike_width=4, max_down_spike_width=4):
+        future_length = max(max_up_spike_width, max_down_spike_width) + 1
         prev_angle = np.roll(angle, 1)
         prev_angle[0] = prev_angle[1]
         # distance from previous angle to this angle and several future angles. [:,i] is i samples in the future.
         change_from_prev_angle = np.empty((len(angle), future_length))
-        for i in range(future_length):
-            change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
-        is_down_from_prev = change_from_prev_angle < -min_drop_start_size
+        if not recalc_change:
+            for i in range(future_length):
+                change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
+        for width in range(1, future_length):
+            for is_down in down:
+                if width > (max_down_spike_width if is_down else max_up_spike_width):
+                    continue
+                if recalc_change:
+                    for i in range(future_length):
+                        change_from_prev_angle[:, i] = np.roll(angle, -i) - prev_angle
+                change_across_spike = change_from_prev_angle[:, width]
+                if is_down:
+                    is_away_from_prev = change_from_prev_angle < -min_spike_start_size
+                    ends_going_back = (change_from_prev_angle[:, width-1] < change_across_spike)
+                else:
+                    is_away_from_prev = change_from_prev_angle > min_spike_start_size
+                    ends_going_back = (change_from_prev_angle[:, width-1] > change_across_spike)
+                all_samples_away_from_prev = np.all(is_away_from_prev[:, 0:width], axis=1)
+                is_start_of_spike = (all_samples_away_from_prev & ends_going_back)
+                for index_in_spike in range(width):
+                    is_this_index_in_spike = np.roll(is_start_of_spike, index_in_spike)
+                    interpolated_value_unshifted = (index_in_spike + 1) / (width + 1) * change_across_spike + prev_angle
+                    interpolated_value = np.roll(interpolated_value_unshifted, index_in_spike)
+                    angle = np.where(is_this_index_in_spike, interpolated_value, angle)
+        return angle
 
-        clean_angle = angle.copy()
-        for width in range(1, max_drop_width + 1):
-            all_samples_down_from_prev = np.all(is_down_from_prev[:, 0:width], axis=1)
-            change_across_spike = change_from_prev_angle[:, width]
-            ends_going_up = (change_from_prev_angle[:, width-1] < change_across_spike)
-            is_start_of_spike = (all_samples_down_from_prev & ends_going_up)
-            for index_in_spike in range(width):
-                is_this_index_in_spike = np.roll(is_start_of_spike, index_in_spike)
-                interpolated_value_unshifted = (index_in_spike + 1) / (width + 1) * change_across_spike + prev_angle
-                interpolated_value = np.roll(interpolated_value_unshifted, index_in_spike)
-                clean_angle = np.where(is_this_index_in_spike, interpolated_value, clean_angle)
-        # clean angle is now clean, replace testdata with it and save results["spiky_angle"]
-        if "spiky_angle" in results:
-            results["spiky_angle"] = np.concatenate((results["spiky_angle"], cut_first(angle)))
-        else:
-            results["spiky_angle"] = cut_first(angle)
-        this_data["angle"] = clean_angle
-
-    def remove_idle_messages(this_data):
-        index_first = np.flatnonzero(this_data["t"] < 100)[0]
+    def remove_idle_messages(this_data, t_max=100):
+        index_first = np.flatnonzero(this_data["t"] < t_max)[0]
         for m in ["V", "angle", "t"]:
             this_data[m] = this_data[m][index_first:]
-        high_t = np.flatnonzero(this_data["t"] > 100)
+        high_t = np.flatnonzero(this_data["t"] > t_max)
         index_last = high_t[0] if len(high_t) > 0 else len(this_data["t"])
-        if index_first > 0 or len(this_data['angle']) > index_last:
-            print(f"Cut off first {index_first}, last {len(this_data['angle']) - index_last}, now {index_last}")
         for m in ["V", "angle", "t"]:
             this_data[m] = this_data[m][:index_last]
 
     startTime = time.time()
     remove_idle_messages(this_data)
-    remove_angle_downspikes(this_data, results)
+    # save "spiky_angle" so we can overwrite testdata["angle"] with clean_angle
+    if "spiky_angle" in results:
+        results["spiky_angle"] = np.concatenate((results["spiky_angle"], cut_first(this_data["angle"], filter_params)))
+    else:
+        results["spiky_angle"] = cut_first(this_data["angle"], filter_params)
+    this_data["angle"] = remove_spikes(this_data["angle"], [False], max_up_spike_width=2)
+    this_data["angle"] = remove_spikes(this_data["angle"], [True], max_down_spike_width=4)
+    # this_data["angle"] = remove_spikes(this_data["angle"], [False, True], recalc_change=True)
+    FILT_MOVING_AVG_N = 10  # mostly to counter value quantization. After spike removal, before lowpass.
+    assert(FILT_MOVING_AVG_N < filter_params.N)
+    this_data["angle"] = moving_avg(this_data["angle"], n_samples=FILT_MOVING_AVG_N, pad_val=this_data["angle"][0])
     duration = time.time() - startTime
     results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration
 
 
+def moving_avg(data, n_samples=1, pad_val=0):
+    return np.concatenate((np.ones(n_samples-1) * pad_val, np.convolve(data, np.ones(n_samples), 'valid') / n_samples))
+
 # continuous number [0,1] where 1 means it's slow enough for static friction
-def slowness_factor_continuous(vel, speed_thresh = 0.06):
-    #return filter_data(np.where(np.abs(vel) < speed_thresh, (speed_thresh - np.abs(vel)) / speed_thresh, 0), 4)
-    return np.arctan((np.abs(vel) < speed_thresh) * 20 - 10) / np.pi + 0.5
+def slowness_factor_continuous(vel, speed_thresh=0.06, steepness=6, moving_avg_samples=20):
+    # arctangent is useful because it has a flat response in both limits
+    # return np.arctan((np.abs(vel) < speed_thresh) * 20 - 10) / np.pi + 0.5
     # return np.arctan(speed_thresh / np.abs(vel)) / np.pi * 2
+    speed = moving_avg(np.abs(vel), moving_avg_samples)
+    return np.arctan((speed_thresh - speed) * steepness / speed_thresh) / np.pi + 0.5
     # return np.clip(speed_thresh / np.abs(vel), 0., 1.)
 
 
 def saveParams(params, filename = "new"):
-    with open(filename +".learnedparams", "wb") as file:
+    with open(filename if "." in filename else filename + ".learnedparams", "wb") as file:
         np.savez(file, **params)
     
 def loadParams(filename = "motorparams"):
     try:
-        with open(filename+".learnedparams", "rb") as file:
+        with open(filename if "." in filename else filename + ".learnedparams", "rb") as file:
             return dict(np.load(file))
     except FileNotFoundError:
         print("Couldn't load parameters")
         return None
-        
-
-def main():
-    import sys
-    if len(sys.argv) < 2:
-        raise ValueError("First arg should be file pattern")
-    import glob
-    testdata = [loadRun(f) for i in range(1, len(sys.argv)) for f in glob.glob(sys.argv[i])]
-    print("Files:", [data["filename"] for data in testdata])
-    params, results = examineMotor(testdata, model=['static_fric', 'const_opposing_fric'])
-    printMotorResults(params, results)
-
-
-if __name__ == "__main__":
-    main()

@@ -7,6 +7,7 @@ on:
       - .github/workflows/calibrate-motor.yml
       - data/motortestdata.zip
       - calibrate/calibrate.py
+      - calibrate/calibrate_cli.py
       - pyproject.toml
 
 jobs:
@@ -24,6 +25,7 @@ jobs:
         with:
           sparse-checkout: |
             calibrate/calibrate.py
+            calibrate/calibrate_cli.py
             pyproject.toml
             data/motortestdata.zip
           sparse-checkout-cone-mode: false
@@ -35,4 +37,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
           resolution-strategy: ${{ matrix.dependency-resolution }}
       - name: calibrate
-        run: uv run --extra calibration calibrate/calibrate.py data/*.motortest >> $GITHUB_STEP_SUMMARY
+        run: uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -m static_fric const_opposing_fric -o data/motorparams -T 0.12 >> $GITHUB_STEP_SUMMARY
