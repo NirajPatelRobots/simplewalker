@@ -2,7 +2,6 @@
 UI for experimenting with calibration
 Interactive command line and graphs
 TODO:
-    change filter parameters
 """
 from scipy import signal, stats
 from scipy.fft import rfft

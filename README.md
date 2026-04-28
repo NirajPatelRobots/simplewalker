@@ -67,7 +67,7 @@ Copy these to the base computer and run `sensorAnalysis.py` on them to get senso
 ### Motor Calibration
 - To collect motor calibration data, run `python3 runMotorCalibration.py` on the main computer (SBC). 
 - Copy that data to the Base computer with `rsync -zic pi@raspberrypi:/home/pi/simplewalker/data/*.motortest ./data/`.
-- To run the calibration and get motor parameters, run `uv run --extra calibration calibrate/calibrate.py [file_glob]`
+- To run the calibration and get motor parameters, run `uv run --extra calibration calibrate/calibrate_cli.py [file_glob]`
 - To run the interactive calibration with a UI, run `uv run --extra interactive_calibration calibrate/interactive_calibrate.py`
 - To run the motor calibration as a notebook, run `uv run -w jupyter -w ipympl --extra interactive_calibration jupyter lab`
 
