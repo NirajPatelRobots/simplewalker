@@ -7,6 +7,7 @@ on:
       - .github/workflows/calibrate-motor.yml
       - data/motortestdata.zip
       - calibrate/calibrate.py
+      - calibrate/filter.py
       - calibrate/calibrate_cli.py
       - pyproject.toml
 
@@ -30,6 +31,7 @@ jobs:
           sparse-checkout: |
             calibrate/calibrate.py
             calibrate/calibrate_cli.py
+            calibrate/filter.py
             pyproject.toml
             data/motortestdata.zip
           sparse-checkout-cone-mode: false

@@ -87,8 +87,7 @@ def graph_torque_ripple(results):
 
 def graph_slowness(results):
     plt.figure(5, clear=True)
-    plt.plot(results["t"], np.abs(results["vel_f"]), results["t"],
-             slowness_factor_continuous(results["vel_f"]))
+    plt.plot(results["t"], np.abs(results["vel_f"]), results["t"], results["slowness_factor"])
     plt.legend(["speed", "slowness"])
     plt.title("Speed and Slowness Factor")
     plt.xlabel("time [s]")
