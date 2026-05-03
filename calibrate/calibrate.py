@@ -99,13 +99,13 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
             if mod == "const_fric":
                 static_direction = np.sign(vel_f)
                 X = np.hstack((X, ((1 - slowness_factor_continuous(vel_f)) * static_direction).reshape(-1,1)))
-            if mod == "const_opposing_fric":
+            elif mod == "const_opposing_fric":
                 opposing_direction = np.where(np.sign(vel_f) == np.sign(V_f), np.sign(vel_f), 0)
                 X = np.hstack((X, ((1 - slowness_factor_continuous(vel_f)) * opposing_direction).reshape(-1,1)))
             # expect param["static_fric"] + param["V"] > 0 or else friction reverses
-            if mod == "static_fric":
+            elif mod == "static_fric":
                 X = np.hstack((X, (slowness_factor_continuous(vel_f) * V_f).reshape(-1,1)))
-            if mod == "offset":
+            elif mod == "offset":
                 X = np.hstack((X, (1 - slowness_factor_continuous(vel_f)).reshape(-1,1)))
             elif mod == "Vsq":
                 X = np.hstack((X, (np.abs(V_f) * V_f).reshape(-1,1)))
@@ -117,13 +117,14 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
                 X = np.hstack((X, -np.sin(results["angle_f"]).reshape(-1,1)))
             elif mod == "hip_leg_weight_12":
                 X = np.hstack((X, np.sin(results["knee_angle_f"]).reshape(-1,1)))
+            else:
+                raise ValueError("Unknown model variable: " + mod)
         return X
     
     def determine_params(X, acc_f, results, remove_outliers=True):
-        paramArr = np.linalg.inv(X.T @ X) @ X.T @ acc_f
-        results["accel_predic"] = X @ paramArr
+        paramArr = np.linalg.inv(X.T @ X) @ X.T @ acc_f  # linear least squares
         if remove_outliers:
-            accel_error = acc_f - results["accel_predic"]
+            accel_error = acc_f - X @ paramArr
             results["outlier_thresh"] = 3 * np.std(accel_error)
             outliers = np.abs(accel_error) > results["outlier_thresh"]
             acc_f_clean = np.where(outliers, 0., acc_f)
@@ -136,14 +137,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         else:
             return paramArr
 
-    def test_loaded_params(X, model, params, results):
-        print(params)
-        paramArr = [params[m] for m in model]
-        results["accel_predic"] = X @ paramArr
-        accel_error = results["acc_f"] - results["accel_predic"]
-        results["outlier_thresh"] = 3 * np.std(accel_error)
-        results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
-
     def assign_parameters(param_array, model):
         """assigns parameters based on regression outputs and model"""
         params = {}
@@ -152,6 +145,9 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         return params
 
     def calc_result_stats(results):
+        accel_error = results["acc_f"] - results["accel_predic"]
+        results["outlier_thresh"] = 3 * np.std(accel_error)
+        results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
         accel_error = results["acc_f"] - results["accel_predic"]
         results["accel_error"] = accel_error
         results["error_std_dev"] = np.std(accel_error)
@@ -168,11 +164,12 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
 
     if len(testdata) == 0:
         raise ValueError("No testdata")
-    if model is None:
-        model = []
     results = filter_and_derivative_and_assemble(testdata, filter_params)
-    
-    # use Linear Least Squares regression to determine parameters
+
+    if params is None:
+        model = model or []
+    else:
+        model = [m for m in params.keys() if m not in ["V", "omega"]]
     X = make_independent_variable(results, model)
     if params is None:
         startTime = time.perf_counter()
@@ -180,7 +177,8 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         print("Parameter determination took", time.perf_counter() - startTime, "s")
         params = assign_parameters(paramArr, model)
     else:
-        test_loaded_params(X, model, params, results)
+        paramArr = [params[m] for m in ["V", "omega"] + model]
+    results["accel_predic"] = X @ paramArr
     calc_result_stats(results)
     return params, results
 
@@ -312,9 +310,5 @@ def saveParams(params, filename = "new"):
         np.savez(file, **params)
     
 def loadParams(filename = "motorparams"):
-    try:
-        with open(filename if "." in filename else filename + ".learnedparams", "rb") as file:
-            return dict(np.load(file))
-    except FileNotFoundError:
-        print("Couldn't load parameters")
-        return None
+    filename = filename if "." in filename else filename + ".learnedparams"
+    return {k: float(v) for (k, v) in np.load(filename).items()}

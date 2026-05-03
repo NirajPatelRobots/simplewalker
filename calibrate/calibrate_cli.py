@@ -6,8 +6,9 @@ from calibrate import *
 
 def parse_args(src=None):
     parser = argparse.ArgumentParser(prog="Calibrate Motor")
-    parser.add_argument("filenames", nargs='+', help="Input .motortest files, or .param file(s) if -t is set.")
-    parser.add_argument("-m", "--model", nargs='+', help="Names of model parameters. V and vel are always in the model.")
+    parser.add_argument("filenames", nargs='+', help="Input .motortest files")
+    parser.add_argument("-m", "--model", nargs='+',
+                        help="Names of model parameters. V and vel are always in the model. Ignored if -i is set.")
     io_group = parser.add_mutually_exclusive_group()
     io_group.add_argument("-i", "--params-in",
                           help="Skip parameter determination and load params from this file instead")

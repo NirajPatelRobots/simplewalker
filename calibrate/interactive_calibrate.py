@@ -13,7 +13,7 @@ import sys
 from calibrate import *
 
 
-def graphMotorResults(results):
+def graphMotorResults(results, filter_params):
     # plt.style.use('dark_background')
     graph_V_and_angle_and_derivatives(results)
     # graph_3d_acc_V_vel(results)
@@ -23,9 +23,9 @@ def graphMotorResults(results):
     graph_time_error(results)
     # graph_error_stats(results)
     graph_high_freq(results)
-    graph_signal_filter_frequencies(results, "angle", 'rad', 10, x_max_filter_cutoff_multipler=1.5, also="spiky_angle")
-    graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, x_max_filter_cutoff_multipler=1.5)
-    graph_signal_filter_frequencies(results, "V", 'Volts', 12, x_max_filter_cutoff_multipler=1.5)
+    graph_signal_filter_frequencies(results, "angle", 'rad', 10, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5, also="spiky_angle")
+    graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
+    graph_signal_filter_frequencies(results, "V", 'Volts', 12, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
     plt.show()
 
 
@@ -127,7 +127,8 @@ def graph_time_error(results):
     plt.ylabel("Change in time [s]")
     plt.grid()
 
-def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_cutoff_multipler=None, also=None):
+def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params=FilterParams(),
+                                    x_max_filter_cutoff_multipler=None, also=None):
     freqs = results["fft_freqs"]
     if results["fft_freqs"] is None:
         print(f'timestep is too variable for fft. Implement slow fourier transforms. {results["dt_std_dev"]=}')
@@ -143,9 +144,9 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, x_max_filter_
     data_mag_smooth = moving_avg(data_mag, 100, np.nan)
     also_mag_smooth = moving_avg(also_mag, 100, np.nan) if also is not None else None
     try:
-        w, h = signal.freqz_sos(lowpass_sos, fs=1/results["dt"])
+        w, h = signal.freqz_sos(filter_params.lowpass_sos, fs=1/results["dt"])
     except AttributeError:
-        w, h = signal.sosfreqz(lowpass_sos, fs=1/results["dt"])
+        w, h = signal.sosfreqz(filter_params.lowpass_sos, fs=1/results["dt"])
 
     fig, axs = plt.subplots(num=num, nrows=3, sharex='all', figsize=(8, 10), clear=True)
     axs[0].plot(freqs, data_mag_smooth, 'C1', zorder=4, label="moving avg")
@@ -242,9 +243,10 @@ def main():
                                 print("mismatched test_type", test_type, testdata[i]["test_type"], "for", f)
             if len(testdata) > 0:
                 if test_type == "motor":
-                    params, results = examineMotor(testdata, model)
+                    filter_params = FilterParams()
+                    params, results = examineMotor(testdata, model, filter_params=filter_params)
                     printMotorResults(params, results)
-                    graphMotorResults(results)
+                    graphMotorResults(results, filter_params)
         elif command == "saveparams":
             filename = args[1] if len(args) > 1 else "new"
             saveParams(params, join(settings_path, filename))

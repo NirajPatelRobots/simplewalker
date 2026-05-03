@@ -15,11 +15,15 @@ jobs:
     runs-on: ubuntu-slim
     strategy:
       matrix:
+        python-version: ["3.14"]
+        dependency-resolution: ["highest"]
+        train_filter_cutoff: [0.12]
+        test_filter_cutoff: [0.10]
         include:
-          - python-version: ""
-            dependency-resolution: "highest"
           - python-version: "3.11"
             dependency-resolution: "lowest"
+            train_filter_cutoff: 0.12
+            test_filter_cutoff: null
     steps:
       - uses: actions/checkout@v6
         with:
@@ -36,5 +40,17 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           resolution-strategy: ${{ matrix.dependency-resolution }}
+
       - name: calibrate
-        run: uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -m static_fric const_opposing_fric -o data/motorparams -T 0.12 >> $GITHUB_STEP_SUMMARY
+        run: >-
+          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
+          -m static_fric const_opposing_fric
+          -T ${{ matrix.train_filter_cutoff }}
+          -o data/motorparams >> $GITHUB_STEP_SUMMARY
+
+      - name: test calibration
+        if: ${{ matrix.test_filter_cutoff != null }}
+        run: >-
+          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
+          -T ${{ matrix.test_filter_cutoff }}
+          -i data/motorparams >> $GITHUB_STEP_SUMMARY
