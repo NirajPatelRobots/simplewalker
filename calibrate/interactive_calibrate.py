@@ -26,6 +26,7 @@ def graphMotorResults(results, filter_params):
     graph_signal_filter_frequencies(results, "angle", 'rad', 10, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5, also="spiky_angle")
     graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
     graph_signal_filter_frequencies(results, "V", 'Volts', 12, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
+    graph_contributions(results)
     plt.show()
 
 
@@ -195,6 +196,16 @@ def graph_high_freq(results):
     plt.plot(results["t"], results["angle_hf"], '.', label="angle")
     plt.title("High Frequency")
     plt.ylabel("Angle [rad]")
+    plt.legend()
+    plt.grid()
+
+def graph_contributions(results):
+    plt.figure(13, clear=True)
+    for mod, contribution in results["model_contributions"].items():
+        plt.plot(results["t"], contribution, label=mod)
+    plt.plot(results["t"], results["accel_error"], 'k', label="accel error")
+    plt.title("Model Contributions")
+    plt.ylabel("Acc [rad/s^2]")
     plt.legend()
     plt.grid()
 

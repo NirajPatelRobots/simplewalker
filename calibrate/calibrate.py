@@ -10,11 +10,11 @@ TODO:
     angle noise wrong, high-freq graph big oscillations because filter after stitch. Do high-freq filter before stitch.
     measure battery voltage during calibration
     better model sticky stops. Spring that stores and releases energy?
+    acc_pred and acc_pred_f with acc_pred before filtering
     clean up and organize
         organized model definition
             Dict[model_name: (function(results: Dict) -> np.array)] ?
                 ex "Vsq": (lambda results: return np.abs(results["V_f"]) * results["V_f"])
-    graph individual variable contributions to model (use X matrix)
     think more about inductance (can model with 3rd derivative of angle)
     electrically isolate angle sensors to reduce noise?
 
@@ -123,12 +123,11 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         return params
 
     def calc_result_stats(results):
-        accel_error = results["acc_f"] - results["accel_predic"]
-        results["outlier_thresh"] = 3 * np.std(accel_error)
-        results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
-        accel_error = results["acc_f"] - results["accel_predic"]
-        results["accel_error"] = accel_error
+        accel_error = results["accel_predic"] - results["acc_f"]
         results["error_std_dev"] = np.std(accel_error)
+        results["outlier_thresh"] = 3 * results["error_std_dev"]
+        results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
+        results["accel_error"] = accel_error
         results["R^2_with_outliers"] = 1 - np.sum(accel_error**2) / np.sum(results["acc_f"]**2)
         results["accel_error_nan"] = np.where(np.abs(accel_error) < results["outlier_thresh"], accel_error, np.nan)
         acc_f_nan = np.where(np.abs(accel_error) < results["outlier_thresh"], results["acc_f"], np.nan)
@@ -139,6 +138,12 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         results["fft_freqs"] = None
         if results["dt_std_dev"] / results["dt"] < 0.01:  # if dt is stable to within 1% precision
             results["fft_freqs"] = rfftfreq(results["N"], results["dt"])
+
+    def calc_model_contributions(X, results, paramArr, model):
+        results["model_contributions"] = {}
+        for mod, param, i in zip(["V", "omega"] + model, paramArr, range(len(paramArr)), strict=True):
+            results["model_contributions"][mod] = float(param) * X[:, i].transpose()
+            print(mod, results["model_contributions"][mod].shape)
 
     if len(testdata) == 0:
         raise ValueError("No testdata")
@@ -158,6 +163,7 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         paramArr = [params[m] for m in ["V", "omega"] + model]
     results["accel_predic"] = X @ paramArr
     calc_result_stats(results)
+    calc_model_contributions(X, results, paramArr, model)
     return params, results
 
 
