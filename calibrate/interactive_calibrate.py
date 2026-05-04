@@ -26,6 +26,7 @@ def graphMotorResults(results, filter_params):
     graph_signal_filter_frequencies(results, "angle", 'rad', 10, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5, also="spiky_angle")
     graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
     graph_signal_filter_frequencies(results, "V", 'Volts', 12, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
+    graph_signal_filter_frequencies(results, "accel_error", 'rad/s^2', 13, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
     graph_contributions(results)
     plt.show()
 
@@ -136,10 +137,10 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params
     name_f = name + "_f"
     window = signal.windows.blackman(results["N"])
     data_fourier = rfft(results[name] * window)
-    filtered_fourier = rfft(results[name_f] * window)
+    filtered_fourier = rfft(results[name_f] * window) if name_f in results else None
     also_fourier = rfft(results[also] * window) if also is not None else None
     data_mag = 2.0/results["N"] * np.abs(data_fourier)
-    filtered_mag = 2.0/results["N"] * np.abs(filtered_fourier)
+    filtered_mag = 2.0/results["N"] * np.abs(filtered_fourier) if filtered_fourier is not None else None
     also_mag = 2.0/results["N"] * np.abs(also_fourier) if also is not None else None
     data_mag_smooth = moving_avg(data_mag, 100, np.nan)
     also_mag_smooth = moving_avg(also_mag, 100, np.nan) if also is not None else None
@@ -152,7 +153,8 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params
     axs[0].plot(freqs, data_mag_smooth, 'C1', zorder=4, label="moving avg")
     axs[0].set_ylim(axs[0].get_ylim())
     axs[0].plot(freqs, data_mag, '.', color='C2', label=name)
-    axs[0].plot(freqs, filtered_mag, '.', color='C3', label=name_f)
+    if filtered_fourier is not None:
+        axs[0].plot(freqs, filtered_mag, '.', color='C3', label=name_f)
     if also is not None:
         axs[0].plot(freqs, also_mag, '.', color='C4', zorder=1, label=also)
         axs[0].plot(freqs, also_mag_smooth, color='C5', zorder=3, label=also+'_avg')
@@ -164,7 +166,8 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params
     axs[1].plot(freqs, 20 * np.log10(data_mag_smooth), 'C1', zorder=4, label="moving avg")
     axs[1].set_ylim(axs[1].get_ylim())
     axs[1].plot(freqs, 20 * np.log10(data_mag), '.', color='C2', label=name)
-    axs[1].plot(freqs, 20 * np.log10(filtered_mag), '.', color='C3', label=name_f)
+    if filtered_fourier is not None:
+        axs[1].plot(freqs, 20 * np.log10(filtered_mag), '.', color='C3', label=name_f)
     if also is not None:
         axs[1].plot(freqs, 20 * np.log10(also_mag), '.', color='C4', zorder=1, label=also)
         axs[1].plot(freqs, 20 * np.log10(also_mag_smooth), color='C5', zorder=3, label=also+'avg')
@@ -175,7 +178,8 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params
 
     axs[2].plot(freqs, np.unwrap(np.angle(data_fourier)), 'g', label=name)
     axs[2].set_ylim(axs[2].get_ylim())
-    axs[2].plot(freqs, np.unwrap(np.angle(filtered_fourier)), 'r', label=name_f)  # goodbye
+    if filtered_fourier is not None:
+        axs[2].plot(freqs, np.unwrap(np.angle(filtered_fourier)), 'r', label=name_f)  # goodbye
     twin_ax2 = axs[2].twinx()
     twin_ax2.plot(w, np.unwrap(np.angle(h)), 'b', label='filter')
     twin_ax2.set_ylabel("Filter Angle (blue) [rad]")
@@ -200,7 +204,7 @@ def graph_high_freq(results):
     plt.grid()
 
 def graph_contributions(results):
-    plt.figure(13, clear=True)
+    plt.figure(15, clear=True)
     for mod, contribution in results["model_contributions"].items():
         plt.plot(results["t"], contribution, label=mod)
     plt.plot(results["t"], results["accel_error"], 'k', label="accel error")
