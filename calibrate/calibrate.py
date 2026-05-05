@@ -7,10 +7,10 @@ TODO:
         graph slowness factor and acceleration?
         some way to compare slowness functions for static and const friction? (sub-model)
     some way to deal with nonlinear parameters, like slowness threshold
-    angle noise wrong, high-freq graph big oscillations because filter after stitch. Do high-freq filter before stitch.
     measure battery voltage during calibration
     better model sticky stops. Spring that stores and releases energy?
     acc_pred and acc_pred_f with acc_pred before filtering
+    why angle jumps? Just remove them from test data?
     clean up and organize
         organized model definition
             Dict[model_name: (function(results: Dict) -> np.array)] ?
@@ -38,7 +38,8 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
     model is a list of strings naming additional model dynamics"""
 
     def filter_and_derivative_and_assemble(testdata, filter_params) -> dict[str, np.ndarray | float]:
-        results = {m: np.empty(0) for m in [m + f for m in ["V", "angle", "vel", "acc"] for f in ("", "_f")] + ["t"]}
+        results = {m: np.empty(0) for m in ["t", "angle_hf", "spiky_angle_hf"]
+                   + [n + f for n in ["V", "angle", "vel", "acc", "spiky_angle"] for f in ("", "_f")]}
         for this_data in testdata:
             if filter_params.T is not None:
                 filter_params.set_N(N=None, t_data=this_data["t"])
@@ -49,14 +50,14 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
             this_t = cut_first(this_data["t"], filter_params)
             new_start_t = results["t"][-1] + (this_t[1] - this_t[0]) if len(results["t"]) > 0 else 0.
             results["t"] = np.concatenate((results["t"], this_t - this_t[0] + new_start_t))
-            for m in ["V", "angle", "vel", "acc"]:
+            for m in ["V", "angle", "vel", "acc", "spiky_angle"]:
                 results[m] = np.concatenate((results[m], cut_first(this_data[m], filter_params)))
                 results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m], filter_params)))
+            for m in ["spiky_angle", "angle"]:
+                results[m + "_hf"] = np.concatenate((results[m+"_hf"], filter_data(this_data[m], filter_params, type='high')))
         results["diff_t"] = np.diff(results["t"])
         if np.any(results["diff_t"] <= 0):
             raise ValueError("ERROR: time stops or goes backwards", np.flatnonzero(results["diff_t"] <= 0))
-        results["spiky_angle_hf"] = filter_data(results["spiky_angle"], filter_params, type='high')
-        results["angle_hf"] = filter_data(results["angle"], filter_params, type='high')
         spiky_angle_noise = round(np.std(results["spiky_angle_hf"]) * 1000, 3)
         clean_angle_noise = round(np.std(results["angle_hf"]) * 1000, 3)
         print(f"Angle noise std_dev [mrad]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
@@ -211,10 +212,7 @@ def clean_up_test_data(this_data, results, filter_params):
     startTime = time.time()
     remove_idle_messages(this_data)
     # save "spiky_angle" so we can overwrite testdata["angle"] with clean_angle
-    if "spiky_angle" in results:
-        results["spiky_angle"] = np.concatenate((results["spiky_angle"], cut_first(this_data["angle"], filter_params)))
-    else:
-        results["spiky_angle"] = cut_first(this_data["angle"], filter_params)
+    this_data["spiky_angle"] = this_data["angle"]
     # the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
     this_data["angle"] = remove_spikes(this_data["angle"], [False], max_up_spike_width=2)
     this_data["angle"] = remove_spikes(this_data["angle"], [True], max_down_spike_width=4)

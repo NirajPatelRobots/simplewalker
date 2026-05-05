@@ -36,9 +36,7 @@ def filter_data(data, filter_params=FilterParams(), type='lowpass'):
         filtered = signal.sosfilt(filter_params.lowpass_sos, padded_data)
     else:
         filtered = signal.sosfilt(filter_params.hipass_sos, padded_data)
-    filtered = filtered[n_suspicious_filtered:]
-    if type == 'lowpass' or type == 'low':
-        filtered = cut_first(filtered, filter_params)
+    filtered = cut_first(filtered[n_suspicious_filtered:], filter_params)
     return filtered
 
 
