@@ -7,7 +7,7 @@ from scipy import signal, stats
 from scipy.fft import rfft
 import matplotlib.pyplot as plt
 from os import listdir
-from os.path import isfile, join, dirname
+from os.path import isfile, join, dirname, splitext
 import sys
 
 from calibrate import *
@@ -89,7 +89,7 @@ def graph_torque_ripple(results):
 
 def graph_slowness(results):
     plt.figure(5, clear=True)
-    plt.plot(results["t"], np.abs(results["vel_f"]), results["t"], results["slowness_factor"])
+    plt.plot(results["t"], np.abs(results["vel_f"]), results["t"], results["slowness"])
     plt.legend(["speed", "slowness"])
     plt.title("Speed and Slowness Factor")
     plt.xlabel("time [s]")
@@ -244,7 +244,7 @@ def main():
         elif command == "examine":
             if len(args) > 1:
                 filenames = sorted([f for f in listdir(data_path) if isfile(join(data_path,f)) and f.startswith(args[1])])
-                print("Loading", filenames, "\n")
+                print("Loading", ', '.join([splitext(f)[0] for f in filenames]), "\n")
                 testdata = []
                 for i, f in enumerate(filenames):
                     newdata = loadRun(join(data_path,f))

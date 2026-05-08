@@ -1,21 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 Library for motor calibration
-TODO:
+TODO (model):
     slowness:
         look at slowness factor (coulomb (and/or static?) fric too high)
         graph slowness factor and acceleration?
         some way to compare slowness functions for static and const friction? (sub-model)
+        better model sticky stops. Spring that stores and releases energy?
+    think more about inductance (can model with 3rd derivative of angle)
     some way to deal with nonlinear parameters, like slowness threshold
+TODO (data):
     measure battery voltage during calibration
-    better model sticky stops. Spring that stores and releases energy?
     acc_pred and acc_pred_f with acc_pred before filtering
     why angle jumps? Just remove them from test data?
-    clean up and organize
-        organized model definition
-            Dict[model_name: (function(results: Dict) -> np.array)] ?
-                ex "Vsq": (lambda results: return np.abs(results["V_f"]) * results["V_f"])
-    think more about inductance (can model with 3rd derivative of angle)
     electrically isolate angle sensors to reduce noise?
 
 Created Jun 2021
@@ -26,6 +23,23 @@ import numpy as np
 from scipy.fft import rfftfreq
 import time
 from filter import *
+
+
+model_fcns = {
+    "V": lambda results:                 results["V_f"],
+    "omega": lambda results:             results["vel_f"],
+    "const_fric": lambda results:        (1 - results["slowness"]) * np.sign(results["vel_f"]),
+    "const_opposing_fric": lambda results:
+        (1 - results["slowness"]) * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), np.sign(results["vel_f"]), 0),
+                                            # expect param["static_fric"] + param["V"] > 0 or else friction reverses
+    "static_fric": lambda results:       results["slowness"] * results["V_f"],
+    "offset": lambda results:            1 - results["slowness"],
+    "Vsq": lambda results:               np.abs(results["V_f"]) * results["V_f"],
+                                            # theta_3dot is an alternate way to model current
+    "theta_3dot": lambda results:        derivative(results, "acc"),
+    "knee_leg_weight_2": lambda results: -np.sin(results["angle"]),
+    "hip_leg_weight_12": lambda results: np.sin(results["knee_angle"]),
+}
 
 
 def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()):
@@ -65,39 +79,12 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         results["N"] = np.size(results["V_f"])
         return results
 
-    def derivative(data, name):
-        return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
-
     """make array used for the independent variable in regression"""
     def make_independent_variable(results, model):
-        V_f = results["V_f"]
-        vel_f = results["vel_f"]
-        X = np.hstack((V_f.reshape(-1,1), vel_f.reshape(-1,1)))
-        results["slowness_factor"] = continuous_threshold(moving_avg(np.abs(vel_f), 20), thresh=0.06, steepness=6)
+        X = np.hstack((results["V_f"].reshape(-1,1), results["vel_f"].reshape(-1,1)))
+        results["slowness"] = continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=6)
         for mod in model:
-            if mod == "const_fric":
-                static_direction = np.sign(vel_f)
-                X = np.hstack((X, ((1 - results["slowness_factor"]) * static_direction).reshape(-1,1)))
-            elif mod == "const_opposing_fric":
-                opposing_direction = np.where(np.sign(vel_f) == np.sign(V_f), np.sign(vel_f), 0)
-                X = np.hstack((X, ((1 - results["slowness_factor"]) * opposing_direction).reshape(-1,1)))
-            # expect param["static_fric"] + param["V"] > 0 or else friction reverses
-            elif mod == "static_fric":
-                X = np.hstack((X, (results["slowness_factor"] * V_f).reshape(-1,1)))
-            elif mod == "offset":
-                X = np.hstack((X, (1 - results["slowness_factor"]).reshape(-1,1)))
-            elif mod == "Vsq":
-                X = np.hstack((X, (np.abs(V_f) * V_f).reshape(-1,1)))
-            elif mod == "theta_3dot":   # alternate strategy to modeling current
-                X = np.hstack((X, derivative(results, "acc_f").reshape(-1,1)))
-            elif mod == "knee_leg_weight_2":
-                X = np.hstack((X, -np.sin(results["angle_f"]).reshape(-1,1)))
-            elif mod == "hip_leg_weight_1":
-                X = np.hstack((X, -np.sin(results["angle_f"]).reshape(-1,1)))
-            elif mod == "hip_leg_weight_12":
-                X = np.hstack((X, np.sin(results["knee_angle_f"]).reshape(-1,1)))
-            else:
-                raise ValueError("Unknown model variable: " + mod)
+            X = np.hstack((X, model_fcns[mod](results).reshape(-1, 1)))
         return X
     
     def determine_params(X, acc_f, results, remove_outliers=True):
@@ -144,7 +131,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         results["model_contributions"] = {}
         for mod, param, i in zip(["V", "omega"] + model, paramArr, range(len(paramArr)), strict=True):
             results["model_contributions"][mod] = float(param) * X[:, i].transpose()
-            print(mod, results["model_contributions"][mod].shape)
 
     if len(testdata) == 0:
         raise ValueError("No testdata")
@@ -166,6 +152,10 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
     calc_result_stats(results)
     calc_model_contributions(X, results, paramArr, model)
     return params, results
+
+
+def derivative(data, name):
+    return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
 
 
 def printMotorResults(params, results):
