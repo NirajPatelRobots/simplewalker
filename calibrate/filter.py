@@ -29,14 +29,16 @@ class FilterParams:
             self.hipass_sos  = signal.butter(self.order, 1/N, 'highpass', output='sos')
 
 
-def filter_data(data, filter_params=FilterParams(), type='lowpass'):
+def filter_data(data, filter_params=FilterParams(), type='lowpass', cut=True):
     n_suspicious_filtered = filter_params.N * 2
     padded_data = np.concatenate((np.average(data[:n_suspicious_filtered]) * np.ones(n_suspicious_filtered), data))
     if type == 'lowpass' or type == 'low':
         filtered = signal.sosfilt(filter_params.lowpass_sos, padded_data)
     else:
         filtered = signal.sosfilt(filter_params.hipass_sos, padded_data)
-    filtered = cut_first(filtered[n_suspicious_filtered:], filter_params)
+    filtered = filtered[n_suspicious_filtered:]
+    if cut:
+        filtered = cut_first(filtered, filter_params)
     return filtered
 
 
@@ -46,6 +48,10 @@ def cut_first(data, filter_params):
 
 def moving_avg(data, n_samples=1, pad_val=0):
     return np.concatenate((np.ones(n_samples-1) * pad_val, np.convolve(data, np.ones(n_samples), 'valid') / n_samples))
+
+
+def derivative(data, name):  # this isn't really a filter but motor_model needs it
+    return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
 
 
 # Returns smooth continuous threshold with a flat response in both limits (0 and 1)

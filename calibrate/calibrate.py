@@ -6,12 +6,9 @@ TODO (model):
         look at slowness factor (coulomb (and/or static?) fric too high)
         graph slowness factor and acceleration?
         some way to compare slowness functions for static and const friction? (sub-model)
-        better model sticky stops. Spring that stores and releases energy?
-    think more about inductance (can model with 3rd derivative of angle)
     some way to deal with nonlinear parameters, like slowness threshold
 TODO (data):
     measure battery voltage during calibration
-    acc_pred and acc_pred_f with acc_pred before filtering
     why angle jumps? Just remove them from test data?
     electrically isolate angle sensors to reduce noise?
 
@@ -23,23 +20,7 @@ import numpy as np
 from scipy.fft import rfftfreq
 import time
 from filter import *
-
-
-model_fcns = {
-    "V": lambda results:                 results["V_f"],
-    "omega": lambda results:             results["vel_f"],
-    "const_fric": lambda results:        (1 - results["slowness"]) * np.sign(results["vel_f"]),
-    "const_opposing_fric": lambda results:
-        (1 - results["slowness"]) * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), np.sign(results["vel_f"]), 0),
-                                            # expect param["static_fric"] + param["V"] > 0 or else friction reverses
-    "static_fric": lambda results:       results["slowness"] * results["V_f"],
-    "offset": lambda results:            1 - results["slowness"],
-    "Vsq": lambda results:               np.abs(results["V_f"]) * results["V_f"],
-                                            # theta_3dot is an alternate way to model current
-    "theta_3dot": lambda results:        derivative(results, "acc"),
-    "knee_leg_weight_2": lambda results: -np.sin(results["angle"]),
-    "hip_leg_weight_12": lambda results: np.sin(results["knee_angle"]),
-}
+import motor_model
 
 
 def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()):
@@ -78,14 +59,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
         return results
-
-    """make array used for the independent variable in regression"""
-    def make_independent_variable(results, model):
-        X = np.hstack((results["V_f"].reshape(-1,1), results["vel_f"].reshape(-1,1)))
-        results["slowness"] = continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=6)
-        for mod in model:
-            X = np.hstack((X, model_fcns[mod](results).reshape(-1, 1)))
-        return X
     
     def determine_params(X, acc_f, results, remove_outliers=True):
         paramArr = np.linalg.inv(X.T @ X) @ X.T @ acc_f  # linear least squares
@@ -136,11 +109,8 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         raise ValueError("No testdata")
     results = filter_and_derivative_and_assemble(testdata, filter_params)
 
-    if params is None:
-        model = model or []
-    else:
-        model = [m for m in params.keys() if m not in ["V", "omega"]]
-    X = make_independent_variable(results, model)
+    model = motor_model.Model(model, params)
+    X = motor_model.make_independent_variable(results, model)
     if params is None:
         startTime = time.perf_counter()
         paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
@@ -152,10 +122,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
     calc_result_stats(results)
     calc_model_contributions(X, results, paramArr, model)
     return params, results
-
-
-def derivative(data, name):
-    return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
 
 
 def printMotorResults(params, results):
