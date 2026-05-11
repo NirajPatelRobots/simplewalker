@@ -142,7 +142,7 @@ def printMotorResults(params, results):
 
 
 def loadRun(filename):
-    if not "motortest" in filename:
+    if "motortest" not in filename:
         filename = filename + ".motortest"
     try:
         with open(filename, 'rb') as file:

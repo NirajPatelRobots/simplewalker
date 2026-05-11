@@ -18,3 +18,9 @@ interactive_calibration = [
     "pillow>=9.3",
     "scipy>=1.13",
 ]
+
+
+[tool.ruff.lint]
+ignore = ["F403", "F405",  # star imports
+    "E702"  # Multiple statements on one line
+]

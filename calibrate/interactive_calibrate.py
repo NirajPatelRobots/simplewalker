@@ -267,7 +267,7 @@ def main():
         elif command == "loadparams":
             filename = args[1] if len(args) > 1 else "new"
             ret = loadParams(join(settings_path, filename))
-            if not ret is None:
+            if ret is not None:
                 params = ret
                 print("Loaded parameters:", params)
         elif command == "model":
