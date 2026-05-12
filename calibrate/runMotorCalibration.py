@@ -7,7 +7,6 @@ TODO:
     receive binary data from controller
     remove angvel from text comm (removed from MotorCalibrationStateMsg)
     measure battery voltage during calibration
-    different excitation voltage patterns
     compare reported controller time with system time?
 
 Created Jun 2021, reworked late 2023
@@ -59,6 +58,9 @@ def parse_MotorCalibrationStateMessage(message:bytes):
     return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
 
 
+signal_type_names = ["sin", "squ", "db", "const"]
+
+
 def print_from_micro(ser: ControllerSerial):
     text = ""
     regex = re.compile(r"(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+)$", flags=re.MULTILINE)
@@ -73,7 +75,7 @@ def print_from_micro(ser: ControllerSerial):
             if regex_match:
                 text = text[regex_match.end()+1:]
                 this_time = float(regex_match.group(1))
-                print("t = ", this_time, "   ", end='\r')
+                print("t =", this_time, "   V =", regex_match.group(2), "    ", end='\r')
                 is_finished = (this_time > 1000)
                 voltage.append(float(regex_match.group(2)))
                 angle.append(float(regex_match.group(3)))
@@ -86,8 +88,9 @@ def print_from_micro(ser: ControllerSerial):
     print(text)
     return np.array(voltage), np.array(angle), np.array(timestamp)
 
-def motortest_filename_tag(amp_scale, freq_scale) -> str:
-    return f"_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
+
+def motortest_filename_tag(amp_scale, freq_scale, sig_type) -> str:
+    return f"_{signal_type_names[sig_type]}_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
 
 
 def run_tests_from_file_input(infile_name: str, series_name: str):
@@ -96,22 +99,26 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
         series_config = json.loads(infile.read())
     ser.reset_input_buffer()
     for run in series_config["runs"]:
-        print(run["type"], "run")
-        for amp_scale in run["amp_scales"]:
-            for freq_scale in run["freq_scales"]:
-                filename = series_name + motortest_filename_tag(amp_scale, freq_scale)
-                print("\tRunning:", filename)
-                if "dry_run" in series_config and series_config["dry_run"] is True:
-                    continue
-                time.sleep(0.5)
-                ser.reset_input_buffer()
-                ser.write(make_MotorCalibrationTriggerMessage(series_config["motorNum"], amp_scale, freq_scale,
-                                      series_config["dt"], 0, series_config["max_angle"], series_config["min_angle"], True))
-                V, angle, timestamp = print_from_micro(ser)
-                print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
-                saveRun(filename, V, angle, series_config["motorNum"], timestamp)
-                time.sleep(0.5)
-                ser.reset_input_buffer()
+        for run_type in run["types"]:
+            run_type_num = signal_type_names.index(run_type)
+            print(f'{run_type} (type {run_type_num}) run')
+            for amp_scale in run["amp_scales"]:
+                for freq_scale in run["freq_scales"]:
+                    filename = series_name + motortest_filename_tag(amp_scale, freq_scale, run_type_num)
+                    if ("dry_run" in series_config and series_config["dry_run"]) or ("skip" in run and run["skip"]):
+                        print("Skipping", filename)
+                        continue
+                    print("\tRunning:", filename)
+                    time.sleep(0.5)
+                    ser.reset_input_buffer()
+                    ser.write(make_MotorCalibrationTriggerMessage(series_config["motorNum"], amp_scale, freq_scale,
+                                                        series_config["dt"], run_type_num,
+                                                        series_config["max_angle"], series_config["min_angle"], True))
+                    V, angle, timestamp = print_from_micro(ser)
+                    print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
+                    saveRun(filename, V, angle, series_config["motorNum"], timestamp)
+                    time.sleep(0.5)
+                    ser.reset_input_buffer()
 
 
 def interactive_main():
@@ -124,6 +131,7 @@ def interactive_main():
           "dt (float)",
           "ls [file_prefix]",
           "save [filename]",
+          "type [int(MotorCalibrationInputType)]",
           "code", sep = "\n ")
     freq_scale = 1.
     amp_scale = 1.
@@ -135,6 +143,7 @@ def interactive_main():
     dt = 0.002  # seconds
     filename = None
     timestamp = np.array([])
+    sig_type = 0
     
     while True:
         args = input(">>> ").split()
@@ -151,7 +160,7 @@ def interactive_main():
                     amp_scale = float(args[2])
                     if len(args) > 3:
                         filename = args[3]
-            message = make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, 0,
+            message = make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, sig_type,
                                                           max_angle, min_angle, True)
             ser.reset_input_buffer()
             ser.write(message)
@@ -159,15 +168,15 @@ def interactive_main():
             V, angle, timestamp = print_from_micro(ser)
             print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
             if filename:
-                saveRun(filename + motortest_filename_tag(amp_scale, freq_scale), V, angle, motorNum, timestamp)
+                saveRun(filename + motortest_filename_tag(amp_scale, freq_scale, sig_type), V, angle, motorNum, timestamp)
         elif command == "motornum":
             try:
                 motorNum = int(args[1])
-            except:
+            except ValueError:
                 print("Invalid motor number")
         elif command == "save":
             filename = (args[1] if len(args) > 1 else "")
-            saveRun(filename + motortest_filename_tag(amp_scale, freq_scale), V, angle, motorNum, timestamp)
+            saveRun(filename + motortest_filename_tag(amp_scale, freq_scale, sig_type), V, angle, motorNum, timestamp)
         elif command == "dt":
             if len(args) > 1:
                 dt = float(args[1])
@@ -184,6 +193,13 @@ def interactive_main():
             import glob
             ls_path = "data" + sep + (args[1] if len(args) > 1 else "") + "*.motortest"
             print([d[5:-10] for d in glob.glob(ls_path)])
+        elif command == "type":
+            if len(args) > 1:
+                if args[1] in signal_type_names:
+                    sig_type = signal_type_names.index(args[1])
+                else:
+                    sig_type = int(args[1])
+            print("Signal type:", signal_type_names[sig_type], f"({sig_type})")
         elif command.startswith("exit"):
             ser.close()
             break

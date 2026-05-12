@@ -71,7 +71,8 @@ pico_enable_stdio_uart(hardware_test 0)
 pico_add_extra_outputs(hardware_test)
 
 add_executable(calibrate_motor
-        calibrateMotor.cpp
+        calibrate/calibrateMotor.cpp
+        calibrate/signal_generator.cpp
         ${pico_motor_IO_src}
         ${COMM_src}
 )
