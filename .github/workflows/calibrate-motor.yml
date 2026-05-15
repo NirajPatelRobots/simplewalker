@@ -15,10 +15,6 @@ on:
 jobs:
   calibrate:
     runs-on: ubuntu-slim
-    strategy:
-      matrix:
-        train_filter_cutoff: [0.12]
-        test_filter_cutoff: [0.10]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -41,21 +37,25 @@ jobs:
           -m static_fric const_opposing_fric
           -o data/motorparams >> $GITHUB_STEP_SUMMARY
 
+      - run: echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> $GITHUB_STEP_SUMMARY
       - name: Test calibration @ filter_cutoff = 0.1s
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -T 0.1
           -i data/motorparams >> $GITHUB_STEP_SUMMARY
 
+      - run: echo --- Test calibration on squares ----------------------------------- >> $GITHUB_STEP_SUMMARY
       - name: Test calibration on squares
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*_squ_*.motortest
           -i data/motorparams >> $GITHUB_STEP_SUMMARY
 
+      - run: echo --- Test calibration on sines ------------------------------------- >> $GITHUB_STEP_SUMMARY
       - name: Test calibration on sines
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*_sin_*.motortest
           -i data/motorparams >> $GITHUB_STEP_SUMMARY
 
+      - run: echo --- Test calibration on deadband ---------------------------------- >> $GITHUB_STEP_SUMMARY
       - name: Test calibration on deadband
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*_db_*.motortest

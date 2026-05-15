@@ -2,6 +2,7 @@
 Created October 2021, reworked late 2023
 TODO:
     way to cancel calibration
+    Invalid scale values error?
     error if can't return to start
         detect wrong direction
     measure battery voltage variability?

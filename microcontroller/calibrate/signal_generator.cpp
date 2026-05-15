@@ -1,6 +1,5 @@
 #include "signal_generator.hpp"
 #include <math.h>
-#include <optional>
 
 
 class SineExcitationGenerator : public ExcitationSignalGenerator {
@@ -68,56 +67,40 @@ public:
 
 
 class DeadbandExcitationGenerator : public ExcitationSignalGenerator {
-    float V, V_step = 0.01, moving_angvel_thresh = 0.2;
-    std::optional<float> moving_V, stationary_V;
-    int direction, check_cycles, num_cycle_check;
-    bool has_reversed = false;
+    float V, V_step, moving_angvel_thresh, iir_coeff, avg_angvel;
+    bool has_moved;
+    int direction, scale_direction;
 public:
     DeadbandExcitationGenerator(float frequency_scale, float amplitude_scale) :
-            V(0), moving_angvel_thresh(0.1f * fabs(amplitude_scale)), moving_V(), stationary_V(),
-            direction(amplitude_scale > 0 ? 1 : -1), check_cycles(0),
-            num_cycle_check(ceil(0.1 / frequency_scale))
+            V(0), V_step(0.001), moving_angvel_thresh(0.1f * fabs(amplitude_scale)),
+            iir_coeff(fmin(1.0, frequency_scale)), avg_angvel(0), has_moved(false),
+            direction(1), scale_direction(amplitude_scale > 0 ? 1 : -1)
     {}
     float get_next_value(float angVel) override {
         if (is_finished) return 0;
-        static float avg_angvel = 0;
-        avg_angvel += angVel * direction;
-        if (++check_cycles < num_cycle_check) {
-            return V * direction;
-        }
-        avg_angvel /= num_cycle_check;
-        check_cycles = 0;
+        avg_angvel = (angVel * direction * scale_direction) * iir_coeff + avg_angvel * (1 - iir_coeff);
         bool is_moving_wrong_direction = avg_angvel < -moving_angvel_thresh;
         bool is_moving = avg_angvel > moving_angvel_thresh;
-        avg_angvel = 0; //reset avg
         if (is_moving_wrong_direction) {
             V += V_step;
         } else if (is_moving && V >= 0) {
-            if (!moving_V.has_value() || V < moving_V) {
-                moving_V = V;
-                V -= V_step;
+            has_moved = true;
+            V -= V_step;
+        } else if (has_moved) { // if it has moved then stopped, we're done with this direction
+            if (direction == -1) {  // done with both directions
+                is_finished = true;
+                return 0.f;
+            } else {
+                direction = -1;
+                V *= -1;
+                avg_angvel *= -1;
+                has_moved = false;  // reset and reverse direction
+//                num_cycle_check *= 2;  // IDK why it's quicker to recognize movement backwards
             }
-        } else {
-            if (!stationary_V.has_value() || V > stationary_V) {
-                stationary_V = V;
-            }
-            if (moving_V.has_value()) { // if it has moved then stopped, we're done with this direction
-                if (has_reversed) {
-                    is_finished = true;
-                    return 0.f;
-                } else {
-                    has_reversed = true;
-                    direction = -1;
-                    V *= -1;
-                    moving_V.reset();
-                    stationary_V.reset();
-                    num_cycle_check *= 2;  // IDK why it's quicker to recognize movement backwards
-                }
-            } else { // if we haven't moved yet
-                V += V_step;
-            }
+        } else { // if we haven't moved yet
+            V += V_step;
         }
-        return V * direction;
+        return V * direction * scale_direction;
     }
 };
 

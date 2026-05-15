@@ -1,6 +1,6 @@
 import argparse
 import glob
-from os.path import basename, splitext
+from os.path import basename, splitext, commonprefix
 from calibrate import *
 
 
@@ -24,7 +24,9 @@ def parse_args(src=None):
 
 def load_runs(filenames):
     testdata = [loadRun(f) for f in sorted([g for f in filenames for g in glob.glob(f)])]  # :P
-    print("Files:", ', '.join([splitext(basename(data["filename"]))[0] for data in testdata]))
+    names = [splitext(basename(data["filename"]))[0] for data in testdata]
+    prefix = commonprefix(names)[:-1] if commonprefix(names).endswith("_a") else commonprefix(names)
+    print(f"File prefix: {prefix}, tags: {', '.join([n[len(prefix):] for n in names])}")
     return testdata
 
 
