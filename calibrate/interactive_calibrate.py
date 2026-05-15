@@ -2,6 +2,7 @@
 UI for experimenting with calibration
 Interactive command line and graphs
 TODO:
+    graph slowness factor and acceleration / accel error
 """
 from scipy import signal, stats
 from scipy.fft import rfft

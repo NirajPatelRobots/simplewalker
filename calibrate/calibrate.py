@@ -2,11 +2,9 @@
 """
 Library for motor calibration
 TODO (model):
-    slowness:
-        look at slowness factor (coulomb (and/or static?) fric too high)
-        graph slowness factor and acceleration?
-        some way to compare slowness functions for static and const friction? (sub-model)
     some way to deal with nonlinear parameters, like slowness threshold
+    deadband
+        modify angle measurements?
 TODO (data):
     measure battery voltage during calibration
     why angle jumps? Just remove them from test data?
@@ -19,7 +17,7 @@ Created Jun 2021
 import numpy as np
 from scipy.fft import rfftfreq
 import time
-from filter import *
+from filter import FilterParams, filter_data, cut_first, moving_avg, derivative, remove_spikes
 import motor_model
 
 
@@ -76,13 +74,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         else:
             return paramArr
 
-    def assign_parameters(param_array, model):
-        """assigns parameters based on regression outputs and model"""
-        params = {}
-        for mod, param in zip(["V", "omega"] + model, param_array, strict=True):
-            params[mod] = float(param)
-        return params
-
     def calc_result_stats(results):
         accel_error = results["accel_predic"] - results["acc_f"]
         results["error_std_dev"] = np.std(accel_error)
@@ -100,11 +91,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         if results["dt_std_dev"] / results["dt"] < 0.01:  # if dt is stable to within 1% precision
             results["fft_freqs"] = rfftfreq(results["N"], results["dt"])
 
-    def calc_model_contributions(X, results, paramArr, model):
-        results["model_contributions"] = {}
-        for mod, param, i in zip(["V", "omega"] + model, paramArr, range(len(paramArr)), strict=True):
-            results["model_contributions"][mod] = float(param) * X[:, i].transpose()
-
     if len(testdata) == 0:
         raise ValueError("No testdata")
     results = filter_and_derivative_and_assemble(testdata, filter_params)
@@ -115,12 +101,13 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         startTime = time.perf_counter()
         paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
         print("Parameter determination took", time.perf_counter() - startTime, "s")
-        params = assign_parameters(paramArr, model)
+        params = motor_model.assign_parameters(paramArr, model)
+        motor_model.validate_params(params)
     else:
         paramArr = [params[m] for m in ["V", "omega"] + model]
     results["accel_predic"] = X @ paramArr
     calc_result_stats(results)
-    calc_model_contributions(X, results, paramArr, model)
+    results["model_contributions"] = motor_model.calc_model_contributions(X, paramArr, model)
     return params, results
 
 
