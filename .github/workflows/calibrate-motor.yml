@@ -61,6 +61,9 @@ jobs:
           uv run --extra calibration calibrate/calibrate_cli.py data/*_db_*.motortest
           -i data/motorparams >> $GITHUB_STEP_SUMMARY
 
+      - name: Validate parameters
+        run: uv run calibrate/motor_model.py data/motorparams
+
   ruff_check:
     runs-on: ubuntu-slim
     steps:

@@ -102,7 +102,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
         print("Parameter determination took", time.perf_counter() - startTime, "s")
         params = motor_model.assign_parameters(paramArr, model)
-        motor_model.validate_params(params)
     else:
         paramArr = [params[m] for m in ["V", "omega"] + model]
     results["accel_predic"] = X @ paramArr
@@ -112,8 +111,9 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
 
 
 def printMotorResults(params, results):
-    print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s;'
-          f' total data runtime: {np.max(results["t"]):.0f} s')
+    minutes, seconds = divmod(int(np.max(results["t"])), 60)
+    print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total data runtime:',
+          f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s')
     print("Parameters:", params, end="\n\n")
     print(f'Filter nyquist period [s]: {2 * results["filter_period"]:.3}')
     print("Average error =", round(np.average(np.abs(results["accel_error"])), 3), "rad/s^2, Average acceleration",
@@ -165,12 +165,3 @@ def clean_up_test_data(this_data, results, filter_params):
     this_data["angle"] = moving_avg(this_data["angle"], n_samples=FILT_MOVING_AVG_N, pad_val=this_data["angle"][0])
     duration = time.time() - startTime
     results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration
-
-
-def saveParams(params, filename = "new"):
-    with open(filename if "." in filename else filename + ".learnedparams", "wb") as file:
-        np.savez(file, **params)
-    
-def loadParams(filename = "motorparams"):
-    filename = filename if "." in filename else filename + ".learnedparams"
-    return {k: float(v) for (k, v) in np.load(filename).items()}

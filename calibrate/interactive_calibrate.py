@@ -7,11 +7,14 @@ TODO:
 from scipy import signal, stats
 from scipy.fft import rfft
 import matplotlib.pyplot as plt
+import numpy as np
 from os import listdir
 from os.path import isfile, join, dirname, splitext
 import sys
 
-from calibrate import *
+from calibrate import loadRun, examineMotor, printMotorResults
+from filter import moving_avg, FilterParams
+from motor_model import saveParams, loadParams
 
 
 def graphMotorResults(results, filter_params):
@@ -204,8 +207,15 @@ def graph_high_freq(results):
     plt.legend()
     plt.grid()
 
-def graph_contributions(results):
+def graph_contributions(results, combine_V_fric=True):
     plt.figure(15, clear=True)
+    if combine_V_fric:
+        results["model_contributions"]["V + fric"] = results["model_contributions"]["V"]
+        del results["model_contributions"]["V"]
+        for fric_type in ["static_fric", "const_opposing_fric"]:
+            if fric_type in results["model_contributions"]:
+                results["model_contributions"]["V + fric"] += results["model_contributions"][fric_type]
+            del results["model_contributions"][fric_type]
     for mod, contribution in results["model_contributions"].items():
         plt.plot(results["t"], contribution, label=mod)
     plt.plot(results["t"], results["accel_error"], 'k', label="accel error")

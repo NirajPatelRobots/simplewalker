@@ -1,7 +1,8 @@
 import argparse
 import glob
 from os.path import basename, splitext, commonprefix
-from calibrate import *
+from calibrate import loadRun, examineMotor, printMotorResults, FilterParams
+from motor_model import saveParams, loadParams
 
 
 def parse_args(src=None):

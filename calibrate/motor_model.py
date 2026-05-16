@@ -47,7 +47,7 @@ def Model(model, params):
 """make array used for the independent variable in regression"""
 def make_independent_variable(results, model):
     X = np.hstack((results["V_f"].reshape(-1,1), results["vel_f"].reshape(-1,1)))
-    results["slowness"] = continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=6)
+    results["slowness"] = continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=4)
     for mod in model:
         X = np.hstack((X, model_fcns[mod](results).reshape(-1, 1)))
     return X
@@ -62,10 +62,7 @@ def assign_parameters(param_array, model):
 
 
 def calc_model_contributions(X, paramArr, model):
-    # contributions = {}
-    # for mod, param, i in zip(["V", "omega"] + model, paramArr, range(len(paramArr)), strict=True):
-    #     contributions[mod] = float(param) * X[:, i].transpose()
-    return {mod: float(param) * X[:, i].transpose()
+    return {mod: param * X[:, i].transpose()
             for mod, param, i in zip(["V", "omega"] + model, paramArr, range(len(paramArr)), strict=True)}
 
 
@@ -78,3 +75,19 @@ def validate_params(params):
     assert("const_opposing_fric" not in params or params["const_opposing_fric"] < 0)
     if "static_fric" in params:
         assert(params["static_fric"] + params["V"] > 0)
+
+
+def saveParams(params, filename = "new"):
+    with open(filename if "." in filename else filename + ".learnedparams", "wb") as file:
+        np.savez(file, **params)
+
+
+def loadParams(filename = "motorparams"):
+    filename = filename if "." in filename else filename + ".learnedparams"
+    return {k: float(v) for (k, v) in np.load(filename).items()}
+
+
+if __name__ == "__main__":
+    import sys
+    params = loadParams(sys.argv[1])
+    validate_params(params)

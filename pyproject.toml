@@ -19,8 +19,7 @@ interactive_calibration = [
     "scipy>=1.13",
 ]
 
-
+[tool.ruff]
+include = ["calibrate/*.py"]
 [tool.ruff.lint]
-ignore = ["F403", "F405",  # star imports
-    "E702"  # Multiple statements on one line
-]
+ignore = ["E702"]  # Multiple statements on one line
