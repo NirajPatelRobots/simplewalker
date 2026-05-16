@@ -5,9 +5,10 @@
 
 class ExcitationSignalGenerator {
 public:
+    virtual ~ExcitationSignalGenerator() = default;
     virtual float get_next_value(float angVel) = 0;
     bool is_finished = false;
 };
 
-std::shared_ptr<ExcitationSignalGenerator> make_signal_generator(
+std::unique_ptr<ExcitationSignalGenerator> make_signal_generator(
         MotorCalibrationInputType type, float frequency_scale, float amplitude_scale);

@@ -81,12 +81,12 @@ public:
         avg_angvel = (angVel * direction * scale_direction) * iir_coeff + avg_angvel * (1 - iir_coeff);
         bool is_moving_wrong_direction = avg_angvel < -moving_angvel_thresh;
         bool is_moving = avg_angvel > moving_angvel_thresh;
-        if (is_moving_wrong_direction) {
+        if (is_moving_wrong_direction || !(has_moved || is_moving)) {
             V += V_step;
-        } else if (is_moving && V >= 0) {
+        } else if (is_moving || V >= V_step) {
             has_moved = true;
             V -= V_step;
-        } else if (has_moved) { // if it has moved then stopped, we're done with this direction
+        } else { // if it has moved then returned to 0, we're done with this direction
             if (direction == -1) {  // done with both directions
                 is_finished = true;
                 return 0.f;
@@ -95,10 +95,7 @@ public:
                 V *= -1;
                 avg_angvel *= -1;
                 has_moved = false;  // reset and reverse direction
-//                num_cycle_check *= 2;  // IDK why it's quicker to recognize movement backwards
             }
-        } else { // if we haven't moved yet
-            V += V_step;
         }
         return V * direction * scale_direction;
     }
@@ -120,17 +117,17 @@ public:
 };
 
 
-std::shared_ptr<ExcitationSignalGenerator> make_signal_generator(
+std::unique_ptr<ExcitationSignalGenerator> make_signal_generator(
         MotorCalibrationInputType type, float frequency_scale, float amplitude_scale) {
     switch (type) {
         case CAL_INPUT_SINES:
-            return std::make_shared<SineExcitationGenerator>(frequency_scale, amplitude_scale);
+            return std::make_unique<SineExcitationGenerator>(frequency_scale, amplitude_scale);
         case CAL_INPUT_SQU:
-            return std::make_shared<SquareExcitationGenerator>(frequency_scale, amplitude_scale);
+            return std::make_unique<SquareExcitationGenerator>(frequency_scale, amplitude_scale);
         case CAL_INPUT_DEADBAND:
-            return std::make_shared<DeadbandExcitationGenerator>(frequency_scale, amplitude_scale);
+            return std::make_unique<DeadbandExcitationGenerator>(frequency_scale, amplitude_scale);
         case CAL_INPUT_CONST:
-            return std::make_shared<ConstantVoltageGenerator>(amplitude_scale, frequency_scale);
+            return std::make_unique<ConstantVoltageGenerator>(amplitude_scale, frequency_scale);
         default:
             return nullptr;
     }

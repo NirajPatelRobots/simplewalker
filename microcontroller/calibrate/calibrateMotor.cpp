@@ -26,7 +26,7 @@ public:
     shared_ptr<MessageInbox<MotorCalibrationTriggerMsg>> trigger_inbox;
     shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> state_outbox;
     shared_ptr<MotorCalibrationTriggerMsg> instructions;
-    std::shared_ptr<ExcitationSignalGenerator> generator;
+    std::unique_ptr<ExcitationSignalGenerator> generator;
     int startup_stationary_samples = 50;
     MotorCalibrationStatus status {MOTORCAL_IDLE};
 
