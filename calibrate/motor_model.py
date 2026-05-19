@@ -16,17 +16,18 @@ TODO:
 """
 
 import numpy as np
-from filter import moving_avg, derivative, continuous_threshold
+from filter import moving_avg, derivative, continuous_threshold, continuous_sign
 
 
 model_fcns = {
     "V": lambda results:                 results["V_f"],
     "omega": lambda results:             results["vel_f"],
-    "const_fric": lambda results:        (1 - results["slowness"]) * np.sign(results["vel_f"]),
+    "const_fric": lambda results:        results["sign_vel_f"],
     "const_opposing_fric": lambda results:
-    (1 - results["slowness"]) * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), np.sign(results["vel_f"]), 0),
-
+    results["sign_vel_f"] * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), 1, 0),
     "static_fric": lambda results:       results["slowness"] * results["V_f"],
+
+    "sign_V": lambda results:            continuous_sign(results["V_f"], 0.15, 12),
     "offset": lambda results:            1 - results["slowness"],
     "Vsq": lambda results:               np.abs(results["V_f"]) * results["V_f"],
 
@@ -47,7 +48,8 @@ def Model(model, params):
 """make array used for the independent variable in regression"""
 def make_independent_variable(results, model):
     X = np.hstack((results["V_f"].reshape(-1,1), results["vel_f"].reshape(-1,1)))
-    results["slowness"] = continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=4)
+    results["slowness"] = 1 - continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=6)
+    results["sign_vel_f"] = continuous_sign(moving_avg(results["vel_f"], 20), thresh=0.06, steepness=10)
     for mod in model:
         X = np.hstack((X, model_fcns[mod](results).reshape(-1, 1)))
     return X
@@ -91,3 +93,4 @@ if __name__ == "__main__":
     import sys
     params = loadParams(sys.argv[1])
     validate_params(params)
+    print("Success, No Validation Errors")

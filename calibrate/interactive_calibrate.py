@@ -23,6 +23,7 @@ def graphMotorResults(results, filter_params):
     # graph_3d_acc_V_vel(results)
     graph_torque_ripple(results)
     graph_slowness(results)
+    # graph_sign_vel_f(results)
     graph_acc_predict(results)
     graph_time_error(results)
     # graph_error_stats(results)
@@ -98,6 +99,15 @@ def graph_slowness(results):
     plt.title("Speed and Slowness Factor")
     plt.xlabel("time [s]")
     plt.ylabel("Speed [rad/s] and Slowness [arb. units]")
+    plt.grid()
+
+def graph_sign_vel_f(results):
+    plt.figure(16, clear=True)
+    plt.plot(results["t"], results["vel_f"], results["t"], results["sign_vel_f"])
+    plt.legend(["vel_f", "sign_vel_f"])
+    plt.title("Velocity and sign_vel_f Factor")
+    plt.xlabel("time [s]")
+    plt.ylabel("Velocity [rad/s] and sign_vel_f [arb. units]")
     plt.grid()
 
 def graph_acc_predict(results):
@@ -210,12 +220,10 @@ def graph_high_freq(results):
 def graph_contributions(results, combine_V_fric=True):
     plt.figure(15, clear=True)
     if combine_V_fric:
-        results["model_contributions"]["V + fric"] = results["model_contributions"]["V"]
-        del results["model_contributions"]["V"]
+        results["model_contributions"]["V + fric"] = results["model_contributions"]["V"].copy()
         for fric_type in ["static_fric", "const_opposing_fric"]:
             if fric_type in results["model_contributions"]:
                 results["model_contributions"]["V + fric"] += results["model_contributions"][fric_type]
-            del results["model_contributions"][fric_type]
     for mod, contribution in results["model_contributions"].items():
         plt.plot(results["t"], contribution, label=mod)
     plt.plot(results["t"], results["accel_error"], 'k', label="accel error")

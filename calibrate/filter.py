@@ -55,9 +55,16 @@ def derivative(data, name):  # this isn't really a filter but motor_model needs 
 
 
 # Returns smooth continuous threshold with a flat response in both limits (0 and 1)
-# As values -> +inf, return -> 0. As values -> -inf, return -> 1
+# As values -> +inf, return -> 1. As values -> -inf, return -> 0.
+# Mirror around y axis if thresh < 0. Bad near thresh = 0.
 def continuous_threshold(values, thresh, steepness):
-    return np.arctan((thresh - values) * steepness / thresh) / np.pi + 0.5
+    return np.arctan((values - thresh) * steepness / thresh) / np.pi + 0.5
+
+# Smooth continuous replacement for np.sign. Flat response in both limits and around values = 0.
+# As values -> +inf, return -> 1. As values -> -inf, return -> -1. As abs(values) -> 0, return -> 0.
+def continuous_sign(values, thresh: float, steepness: float):
+    return np.where(values > 0, continuous_threshold(values, abs(thresh), steepness),
+                               -continuous_threshold(values, -abs(thresh), steepness))
 
 
 """ Remove spikes smaller than a certain width. Interpolates replacement data.
