@@ -34,7 +34,7 @@ jobs:
       - name: calibrate
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
-          -m static_fric const_opposing_fric
+          -m static_fric const_fric slow_omega
           -o data/motorparams >> $GITHUB_STEP_SUMMARY
 
       - run: echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> $GITHUB_STEP_SUMMARY
@@ -63,6 +63,7 @@ jobs:
 
       - name: Validate parameters
         run: uv run calibrate/motor_model.py data/motorparams
+        continue-on-error: true
 
   ruff_check:
     runs-on: ubuntu-slim

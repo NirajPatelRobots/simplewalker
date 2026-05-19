@@ -242,7 +242,7 @@ def main():
           "model [[no] model_name]",
           "code", sep="\n ")
     testdata = []
-    model = ['static_fric', 'const_opposing_fric']
+    model = ['static_fric', 'const_fric', "slow_omega"]
     params = {}
     data_path = join(dirname(dirname(__file__)), "data")
     settings_path = join(dirname(dirname(__file__)), "settings")

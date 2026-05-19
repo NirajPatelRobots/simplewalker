@@ -27,6 +27,7 @@ model_fcns = {
     results["sign_vel_f"] * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), 1, 0),
     "static_fric": lambda results:       results["slowness"] * results["V_f"],
 
+    "slow_omega": lambda results:        results["slowness"] * results["vel_f"],
     "sign_V": lambda results:            continuous_sign(results["V_f"], 0.15, 12),
     "offset": lambda results:            1 - results["slowness"],
     "Vsq": lambda results:               np.abs(results["V_f"]) * results["V_f"],
