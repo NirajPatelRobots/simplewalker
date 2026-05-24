@@ -2,6 +2,7 @@
 TODO:
     remove spikes: better removal of spikes that swing positive and negative
     more digital filter tuning (IIR vs FIR?)
+    continuous_threshold get closer to 0
 """
 import numpy as np
 from scipy import signal

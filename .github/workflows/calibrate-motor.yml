@@ -34,7 +34,7 @@ jobs:
       - name: calibrate
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
-          -m static_fric const_fric slow_omega
+          -m static_fric const_fric
           -o data/motorparams >> $GITHUB_STEP_SUMMARY
 
       - run: echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> $GITHUB_STEP_SUMMARY

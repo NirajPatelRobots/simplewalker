@@ -3,6 +3,7 @@ UI for experimenting with calibration
 Interactive command line and graphs
 TODO:
     graph slowness factor and acceleration / accel error
+    fancy modern interactive data frontend?
 """
 from scipy import signal, stats
 from scipy.fft import rfft
@@ -143,7 +144,7 @@ def graph_time_error(results):
     plt.grid()
 
 def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params=FilterParams(),
-                                    x_max_filter_cutoff_multipler=None, also=None):
+                                    x_max_filter_cutoff_multipler=None, also=None, moving_avg_pts=10):
     freqs = results["fft_freqs"]
     if results["fft_freqs"] is None:
         print(f'timestep is too variable for fft. Implement slow fourier transforms. {results["dt_std_dev"]=}')
@@ -156,8 +157,8 @@ def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params
     data_mag = 2.0/results["N"] * np.abs(data_fourier)
     filtered_mag = 2.0/results["N"] * np.abs(filtered_fourier) if filtered_fourier is not None else None
     also_mag = 2.0/results["N"] * np.abs(also_fourier) if also is not None else None
-    data_mag_smooth = moving_avg(data_mag, 100, np.nan)
-    also_mag_smooth = moving_avg(also_mag, 100, np.nan) if also is not None else None
+    data_mag_smooth = moving_avg(data_mag, moving_avg_pts, np.nan)
+    also_mag_smooth = moving_avg(also_mag, moving_avg_pts, np.nan) if also is not None else None
     try:
         w, h = signal.freqz_sos(filter_params.lowpass_sos, fs=1/results["dt"])
     except AttributeError:
@@ -242,10 +243,9 @@ def main():
           "model [[no] model_name]",
           "code", sep="\n ")
     testdata = []
-    model = ['static_fric', 'const_fric', "slow_omega"]
-    params = {}
+    model = ['static_fric', 'const_fric']
+    params = None
     data_path = join(dirname(dirname(__file__)), "data")
-    settings_path = join(dirname(dirname(__file__)), "settings")
     test_type = ""
     cmd_args = None if (len(sys.argv) < 2) else sys.argv[1:]
 
@@ -277,16 +277,19 @@ def main():
             if len(testdata) > 0:
                 if test_type == "motor":
                     filter_params = FilterParams()
-                    params, results = examineMotor(testdata, model, filter_params=filter_params)
+                    params, results = examineMotor(testdata, model, params, filter_params)
                     printMotorResults(params, results)
                     graphMotorResults(results, filter_params)
         elif command == "saveparams":
             filename = args[1] if len(args) > 1 else "new"
-            saveParams(params, join(settings_path, filename))
+            saveParams(params, join(data_path, filename))
         elif command == "loadparams":
             filename = args[1] if len(args) > 1 else "new"
-            ret = loadParams(join(settings_path, filename))
-            if ret is not None:
+            try:
+                ret = loadParams(join(data_path, filename))
+            except FileNotFoundError:
+                print("File not found")
+            else:
                 params = ret
                 print("Loaded parameters:", params)
         elif command == "model":

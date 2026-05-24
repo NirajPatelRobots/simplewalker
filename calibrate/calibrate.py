@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 """
 Library for motor calibration
-TODO (model):
+TODO:
     some way to deal with nonlinear parameters, like slowness threshold
-    deadband
+    deadband model
         modify angle measurements?
-TODO (data):
     measure battery voltage during calibration
     why angle jumps? Just remove them from test data?
     electrically isolate angle sensors to reduce noise?
+    structure: clear flow of sensor data -> /(sensor model) -> believed true values -> /(motor model) -> prediction
+    prediction accuracy as fcn of vel?
+    deadband and low-V squ tests are characteristic like impulse response. We see ringing! Use that to measure response
+        fourier analysis (compare F_V(w) with F_acc_pred(w)) to find frequency response of system
+        manually first, then cli version
 
 Created Jun 2021
 @author: Niraj

@@ -13,6 +13,11 @@ TODO:
     Some way to deal with nonlinear parameters like slowness threshold
     look at slowness factor (coulomb (and/or static?) fric too high)
     Better model sticky stops. Spring that stores and releases energy?
+        We need something that springs into action so it starts moving quickly, then oscillates.
+        Observed oscillation T = 0.25 to 0.27s
+        Take more deadband data to outweigh noise and improve freq graph of deadband only
+        Adding slow_omega makes the prediction look more wrong, even if it matches the spikes into motion more closely.
+            It makes the prediction of the return to 0 speed worse! And it fails validation because da/dV < 0 for vel=0!
 """
 
 import numpy as np
