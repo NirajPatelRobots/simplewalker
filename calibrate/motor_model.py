@@ -6,14 +6,21 @@ Fun facts:
     I assume it's ok if the 2nd derivative is the predicted variable and the 3rd derivative is one of the model fcns.
   - Tried using V and vel instead of V_f and vel_f, and filtering each fcn in make_independent_variable.
     Makes sense because we're comparing to acc_f, which can't change quickly. But it constrains what acc_pred can do.
-    R^2->.605. Using filtered signals for slowness and np.sign improved to .65.
+    R^2 ~.78->.605. Using filtered signals for slowness and np.sign improved to .65.
+  - Tried spring-mass-damper model that holds hidden spring pos and vel variables, gives acceleration as spring force
+    pulling from true pos to spring pos. The hidden spring variables are numerically integrated from that accel.
+    But, calibration optimizes it to pull in the opposite direction, setting accel to pull to the true pos. This gives
+    it perfect prediction if the spring constant is high enough. The problem is that the 2nd order dynamics can't be
+    predicted in the current framework. The spring is driven by the motor motion, so it's impossible to know the
+    accel caused by the spring without first knowing the accel without the spring. Attempt saved in try_spring branch.
+    Need multi-part calibration? Simpler model? More complex measurement matrix?
 TODO:
     Validate that d(acc_pred)/dV > 0
     Sub-parameters other than slowness if needed
     Some way to deal with nonlinear parameters like slowness threshold
     look at slowness factor (coulomb (and/or static?) fric too high)
     Better model sticky stops. Spring that stores and releases energy?
-        We need something that springs into action so it starts moving quickly, then oscillates.
+        Springs into action so it starts moving quickly, then oscillates.
         Observed oscillation T = 0.25 to 0.27s
         Take more deadband data to outweigh noise and improve freq graph of deadband only
         Adding slow_omega makes the prediction look more wrong, even if it matches the spikes into motion more closely.
@@ -42,6 +49,7 @@ model_fcns = {
     "hip_leg_weight_12": lambda results: np.sin(results["knee_angle"]),
 }
 
+##################################################################################################
 
 def Model(model, params):
     if params is None:

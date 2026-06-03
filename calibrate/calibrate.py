@@ -3,8 +3,8 @@
 Library for motor calibration
 TODO:
     some way to deal with nonlinear parameters, like slowness threshold
-    deadband model
-        modify angle measurements?
+        Way to set them as model parameters, either definitively or a starting point for nonlinear optimization
+    deadband model: modify angle measurements?
     measure battery voltage during calibration
     why angle jumps? Just remove them from test data?
     electrically isolate angle sensors to reduce noise?
@@ -13,6 +13,7 @@ TODO:
     deadband and low-V squ tests are characteristic like impulse response. We see ringing! Use that to measure response
         fourier analysis (compare F_V(w) with F_acc_pred(w)) to find frequency response of system
         manually first, then cli version
+    Screw a second motor to the calibration motor, short its motor wires, and use it to measure with (2x) backlash?
 
 Created Jun 2021
 @author: Niraj
@@ -44,9 +45,7 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
             clean_up_test_data(this_data, results, filter_params)
             this_data["vel"] = derivative(this_data, "angle")
             this_data["acc"] = derivative(this_data, "vel")
-            this_t = cut_first(this_data["t"], filter_params)
-            new_start_t = results["t"][-1] + (this_t[1] - this_t[0]) if len(results["t"]) > 0 else 0.
-            results["t"] = np.concatenate((results["t"], this_t - this_t[0] + new_start_t))
+            assemble_t(this_data, results, filter_params)
             for m in ["V", "angle", "vel", "acc", "spiky_angle"]:
                 results[m] = np.concatenate((results[m], cut_first(this_data[m], filter_params)))
                 results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m], filter_params)))
@@ -61,7 +60,15 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
         return results
-    
+
+    def assemble_t(this_data, results, filter_params):
+        this_t = cut_first(this_data["t"], filter_params)
+        new_start_t = results["t"][-1] + (this_t[1] - this_t[0]) if len(results["t"]) > 0 else 0.
+        results["t"] = np.concatenate((results["t"], this_t - this_t[0] + new_start_t))
+        if "log_starts" not in results:
+            results["log_starts"] = {}
+        results["log_starts"][new_start_t] = this_data["filename"]
+
     def determine_params(X, acc_f, results, remove_outliers=True):
         paramArr = np.linalg.inv(X.T @ X) @ X.T @ acc_f  # linear least squares
         if remove_outliers:
