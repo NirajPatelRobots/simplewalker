@@ -228,6 +228,7 @@ def graph_contributions(results, combine_V_fric=True):
     for mod, contribution in results["model_contributions"].items():
         plt.plot(results["t"], contribution, label=mod)
     plt.plot(results["t"], results["accel_error"], 'k', label="accel error")
+    plt.plot(results["t"], results["acc_f"], '--', color='gray', zorder=1, label="acc_f")
     plt.title("Model Contributions")
     plt.ylabel("Acc [rad/s^2]")
     plt.legend()
@@ -243,7 +244,7 @@ def main():
           "model [[no] model_name]",
           "code", sep="\n ")
     testdata = []
-    model = ['static_fric', 'const_fric']
+    model = ['static_fric', 'const_fric', 's_punch']
     params = None
     data_path = join(dirname(dirname(__file__)), "data")
     test_type = ""

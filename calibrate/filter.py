@@ -54,6 +54,11 @@ def moving_avg(data, n_samples=1, pad_val=0):
 def derivative(data, name):  # this isn't really a filter but motor_model needs it
     return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
 
+# naive numerical integration. Return (new_pos, new_vel)
+def integration(pos_in: float, v_in: float, a_in: float, dt: float) -> (float, float):
+    new_vel = v_in + a_in * dt
+    return pos_in + (new_vel * dt) + (0.5 * a_in * dt**2), new_vel
+
 
 # Returns smooth continuous threshold with a flat response in both limits (0 and 1)
 # As values -> +inf, return -> 1. As values -> -inf, return -> 0.

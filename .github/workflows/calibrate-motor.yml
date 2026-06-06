@@ -34,7 +34,7 @@ jobs:
       - name: calibrate
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
-          -m static_fric const_fric
+          -m static_fric const_fric s_punch
           -o data/motorparams >> $GITHUB_STEP_SUMMARY
 
       - run: echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> $GITHUB_STEP_SUMMARY
@@ -60,6 +60,14 @@ jobs:
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*_db_*.motortest
           -i data/motorparams >> $GITHUB_STEP_SUMMARY
+
+      - run: echo --- Test calibration without punch ---------------------------------- >> $GITHUB_STEP_SUMMARY
+      - name: calibrate
+        run: >-
+          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
+          -m static_fric const_fric >> $GITHUB_STEP_SUMMARY
+      
+
       - name: Upload calibrated motor parameters
         uses: actions/upload-artifact@v6
         with:

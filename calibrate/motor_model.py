@@ -14,6 +14,9 @@ Fun facts:
     predicted in the current framework. The spring is driven by the motor motion, so it's impossible to know the
     accel caused by the spring without first knowing the accel without the spring. Attempt saved in try_spring branch.
     Need multi-part calibration? Simpler model? More complex measurement matrix?
+    -> Created ModelSpring which takes another model as input
+  - Adding slow_omega makes the prediction look more wrong, even if it matches the spikes into motion more closely.
+    It made the prediction of the return to 0 speed worse! And it fails validation because da/dV < 0 for vel=0!
 TODO:
     Validate that d(acc_pred)/dV > 0
     Sub-parameters other than slowness if needed
@@ -22,13 +25,42 @@ TODO:
     Better model sticky stops. Spring that stores and releases energy?
         Springs into action so it starts moving quickly, then oscillates.
         Observed oscillation T = 0.25 to 0.27s
-        Take more deadband data to outweigh noise and improve freq graph of deadband only
-        Adding slow_omega makes the prediction look more wrong, even if it matches the spikes into motion more closely.
-            It makes the prediction of the return to 0 speed worse! And it fails validation because da/dV < 0 for vel=0!
+            ^ Is that just the filter?
+    Direct counter to low voltage
 """
 
 import numpy as np
-from filter import moving_avg, derivative, continuous_threshold, continuous_sign
+from filter import moving_avg, derivative, continuous_threshold, continuous_sign, integration
+
+
+def Punch(signal, num_points=100, on_thresh=0.1, off_thresh=None, early=True) -> np.ndarray:
+    off_thresh = off_thresh or on_thresh  # default to same
+    old_signal = signal if early else np.roll(signal, num_points)
+    new_signal = np.roll(signal, -num_points) if early else signal
+    punch_force = np.where((np.abs(old_signal) < off_thresh) & (np.abs(new_signal) > on_thresh),
+                           (new_signal - old_signal), 0)
+    punch_force[0:num_points] = np.zeros(num_points)
+    return punch_force
+
+
+def Spring(unsprung_acc, results, freq, damping_eta):
+    w = 2 * np.pi * freq;   k = w**2;   c = 2 * w * damping_eta
+    spring_angle = np.zeros(unsprung_acc.shape)  # the secondary is pulled to the primary by the spring
+    spring_vel = np.zeros(unsprung_acc.shape)
+    spring_acc = np.zeros(unsprung_acc.shape)
+    primary_angle = np.zeros(unsprung_acc.shape)  # the primary has both the unsprung_acc and the spring force on it
+    primary_vel = np.zeros(unsprung_acc.shape)
+    for i in range(1, len(unsprung_acc)):
+        dt = results["t"][i] - results["t"][i - 1]
+        if results["t"][i] in results["log_starts"].keys():
+            for hidden_signal in [spring_angle, spring_vel, primary_angle, primary_vel]:
+                hidden_signal[i] = 0
+        else:
+            spring_acc[i] = k * (primary_angle[i-1] - spring_angle[i-1]) + c * (primary_vel[i-1] - spring_vel[i-1])
+            primary_acc = unsprung_acc[i] - spring_acc[i]
+            spring_angle[i], spring_vel[i] = integration(spring_angle[i - 1], spring_vel[i - 1], spring_acc[i], dt)
+            primary_angle[i], primary_vel[i] = integration(primary_angle[i - 1], primary_vel[i - 1], primary_acc, dt)
+    return spring_acc
 
 
 model_fcns = {
@@ -38,6 +70,13 @@ model_fcns = {
     "const_opposing_fric": lambda results:
     results["sign_vel_f"] * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), 1, 0),
     "static_fric": lambda results:       results["slowness"] * results["V_f"],
+
+    # speed or Voltage punch "kicks-in" as signal is starting up
+    "s_punch": lambda results:           Punch(results["vel_f"], num_points=95, on_thresh=0.05, early=False),
+    "V_punch": lambda results:           Punch(results["V_f"],   num_points=130, on_thresh=0.5, off_thresh=0.4, early=False),
+    "sharp_punch": lambda results:       Punch(results["vel_f"], num_points=50, on_thresh=0.05, early=False),
+    "early_punch": lambda results:       Punch(results["vel_f"], num_points=80, on_thresh=0.05, early=True),
+    "spring_punch": lambda results:      Spring(Punch(results["vel_f"], num_points=10, on_thresh=0.05), results, 3, 0.1),
 
     "slow_omega": lambda results:        results["slowness"] * results["vel_f"],
     "sign_V": lambda results:            continuous_sign(results["V_f"], 0.15, 12),
