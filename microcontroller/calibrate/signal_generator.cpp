@@ -55,11 +55,8 @@ public:
                 place = 0;
             }
         } else {
-            if (place < 4 * square_length)      V = 0.0;
-            else { //finally done
-                is_finished = true;
-                return V;
-            }
+            V = 0.0;
+            is_finished = true;
         }
         return V;
     }

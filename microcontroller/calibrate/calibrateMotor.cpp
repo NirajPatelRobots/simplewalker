@@ -27,7 +27,6 @@ public:
     shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> state_outbox;
     shared_ptr<MotorCalibrationTriggerMsg> instructions;
     std::unique_ptr<ExcitationSignalGenerator> generator;
-    int startup_stationary_samples = 50;
     MotorCalibrationStatus status {MOTORCAL_IDLE};
 
     MotorCalibrator()
@@ -49,7 +48,7 @@ public:
     }
 
     int calibrate_motor() {
-        float V = 0.0, lastV = 0.0, angle = 0.0, angVel = 0.0; //[V], [V], [rad], [rad/s]
+        float angVel = 0.0;
         generator = make_signal_generator(MotorCalibrationInputType(instructions->input_signal_type),
                                           instructions->frequency * instructions->dt,
                                           instructions->amplitude);
@@ -64,33 +63,39 @@ public:
 
         return_motor_to_start();
         status = MOTORCAL_RUNNING;
-        startup_stationary_samples = floor(1.0 / instructions->dt);
+        int startup_stationary_samples = floor(0.75 / instructions->dt);
+        int ending_stationary_samples = floor(0.75 / instructions->dt);
         absolute_time_t looptarget = get_absolute_time();
         absolute_time_t start_time = looptarget;
         for(int i = 0; i < startup_stationary_samples; i++) {
-            angle = read_angle();
-            angVel = calc_angvel(angle);
-            report_result(angle, angVel, V, (looptarget - start_time) * 1e-6);
-            looptarget = delayed_by_us(looptarget, (uint64_t)(instructions->dt * 1e6));
-            sleep_until(looptarget);
+            if (!do_loop(0.0, angVel, looptarget, start_time))
+                break;
         }
         while(!generator->is_finished) {
-            V = generator->get_next_value(angVel);
-            motors_IO->set_battery_voltage(ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL));
-            if (!safely_set_motor(V, angle)) return -1;
-            angle = read_angle();
-            angVel = calc_angvel(angle);
-            report_result(angle, angVel, lastV, (looptarget - start_time) * 1e-6);
-            lastV = V; // shift i+1 because causality. So V[i] affects angle[i]
-            looptarget = delayed_by_us(looptarget, (uint64_t)(instructions->dt * 1e6));
-            sleep_until(looptarget);
+            if (!do_loop(generator->get_next_value(angVel), angVel, looptarget, start_time))
+                break;
         }
+        for(int i = 0; i < ending_stationary_samples; i++) {
+            if (!do_loop(0.0, angVel, looptarget, start_time))
+                break;
+        }
+        motors_IO->set_motor_voltage(instructions->motorNum, 0);
         sleep_us(floor(instructions->dt * 1e6));
         printf("finished calibration\n");
         status = MOTORCAL_IDLE;
-        motors_IO->set_motor_voltage(instructions->motorNum, 0);
         sleep_us(floor(instructions->dt * 1e6));
         return 0;
+    }
+
+    bool do_loop(float V, float &angVel, absolute_time_t &looptarget, absolute_time_t start_time) {
+        motors_IO->set_battery_voltage(ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL));
+        float angle = read_angle();
+        if (!safely_set_motor(V, angle)) return false;
+        angVel = calc_angvel(angle);
+        report_result(angle, angVel, V, (looptarget - start_time) * 1e-6);
+        looptarget = delayed_by_us(looptarget, (uint64_t)(instructions->dt * 1e6));
+        sleep_until(looptarget);
+        return true;
     }
 
     bool safely_set_motor(float voltage, float angle) {
