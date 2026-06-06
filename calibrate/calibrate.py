@@ -35,8 +35,10 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
     Motor model d2(angle)/dt2 = param[V] * V + param[omega] * d(angle)/dt
     model is a list of strings naming additional model dynamics"""
 
-    def filter_and_derivative_and_assemble(testdata, filter_params) -> dict[str, np.ndarray | float]:
-        results = {m: np.empty(0) for m in ["t", "angle_hf", "spiky_angle_hf"]
+    results_t = dict[str, float | int | np.ndarray | np.float64 | np.int64 | dict]
+
+    def filter_and_derivative_and_assemble(testdata, filter_params) -> results_t:
+        results: results_t = {m: np.empty(0) for m in ["t", "angle_hf", "spiky_angle_hf"]
                    + [n + f for n in ["V", "angle", "vel", "acc", "spiky_angle"] for f in ("", "_f")]}
         for this_data in testdata:
             if filter_params.T is not None:
@@ -131,12 +133,32 @@ def printMotorResults(params, results):
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
     print("Regression R^2:", round(results["R^2_with_outliers"], 3))
-    print(f'\tWithout {results["num_outliers"]} outliers:')
+    print(f'\t-Without {results["num_outliers"]} outliers:')
     print("Average error =", round(np.nanmean(np.abs(results["accel_error_nan"])), 3), "rad/s^2, Average acceleration",
           round(results["avg_acc_no_outliers"], 3), "rad/s^2")
     results["error_std_dev_clean"] = np.nanstd(np.abs(results["accel_error_nan"]))
     print("Error std dev:", round(results["error_std_dev_clean"], 3), "rad/s^2")
     print("Regression R^2:", round(results["R^2_no_outliers"], 3))
+
+
+def saveResultsJson(filename, results, model):
+    from os import path; import json
+    if path.exists(filename):
+        with open(filename) as inFile:
+            output = json.load(inFile)
+    else:
+        output = {"tests": []}
+    this_test = {}
+    for k, v in results.items():
+        if (type(v) in [np.ndarray, np.float64] and v.size == 1) or type(v) is float:
+            this_test[k] = float(v)
+        if (type(v) is np.int64 and v.size == 1) or type(v) is int:
+            this_test[k] = int(v)
+    this_test["model"] = " ".join(model)
+    this_test["input_file_prefix"] = path.commonprefix(list(results["log_starts"].values()))
+    output["tests"].append(this_test)
+    with open(filename, "w") as outFile:
+        json.dump(output, outFile, indent=2)
 
 
 def loadRun(filename):
@@ -163,7 +185,6 @@ def clean_up_test_data(this_data, results, filter_params):
         for m in ["V", "angle", "t"]:
             this_data[m] = this_data[m][:index_last]
 
-    startTime = time.time()
     remove_idle_messages(this_data)
     # save "spiky_angle" so we can overwrite testdata["angle"] with clean_angle
     this_data["spiky_angle"] = this_data["angle"]
@@ -174,5 +195,3 @@ def clean_up_test_data(this_data, results, filter_params):
     FILT_MOVING_AVG_N = 10  # mostly to counter value quantization. After spike removal, before lowpass.
     assert(FILT_MOVING_AVG_N < filter_params.N)
     this_data["angle"] = moving_avg(this_data["angle"], n_samples=FILT_MOVING_AVG_N, pad_val=this_data["angle"][0])
-    duration = time.time() - startTime
-    results["data clean time"] = results["data clean time"] + duration if "data clean time" in results else duration

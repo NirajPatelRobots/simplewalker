@@ -6,7 +6,7 @@
 import argparse
 import glob
 from os.path import basename, splitext, commonprefix
-from calibrate import loadRun, examineMotor, printMotorResults, FilterParams
+from calibrate import loadRun, examineMotor, printMotorResults, FilterParams, saveResultsJson
 from motor_model import saveParams, loadParams
 
 
@@ -15,6 +15,7 @@ def parse_args(src=None):
     parser.add_argument("filenames", nargs='+', help="Input .motortest files")
     parser.add_argument("-m", "--model", nargs='+',
                         help="Names of model parameters. V and vel are always in the model. Ignored if -i is set.")
+    parser.add_argument("--results-json")
     io_group = parser.add_mutually_exclusive_group()
     io_group.add_argument("-i", "--params-in",
                           help="Skip parameter determination and load params from this file instead")
@@ -45,6 +46,8 @@ def main():
     printMotorResults(params, results)
     if args.params_out is not None:
         saveParams(params, args.params_out)
+    if args.results_json is not None:
+        saveResultsJson(args.results_json, results, params.keys())
 
 
 if __name__ == "__main__":
