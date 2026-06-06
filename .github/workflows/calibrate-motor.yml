@@ -39,12 +39,6 @@ jobs:
           -m static_fric const_fric s_punch
           -o data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> cal_summary.txt
-      - name: Test calibration @ filter_cutoff = 0.1s
-        run: >-
-          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -T 0.1
-          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
-
       - run: echo --- Test calibration on squares ----------------------------------- >> cal_summary.txt
       - name: Test calibration on squares
         run: >-
@@ -68,6 +62,12 @@ jobs:
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
           -m static_fric const_fric --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> cal_summary.txt
+      - name: Test calibration @ filter_cutoff = 0.1s
+        run: >-
+          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -T 0.1
+          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: >- 
           scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period
