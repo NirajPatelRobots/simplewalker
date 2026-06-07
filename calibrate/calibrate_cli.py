@@ -1,7 +1,6 @@
 """ TODO:
     Separate sub-commands for train and test (and fourier analysis?)
     Load model but not params from file, maybe plaintext list of model names?
-    dump results to file? to display in tables?
 """
 import argparse
 import glob

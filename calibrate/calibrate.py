@@ -92,14 +92,20 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         results["error_std_dev"] = np.std(accel_error)
         results["outlier_thresh"] = 3 * results["error_std_dev"]
         results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
+        results["outlier%"] = results["num_outliers"] / results["N"] * 100
         results["accel_error"] = accel_error
+        results["avg_error"] = np.average(np.abs(accel_error))
         results["R^2_with_outliers"] = 1 - np.sum(accel_error**2) / np.sum(results["acc_f"]**2)
         results["accel_error_nan"] = np.where(np.abs(accel_error) < results["outlier_thresh"], accel_error, np.nan)
         acc_f_nan = np.where(np.abs(accel_error) < results["outlier_thresh"], results["acc_f"], np.nan)
         results["avg_acc_no_outliers"] = np.nanmean(np.abs(acc_f_nan))
         results["R^2_no_outliers"] = 1 - np.nansum(results["accel_error_nan"]**2) / np.nansum(acc_f_nan**2)
+        results["avg_error_no_outs"] = np.nanmean(np.abs(results["accel_error_nan"]))
+        results["error_std_dev_no_outs"] = np.nanstd(np.abs(results["accel_error_nan"]))
         results["dt"] = float(np.mean(results["diff_t"]))
         results["dt_std_dev"] = float(np.std(np.where(results["diff_t"] > 10 * results["dt"], results["dt"], results["diff_t"])))
+        minutes, seconds = divmod(int(np.max(results["t"])), 60)
+        results["runtime"] = f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s'
         results["fft_freqs"] = None
         if results["dt_std_dev"] / results["dt"] < 0.01:  # if dt is stable to within 1% precision
             results["fft_freqs"] = rfftfreq(results["N"], results["dt"])
@@ -124,20 +130,17 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
 
 
 def printMotorResults(params, results):
-    minutes, seconds = divmod(int(np.max(results["t"])), 60)
-    print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total data runtime:',
-          f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s')
+    print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total runtime:', results["runtime"])
     print("Parameters:", params, end="\n\n")
     print(f'Filter nyquist period [s]: {2 * results["filter_period"]:.3}')
-    print("Average error =", round(np.average(np.abs(results["accel_error"])), 3), "rad/s^2, Average acceleration",
+    print("Average error =", round(results["avg_error"], 3), "rad/s^2, Average acceleration =",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
     print("Regression R^2:", round(results["R^2_with_outliers"], 3))
-    print(f'\t-Without {results["num_outliers"]} outliers:')
-    print("Average error =", round(np.nanmean(np.abs(results["accel_error_nan"])), 3), "rad/s^2, Average acceleration",
+    print(f'\t-Without {results["num_outliers"]} outliers ({round(results["outlier%"], 2)}%):')
+    print("Average error =", round(results["avg_error_no_outs"], 3), "rad/s^2, Average acceleration",
           round(results["avg_acc_no_outliers"], 3), "rad/s^2")
-    results["error_std_dev_clean"] = np.nanstd(np.abs(results["accel_error_nan"]))
-    print("Error std dev:", round(results["error_std_dev_clean"], 3), "rad/s^2")
+    print("Error std dev:", round(results["error_std_dev_no_outs"], 3), "rad/s^2")
     print("Regression R^2:", round(results["R^2_no_outliers"], 3))
 
 
@@ -152,10 +155,12 @@ def saveResultsJson(filename, results, model):
     for k, v in results.items():
         if (type(v) in [np.ndarray, np.float64] and v.size == 1) or type(v) is float:
             this_test[k] = float(v)
-        if (type(v) is np.int64 and v.size == 1) or type(v) is int:
+        elif (type(v) is np.int64 and v.size == 1) or type(v) is int:
             this_test[k] = int(v)
+        elif type(v) is str:
+            this_test[k] = v
     this_test["model"] = " ".join(model)
-    this_test["input_file_prefix"] = path.commonprefix(list(results["log_starts"].values()))
+    this_test["input_file_prefix"] = path.commonprefix(list(results["log_starts"].values())).split("/")[-1]
     output["tests"].append(this_test)
     with open(filename, "w") as outFile:
         json.dump(output, outFile, indent=2)

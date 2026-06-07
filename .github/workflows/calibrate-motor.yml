@@ -39,31 +39,31 @@ jobs:
           -m static_fric const_fric s_punch
           -o data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo --- Test calibration on squares ----------------------------------- >> cal_summary.txt
+      - run: echo && echo --- Test calibration on squares ----------------------------------- >> cal_summary.txt
       - name: Test calibration on squares
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*_squ_*.motortest
           -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo --- Test calibration on sines ------------------------------------- >> cal_summary.txt
+      - run: echo && echo --- Test calibration on sines ------------------------------------- >> cal_summary.txt
       - name: Test calibration on sines
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*_sin_*.motortest
           -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo --- Test calibration on deadband ---------------------------------- >> cal_summary.txt
+      - run: echo && echo --- Test calibration on deadband ---------------------------------- >> cal_summary.txt
       - name: Test calibration on deadband
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*_db_*.motortest
           -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo --- Test calibration without punch ---------------------------------- >> cal_summary.txt
+      - run: echo && echo --- Test calibration without punch ---------------------------------- >> cal_summary.txt
       - name: calibrate
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
           -m static_fric const_fric --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> cal_summary.txt
+      - run: echo && echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> cal_summary.txt
       - name: Test calibration @ filter_cutoff = 0.1s
         run: >-
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -T 0.1
@@ -71,7 +71,7 @@ jobs:
 
       - run: >- 
           scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period
-          --ignore dt dt_std_dev outlier_thresh --precision 4 >> $GITHUB_STEP_SUMMARY
+          --ignore dt dt_std_dev outlier_thresh N num_outliers --precision 3 >> $GITHUB_STEP_SUMMARY
       - run: cat cal_summary.txt >> $GITHUB_STEP_SUMMARY
 
       - name: Upload calibrated motor parameters

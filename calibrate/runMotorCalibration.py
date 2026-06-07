@@ -7,6 +7,7 @@ TODO:
     receive binary data from controller
     remove angvel from text comm (removed from MotorCalibrationStateMsg)
     measure battery voltage during calibration
+    improve stdout display
     compare reported controller time with system time?
 
 Created Jun 2021, reworked late 2023
