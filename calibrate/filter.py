@@ -6,6 +6,7 @@ TODO:
 """
 import numpy as np
 from scipy import signal
+from scipy.fft import rfft, rfftfreq
 from dataclasses import dataclass
 
 
@@ -28,6 +29,26 @@ class FilterParams:
         else:
             self.lowpass_sos = signal.butter(self.order, 1/N, 'lowpass', output='sos')
             self.hipass_sos  = signal.butter(self.order, 1/N, 'highpass', output='sos')
+
+
+class FourierAnalysis:
+    def __init__(self, results: dict, filter_params: FilterParams):
+        self.valid = (results["dt_std_dev"] / results["dt"] < 0.01)  # dt is stable to within 1% precision
+        if not self.valid:
+            print(f'timestep is too variable for fft. Implement slow fourier transforms. {results["dt_std_dev"]=}')
+            return
+        self.freqs = rfftfreq(results["N"], results["dt"])
+        self.window = signal.windows.blackman(results["N"])
+        try:
+            self.w, self.h = signal.freqz_sos(filter_params.lowpass_sos, fs=1/results["dt"])
+        except AttributeError:
+            self.w, self.h = signal.sosfreqz(filter_params.lowpass_sos, fs=1/results["dt"])
+
+
+class FourierSignal:
+    def __init__(self, results, name, fourier: FourierAnalysis):
+        self.fourier_signal = rfft(results[name] * fourier.window)
+        self.signal_mag = 2.0 / results["N"] * np.abs(self.fourier_signal)
 
 
 def filter_data(data, filter_params=FilterParams(), type='lowpass', cut=True):

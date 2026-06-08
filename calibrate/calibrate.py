@@ -10,9 +10,8 @@ TODO:
     electrically isolate angle sensors to reduce noise?
     structure: clear flow of sensor data -> /(sensor model) -> believed true values -> /(motor model) -> prediction
     prediction accuracy as fcn of vel?
-    deadband and low-V squ tests are characteristic like impulse response. We see ringing! Use that to measure response
-        fourier analysis (compare F_V(w) with F_acc_pred(w)) to find frequency response of system
-        manually first, then cli version
+    fourier analysis (compare F_V(w) with F_acc_pred(w)) to find frequency response of system
+        Is there any way or reason to have cli fourier analysis?
     Screw a second motor to the calibration motor, short its motor wires, and use it to measure with (2x) backlash?
 
 Created Jun 2021
@@ -20,7 +19,6 @@ Created Jun 2021
 """
 
 import numpy as np
-from scipy.fft import rfftfreq
 import time
 from filter import FilterParams, filter_data, cut_first, moving_avg, derivative, remove_spikes
 import motor_model
@@ -35,7 +33,7 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
     Motor model d2(angle)/dt2 = param[V] * V + param[omega] * d(angle)/dt
     model is a list of strings naming additional model dynamics"""
 
-    results_t = dict[str, float | int | np.ndarray | np.float64 | np.int64 | dict]
+    results_t = dict[str, float | int | np.ndarray | np.float64 | np.int64 | dict | str]
 
     def filter_and_derivative_and_assemble(testdata, filter_params) -> results_t:
         results: results_t = {m: np.empty(0) for m in ["t", "angle_hf", "spiky_angle_hf"]
@@ -106,9 +104,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         results["dt_std_dev"] = float(np.std(np.where(results["diff_t"] > 10 * results["dt"], results["dt"], results["diff_t"])))
         minutes, seconds = divmod(int(np.max(results["t"])), 60)
         results["runtime"] = f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s'
-        results["fft_freqs"] = None
-        if results["dt_std_dev"] / results["dt"] < 0.01:  # if dt is stable to within 1% precision
-            results["fft_freqs"] = rfftfreq(results["N"], results["dt"])
 
     if len(testdata) == 0:
         raise ValueError("No testdata")

@@ -5,8 +5,6 @@ TODO:
     graph slowness factor and acceleration / accel error
     fancy modern interactive data frontend?
 """
-from scipy import signal, stats
-from scipy.fft import rfft
 import matplotlib.pyplot as plt
 import numpy as np
 from os import listdir
@@ -14,7 +12,7 @@ from os.path import isfile, join, dirname, splitext
 import sys
 
 from calibrate import loadRun, examineMotor, printMotorResults
-from filter import moving_avg, FilterParams
+from filter import moving_avg, FilterParams, FourierAnalysis, FourierSignal
 from motor_model import saveParams, loadParams
 
 
@@ -28,11 +26,12 @@ def graphMotorResults(results, filter_params):
     graph_acc_predict(results)
     graph_time_error(results)
     # graph_error_stats(results)
+    fourier = FourierAnalysis(results, filter_params)
     graph_high_freq(results)
-    graph_signal_filter_frequencies(results, "angle", 'rad', 10, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5, also="spiky_angle")
-    graph_signal_filter_frequencies(results, "acc", 'rad/s^2', 11, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
-    graph_signal_filter_frequencies(results, "V", 'Volts', 12, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
-    graph_signal_filter_frequencies(results, "accel_error", 'rad/s^2', 13, filter_params=filter_params, x_max_filter_cutoff_multipler=1.5)
+    graph_signal_filter_frequencies(results, "angle", 'rad', fourier, num=10, x_max_filt_cutoff_mult=1.5, also="spiky_angle")
+    graph_signal_filter_frequencies(results, "acc", 'rad/s^2', fourier, num=11, x_max_filt_cutoff_mult=1.5)
+    graph_signal_filter_frequencies(results, "V", 'Volts', fourier, num=12, x_max_filt_cutoff_mult=1.5)
+    graph_signal_filter_frequencies(results, "accel_error", 'rad/s^2', fourier, num=13, x_max_filt_cutoff_mult=1.5)
     graph_contributions(results)
     plt.show()
 
@@ -121,6 +120,7 @@ def graph_acc_predict(results):
     plt.grid()
 
 def graph_error_stats(results):
+    from scipy import stats
     plt.figure(7, clear=True)
     accel_error = results["accel_error"]
     _, x, _ = plt.hist([accel_error, results["accel_error_nan"]], bins="auto", label=["all", "clean"], log=True)
@@ -143,68 +143,52 @@ def graph_time_error(results):
     plt.ylabel("Change in time [s]")
     plt.grid()
 
-def graph_signal_filter_frequencies(results, name, unit, num=None, filter_params=FilterParams(),
-                                    x_max_filter_cutoff_multipler=None, also=None, moving_avg_pts=10):
-    freqs = results["fft_freqs"]
-    if results["fft_freqs"] is None:
-        print(f'timestep is too variable for fft. Implement slow fourier transforms. {results["dt_std_dev"]=}')
+def graph_signal_filter_frequencies(results, name, unit, fourier: FourierAnalysis, num=None,
+                                    x_max_filt_cutoff_mult=None, also=None, moving_avg_pts=10):
+    def plot_mag(axs, freqs, signal_mag, fmt, label, zorder=2):
+        axs[0].plot(freqs, signal_mag, fmt, zorder=zorder, label=label)
+        axs[1].plot(freqs, 20 * np.log10(signal_mag), fmt, zorder=zorder, label=label)
+
+    def plot_filter(ax, f, desc, filter_desc=None):
+        twin_ax = ax.twinx()
+        twin_ax.plot(fourier.w, f, 'b', label='filter')
+        twin_ax.set_ylabel(f"Filter {filter_desc or desc} (blue)")
+        ax.set_ylabel(f"Signal {desc}")
+
+    if not fourier.valid:
         return
+    freqs = fourier.freqs
     name_f = name + "_f"
-    window = signal.windows.blackman(results["N"])
-    data_fourier = rfft(results[name] * window)
-    filtered_fourier = rfft(results[name_f] * window) if name_f in results else None
-    also_fourier = rfft(results[also] * window) if also is not None else None
-    data_mag = 2.0/results["N"] * np.abs(data_fourier)
-    filtered_mag = 2.0/results["N"] * np.abs(filtered_fourier) if filtered_fourier is not None else None
-    also_mag = 2.0/results["N"] * np.abs(also_fourier) if also is not None else None
-    data_mag_smooth = moving_avg(data_mag, moving_avg_pts, np.nan)
-    also_mag_smooth = moving_avg(also_mag, moving_avg_pts, np.nan) if also is not None else None
-    try:
-        w, h = signal.freqz_sos(filter_params.lowpass_sos, fs=1/results["dt"])
-    except AttributeError:
-        w, h = signal.sosfreqz(filter_params.lowpass_sos, fs=1/results["dt"])
+    data_fourier = FourierSignal(results, name, fourier)
+    data_mag_smooth = moving_avg(data_fourier.signal_mag, moving_avg_pts, np.nan)
 
     fig, axs = plt.subplots(num=num, nrows=3, sharex='all', figsize=(8, 10), clear=True)
-    axs[0].plot(freqs, data_mag_smooth, 'C1', zorder=4, label="moving avg")
+    plot_mag(axs, freqs, data_mag_smooth, 'C1', "moving avg", zorder=4)
     axs[0].set_ylim(axs[0].get_ylim())
-    axs[0].plot(freqs, data_mag, '.', color='C2', label=name)
-    if filtered_fourier is not None:
-        axs[0].plot(freqs, filtered_mag, '.', color='C3', label=name_f)
-    if also is not None:
-        axs[0].plot(freqs, also_mag, '.', color='C4', zorder=1, label=also)
-        axs[0].plot(freqs, also_mag_smooth, color='C5', zorder=3, label=also+'_avg')
-    twin_ax0 = axs[0].twinx()
-    twin_ax0.plot(w, np.abs(h), 'b', label='filter')
-    twin_ax0.set_ylabel("Filter Magnitude (blue)")
-    axs[0].set_ylabel(f"Signal Magnitude [{unit}]")
-
-    axs[1].plot(freqs, 20 * np.log10(data_mag_smooth), 'C1', zorder=4, label="moving avg")
     axs[1].set_ylim(axs[1].get_ylim())
-    axs[1].plot(freqs, 20 * np.log10(data_mag), '.', color='C2', label=name)
-    if filtered_fourier is not None:
-        axs[1].plot(freqs, 20 * np.log10(filtered_mag), '.', color='C3', label=name_f)
-    if also is not None:
-        axs[1].plot(freqs, 20 * np.log10(also_mag), '.', color='C4', zorder=1, label=also)
-        axs[1].plot(freqs, 20 * np.log10(also_mag_smooth), color='C5', zorder=3, label=also+'avg')
-    twin_ax1 = axs[1].twinx()
-    twin_ax1.plot(w, 20 * np.log10(np.abs(h)), 'b', label='filter')
-    twin_ax1.set_ylabel("Filter Amplitude (blue) [dB]")
-    axs[1].set_ylabel("Signal Amplitude [dB]")
+    plot_mag(axs, freqs, data_fourier.signal_mag, '.C2', name)
 
-    axs[2].plot(freqs, np.unwrap(np.angle(data_fourier)), 'g', label=name)
+    plot_filter(axs[0], np.abs(fourier.h),                f"Magnitude [{unit}]", "Magnitude")
+    plot_filter(axs[1], 20 * np.log10(np.abs(fourier.h)), "Amplitude [dB]")
+    plot_filter(axs[2], np.unwrap(np.angle(fourier.h)),   "Angle [rad]")
+
+    axs[2].plot(freqs, np.unwrap(np.angle(data_fourier.fourier_signal)), 'g', label=name)
     axs[2].set_ylim(axs[2].get_ylim())
-    if filtered_fourier is not None:
-        axs[2].plot(freqs, np.unwrap(np.angle(filtered_fourier)), 'r', label=name_f)  # goodbye
-    twin_ax2 = axs[2].twinx()
-    twin_ax2.plot(w, np.unwrap(np.angle(h)), 'b', label='filter')
-    twin_ax2.set_ylabel("Filter Angle (blue) [rad]")
-    axs[2].set_ylabel("Signal Angles [rad]")
+    if name_f in results:
+        filtered_fourier = FourierSignal(results, name_f, fourier)
+        plot_mag(axs, freqs, filtered_fourier.signal_mag, '.C3', name_f)
+        axs[2].plot(freqs, np.unwrap(np.angle(filtered_fourier.fourier_signal)), 'r', label=name_f)  # goodbye
+    if also is not None:
+        also_fourier = FourierSignal(results, also, fourier)
+        also_mag_smooth = moving_avg(also_fourier.signal_mag, moving_avg_pts, np.nan)
+        plot_mag(axs, freqs, also_fourier.signal_mag, '.C4', also, zorder=1)
+        plot_mag(axs, freqs, also_mag_smooth, 'C5', also+'_avg', zorder=3)
 
     for i in range(3):
         axs[i].grid()
         axs[i].axvline(1 / results["filter_period"], color='k', linestyle='--', label="filter cutoff")
-        if x_max_filter_cutoff_multipler:
-            axs[i].set_xlim(left=0, right=x_max_filter_cutoff_multipler / results["filter_period"])
+        if x_max_filt_cutoff_mult:
+            axs[i].set_xlim(left=0, right=x_max_filt_cutoff_mult / results["filter_period"])
     axs[2].set_xlabel("frequency [Hz]")
     axs[0].set_title(f"Fourier Transform ({name})")
     axs[0].legend()
