@@ -59,6 +59,7 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         print(f"Angle noise std_dev [mrad]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
+        results["filter_desc"] = str(filter_params)
         return results
 
     def assemble_t(this_data, results, filter_params):
@@ -127,7 +128,7 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
 def printMotorResults(params, results):
     print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total runtime:', results["runtime"])
     print("Parameters:", params, end="\n\n")
-    print(f'Filter nyquist period [s]: {2 * results["filter_period"]:.3}')
+    print(f'{results["filter_desc"]} filter; Period={round(results["filter_period"] * 1000)}ms')
     print("Average error =", round(results["avg_error"], 3), "rad/s^2, Average acceleration =",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
@@ -156,6 +157,9 @@ def saveResultsJson(filename, results, model):
             this_test[k] = v
     this_test["model"] = " ".join(model)
     this_test["input_file_prefix"] = path.commonprefix(list(results["log_starts"].values())).split("/")[-1]
+    for test in output["tests"]:
+        if all([k in test and test[k] == v for k, v in this_test.items()]):
+            return
     output["tests"].append(this_test)
     with open(filename, "w") as outFile:
         json.dump(output, outFile, indent=2)
@@ -191,7 +195,6 @@ def clean_up_test_data(this_data, results, filter_params):
     # the angle is fuzzy, with noticeable spikes down from a probable true value. Remove those.
     this_data["angle"] = remove_spikes(this_data["angle"], [False], max_up_spike_width=2)
     this_data["angle"] = remove_spikes(this_data["angle"], [True], max_down_spike_width=4)
-    # this_data["angle"] = remove_spikes(this_data["angle"], [False, True], recalc_change=True)
-    FILT_MOVING_AVG_N = 10  # mostly to counter value quantization. After spike removal, before lowpass.
-    assert(FILT_MOVING_AVG_N < filter_params.N)
-    this_data["angle"] = moving_avg(this_data["angle"], n_samples=FILT_MOVING_AVG_N, pad_val=this_data["angle"][0])
+    # moving average, mostly to counter value quantization. After spike removal, before lowpass.
+    this_data["angle"] = moving_avg(this_data["angle"], n_samples=filter_params.angle_moving_avg_N,
+                                    pad_val=this_data["angle"][0])

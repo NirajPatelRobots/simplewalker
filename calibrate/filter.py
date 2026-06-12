@@ -1,34 +1,53 @@
 """ filtering for offline calibration
 TODO:
     remove spikes: better removal of spikes that swing positive and negative
-    more digital filter tuning (IIR vs FIR?)
     continuous_threshold get closer to 0
+    filter_data() compensate for delay? FIR delay = order / 2
+    organize chain of filters: spike removal -> moving_avg -> lowpass. DataCleaner?
 """
 import numpy as np
 from scipy import signal
 from scipy.fft import rfft, rfftfreq
 from dataclasses import dataclass
 
+DEFAULT_FILTER_CUTOFF_N = 120
+DEFAULT_IIR_ORDER = 6
+DEFAULT_FIR_ORDER = 250
+CUT_FIRST_N_MULT = 2
+DEFAULT_ANGLE_MOVING_AVG_SAMPLES = 10
+
 
 @dataclass
 class FilterParams:
-    T: int = None
-    N: int = 60
-    order: int = 6
+    T: float = None
+    N: int = None
+    order: int = None
     fcn: str = "butter"   # 'cheby'
     ripple: float = 0.5  # only applies to cheby filters
+    angle_moving_avg_N: int = None
     def __post_init__(self):
-        self.set_N(self.N if self.N is not None else 60)
+        if self.order is None:
+            self.order = DEFAULT_FIR_ORDER if self.fcn == "fir" else DEFAULT_IIR_ORDER
+        self.set_N(self.N if self.N is not None else DEFAULT_FILTER_CUTOFF_N)
+        self.angle_moving_avg_N = self.angle_moving_avg_N or DEFAULT_ANGLE_MOVING_AVG_SAMPLES
+        assert(self.angle_moving_avg_N < self.N)
+
     def set_N(self, N: int | None, t_data: np.ndarray = None):
-        if N is None:
-            N = np.argmax(t_data > self.T) - 1
-        self.N = N
+        self.N = N if (self.T is None or t_data is None) else self.N_from_T(t_data)
         if self.fcn == 'cheby':
-            self.lowpass_sos = signal.cheby1(self.order, self.ripple, 1/N, 'lowpass',  output='sos')
-            self.hipass_sos  = signal.cheby1(self.order, self.ripple, 1/N, 'highpass', output='sos')
-        else:
-            self.lowpass_sos = signal.butter(self.order, 1/N, 'lowpass', output='sos')
-            self.hipass_sos  = signal.butter(self.order, 1/N, 'highpass', output='sos')
+            self.loPass_polynom = signal.cheby1(self.order, self.ripple, 2 / self.N, 'lowpass')
+            self.hiPass_polynom = signal.cheby1(self.order, self.ripple, 2 / self.N, 'highpass')
+        elif self.fcn == "butter":
+            self.loPass_polynom = signal.butter(self.order, 2 / self.N, 'lowpass')
+            self.hiPass_polynom = signal.butter(self.order, 2 / self.N, 'highpass')
+        elif self.fcn == "fir":
+            self.loPass_polynom = signal.firwin(self.order + 1, 2 / self.N), 1.0
+            self.hiPass_polynom = signal.firwin(self.order + 1, 2 / self.N, pass_zero='highpass'), 1.0
+    def N_from_T(self, t_data):
+        return np.argmax(t_data > self.T) - 1
+
+    def __str__(self):
+        return f"N={self.N} order={self.order} {self.fcn}"
 
 
 class FourierAnalysis:
@@ -39,33 +58,32 @@ class FourierAnalysis:
             return
         self.freqs = rfftfreq(results["N"], results["dt"])
         self.window = signal.windows.blackman(results["N"])
-        try:
-            self.w, self.h = signal.freqz_sos(filter_params.lowpass_sos, fs=1/results["dt"])
-        except AttributeError:
-            self.w, self.h = signal.sosfreqz(filter_params.lowpass_sos, fs=1/results["dt"])
+        self.w, self.h = signal.freqz(filter_params.loPass_polynom[0], filter_params.loPass_polynom[1],
+                                      fs=1/results["dt"])
 
 
 class FourierSignal:
-    def __init__(self, results, name, fourier: FourierAnalysis):
+    def __init__(self, results, name, fourier: FourierAnalysis, moving_avg_points=None):
         self.fourier_signal = rfft(results[name] * fourier.window)
         self.signal_mag = 2.0 / results["N"] * np.abs(self.fourier_signal)
+        if moving_avg_points is None:
+            self.smooth_mag = None
+        else:
+            self.smooth_mag = moving_avg(self.signal_mag, moving_avg_points, np.nan)
 
 
 def filter_data(data, filter_params=FilterParams(), type='lowpass', cut=True):
     n_suspicious_filtered = filter_params.N * 2
     padded_data = np.concatenate((np.average(data[:n_suspicious_filtered]) * np.ones(n_suspicious_filtered), data))
-    if type == 'lowpass' or type == 'low':
-        filtered = signal.sosfilt(filter_params.lowpass_sos, padded_data)
-    else:
-        filtered = signal.sosfilt(filter_params.hipass_sos, padded_data)
-    filtered = filtered[n_suspicious_filtered:]
+    filt_polynom = filter_params.loPass_polynom if type == 'lowpass' or type == 'low' else filter_params.hiPass_polynom
+    filtered = signal.lfilter(filt_polynom[0], filt_polynom[1], padded_data)[n_suspicious_filtered:]
     if cut:
         filtered = cut_first(filtered, filter_params)
     return filtered
 
 
 def cut_first(data, filter_params):
-    return data[filter_params.N * 4:]
+    return data[filter_params.N * CUT_FIRST_N_MULT:]
 
 
 def moving_avg(data, n_samples=1, pad_val=0):

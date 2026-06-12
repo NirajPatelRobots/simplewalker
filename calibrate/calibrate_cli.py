@@ -23,8 +23,9 @@ def parse_args(src=None):
     filter_N_group = filter_group.add_mutually_exclusive_group()
     filter_N_group.add_argument("-T", "--filt-period", type=float)
     filter_N_group.add_argument("-N", "--filt-samples", type=int)
-    filter_group.add_argument("--filt-order", default=6, type=int)
-    filter_group.add_argument("--filt-fcn", choices=['butter', 'cheby'], default="butter")
+    filter_group.add_argument("--filt-order", type=int)
+    filter_group.add_argument("--filt-fcn", choices=['butter', 'cheby', 'fir'], default="butter")
+    filter_group.add_argument("--filt-moving-avg", type=int)
     return parser.parse_args(src)
 
 
@@ -40,7 +41,8 @@ def main():
     args = parse_args()
     testdata = load_runs(args.filenames)
     params = None if args.params_in is None else loadParams(args.params_in)
-    filter_params = FilterParams(N=args.filt_samples, T=args.filt_period, order=args.filt_order, fcn=args.filt_fcn)
+    filter_params = FilterParams(N=args.filt_samples, T=args.filt_period, order=args.filt_order, fcn=args.filt_fcn,
+                                 angle_moving_avg_N=args.filt_moving_avg)
     params, results = examineMotor(testdata, args.model, params, filter_params)
     printMotorResults(params, results)
     if args.params_out is not None:

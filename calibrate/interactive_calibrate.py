@@ -12,7 +12,7 @@ from os.path import isfile, join, dirname, splitext
 import sys
 
 from calibrate import loadRun, examineMotor, printMotorResults
-from filter import moving_avg, FilterParams, FourierAnalysis, FourierSignal
+from filter import FilterParams, FourierAnalysis, FourierSignal
 from motor_model import saveParams, loadParams
 
 
@@ -20,11 +20,11 @@ def graphMotorResults(results, filter_params):
     # plt.style.use('dark_background')
     graph_V_and_angle_and_derivatives(results)
     # graph_3d_acc_V_vel(results)
-    graph_torque_ripple(results)
-    graph_slowness(results)
+    #graph_torque_ripple(results)
+    #graph_slowness(results)
     # graph_sign_vel_f(results)
-    graph_acc_predict(results)
-    graph_time_error(results)
+    #graph_acc_predict(results)
+    #graph_time_error(results)
     # graph_error_stats(results)
     fourier = FourierAnalysis(results, filter_params)
     graph_high_freq(results)
@@ -159,11 +159,10 @@ def graph_signal_filter_frequencies(results, name, unit, fourier: FourierAnalysi
         return
     freqs = fourier.freqs
     name_f = name + "_f"
-    data_fourier = FourierSignal(results, name, fourier)
-    data_mag_smooth = moving_avg(data_fourier.signal_mag, moving_avg_pts, np.nan)
+    data_fourier = FourierSignal(results, name, fourier, moving_avg_pts)
 
     fig, axs = plt.subplots(num=num, nrows=3, sharex='all', figsize=(8, 10), clear=True)
-    plot_mag(axs, freqs, data_mag_smooth, 'C1', "moving avg", zorder=4)
+    plot_mag(axs, freqs, data_fourier.smooth_mag, 'C1', "moving avg", zorder=4)
     axs[0].set_ylim(axs[0].get_ylim())
     axs[1].set_ylim(axs[1].get_ylim())
     plot_mag(axs, freqs, data_fourier.signal_mag, '.C2', name)
@@ -179,11 +178,9 @@ def graph_signal_filter_frequencies(results, name, unit, fourier: FourierAnalysi
         plot_mag(axs, freqs, filtered_fourier.signal_mag, '.C3', name_f)
         axs[2].plot(freqs, np.unwrap(np.angle(filtered_fourier.fourier_signal)), 'r', label=name_f)  # goodbye
     if also is not None:
-        also_fourier = FourierSignal(results, also, fourier)
-        also_mag_smooth = moving_avg(also_fourier.signal_mag, moving_avg_pts, np.nan)
+        also_fourier = FourierSignal(results, also, fourier, moving_avg_pts)
         plot_mag(axs, freqs, also_fourier.signal_mag, '.C4', also, zorder=1)
-        plot_mag(axs, freqs, also_mag_smooth, 'C5', also+'_avg', zorder=3)
-
+        plot_mag(axs, freqs, also_fourier.smooth_mag, 'C5', also+'_avg', zorder=3)
     for i in range(3):
         axs[i].grid()
         axs[i].axvline(1 / results["filter_period"], color='k', linestyle='--', label="filter cutoff")
@@ -211,7 +208,7 @@ def graph_contributions(results, combine_V_fric=True):
                 results["model_contributions"]["V + fric"] += results["model_contributions"][fric_type]
     for mod, contribution in results["model_contributions"].items():
         plt.plot(results["t"], contribution, label=mod)
-    plt.plot(results["t"], results["accel_error"], 'k', label="accel error")
+    plt.plot(results["t"], results["accel_error"], 'k', zorder=1, label="accel error")
     plt.plot(results["t"], results["acc_f"], '--', color='gray', zorder=1, label="acc_f")
     plt.title("Model Contributions")
     plt.ylabel("Acc [rad/s^2]")
@@ -229,6 +226,7 @@ def main():
           "code", sep="\n ")
     testdata = []
     model = ['static_fric', 'const_fric', 's_punch']
+    filter_params = FilterParams(fcn="butter")
     params = None
     data_path = join(dirname(dirname(__file__)), "data")
     test_type = ""
@@ -261,7 +259,6 @@ def main():
                                 print("mismatched test_type", test_type, testdata[i]["test_type"], "for", f)
             if len(testdata) > 0:
                 if test_type == "motor":
-                    filter_params = FilterParams()
                     params, results = examineMotor(testdata, model, params, filter_params)
                     printMotorResults(params, results)
                     graphMotorResults(results, filter_params)

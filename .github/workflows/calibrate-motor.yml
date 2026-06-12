@@ -63,14 +63,20 @@ jobs:
           uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest
           -m static_fric const_fric --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration @ filter_cutoff = 0.1s ----------------------- >> cal_summary.txt
-      - name: Test calibration @ filter_cutoff = 0.1s
+      - run: echo && echo --- Test calibration with FIR filter -------------------------------- >> cal_summary.txt
+      - name: Test calibration with FIR filter
         run: >-
-          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -T 0.1
+          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest --filt-fcn fir
+          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo && echo --- Test calibration @ filter_cutoff = 0.2s ----------------------- >> cal_summary.txt
+      - name: Test calibration @ filter_cutoff = 0.2s
+        run: >-
+          uv run --extra calibration calibrate/calibrate_cli.py data/*.motortest -T 0.2
           -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: >- 
-          scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period
+          scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period filter_desc
           --ignore dt dt_std_dev outlier_thresh N num_outliers --precision 3 >> $GITHUB_STEP_SUMMARY
       - run: cat cal_summary.txt >> $GITHUB_STEP_SUMMARY
 
