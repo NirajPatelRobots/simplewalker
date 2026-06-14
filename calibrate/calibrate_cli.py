@@ -1,3 +1,6 @@
+# /// script
+# dependencies = ["calibrate"]
+# ///
 """ TODO:
     Separate sub-commands for train and test (and fourier analysis?)
     Load model but not params from file, maybe plaintext list of model names?

@@ -1,3 +1,6 @@
+# /// script
+# dependencies = ["calibrate"]
+# ///
 """ motor model for calibration
 
 Fun facts:
