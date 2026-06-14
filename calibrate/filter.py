@@ -10,11 +10,11 @@ from scipy import signal
 from scipy.fft import rfft, rfftfreq
 from dataclasses import dataclass
 
-DEFAULT_FILTER_CUTOFF_N = 120
-DEFAULT_IIR_ORDER = 6
+DEFAULT_FILTER_CUTOFF_N = 180
+DEFAULT_IIR_ORDER = 5
 DEFAULT_FIR_ORDER = 250
 CUT_FIRST_N_MULT = 2
-DEFAULT_ANGLE_MOVING_AVG_SAMPLES = 10
+DEFAULT_ANGLE_MOVING_AVG_SAMPLES = 30
 
 
 @dataclass

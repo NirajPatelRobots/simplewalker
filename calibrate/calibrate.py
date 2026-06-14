@@ -9,6 +9,7 @@ TODO:
     why angle jumps? Just remove them from test data?
     electrically isolate angle sensors to reduce noise?
     structure: clear flow of sensor data -> /(sensor model) -> believed true values -> /(motor model) -> prediction
+    Way of representing how much data is lost when filtering is increased causing R^2 to increase
     prediction accuracy as fcn of vel?
     fourier analysis (compare F_V(w) with F_acc_pred(w)) to find frequency response of system
         Is there any way or reason to have cli fourier analysis?
@@ -128,7 +129,7 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
 def printMotorResults(params, results):
     print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total runtime:', results["runtime"])
     print("Parameters:", params, end="\n\n")
-    print(f'{results["filter_desc"]} filter; Period={round(results["filter_period"] * 1000)}ms')
+    print(f'{results["filter_desc"]} filter; Period = {round(results["filter_period"] * 1000)}ms')
     print("Average error =", round(results["avg_error"], 3), "rad/s^2, Average acceleration =",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")

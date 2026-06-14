@@ -69,10 +69,10 @@ jobs:
           uv run calibrate/calibrate_cli.py data/*.motortest --filt-fcn fir
           -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration @ filter_cutoff = 0.2s ----------------------- >> cal_summary.txt
-      - name: Test calibration @ filter_cutoff = 0.2s
+      - run: echo && echo --- Test calibration @ filter_cutoff = 0.24s ----------------------- >> cal_summary.txt
+      - name: Test calibration @ filter_cutoff = 0.24s
         run: >-
-          uv run calibrate/calibrate_cli.py data/*.motortest -T 0.2
+          uv run calibrate/calibrate_cli.py data/*.motortest -T 0.24
           -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: >- 
