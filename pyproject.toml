@@ -22,4 +22,12 @@ interactive_calibration = [
 [tool.ruff]
 include = ["calibrate/*.py"]
 [tool.ruff.lint]
-ignore = ["E702"]  # Multiple statements on one line
+ignore = ["E702",  # Multiple statements on one line
+          "F401"   # Unused import
+]
+
+
+[tool.pytest]
+minversion = "9.0"
+testpaths = ["test/unittests/calibration_unittest.py"]
+# other unit tests are unittest framework
