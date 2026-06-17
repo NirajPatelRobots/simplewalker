@@ -31,7 +31,7 @@ TODO: infra
     New file for model_functions implementations?
     Nonlinear params
         nonlinparam_ranges: list[(float | None, float | None)]
-        How should inherited variable_param_names be stored?
+        Class for nonlinparams with names, current values, defaults, dict<->array conversion?
     Create model from string
 """
 
@@ -42,12 +42,12 @@ from types import FunctionType
 class ModelFcn:
     # fcn_input can be one of: a string key for results, another ModelFcn, or a (lambda) function(results) -> ndarray
     def __init__(self, fcn_input, default_params: dict, const_params: dict):
+        if "input" in default_params.keys() or "input" in const_params.keys():
+            raise ValueError("'input' is not a valid param name")
         self.fcn_input = fcn_input
         self.variable_param_names = [p for p in default_params.keys() if p not in const_params.keys()]
         self.set_params(default_params)
         self.set_params(const_params)  # override defaults
-        if isinstance(self.fcn_input, ModelFcn):
-            self.variable_param_names.append(fcn_input.variable_param_names)
     def set_params(self, new_params: dict):
         for param_name, param_value in new_params.items():
             self.__dict__[param_name] = param_value
@@ -154,12 +154,15 @@ def Model(model, params):
 
 """make array used for the independent variable in regression"""
 def make_independent_variable(results, model, nonlinearparams=None):
-    nonlinearparams = None or {}
+    nonlinearparams = nonlinearparams or {}
     X = np.hstack((results["V_f"].reshape(-1,1), results["vel_f"].reshape(-1,1)))
     results["slowness"] = 1 - continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=6)
     results["sign_vel_f"] = continuous_sign(moving_avg(results["vel_f"], 20), thresh=0.06, steepness=10)
     for mod in model:
-        X = np.hstack((X, model_fcns[mod](results, nonlinearparams).reshape(-1, 1)))
+        try:
+            X = np.hstack((X, model_fcns[mod](results, nonlinearparams[mod]).reshape(-1, 1)))
+        except KeyError:
+            X = np.hstack((X, model_fcns[mod](results, {}).reshape(-1, 1)))
     return X
 
 
@@ -170,6 +173,28 @@ def assign_parameters(param_array, model):
         params[mod] = float(param)
     return params
 
+def get_nonlin_paramArr(model: list[str]) -> np.ndarray:
+    def extract(fcn: ModelFcn, arr: list):
+        arr.extend([fcn.__dict__[var] for var in fcn.variable_param_names])
+        if isinstance(fcn.fcn_input, ModelFcn):
+            extract(fcn.fcn_input, arr)
+    arr = []
+    for mod in model:
+        extract(model_fcns[mod], arr)
+    return np.array(arr)
+
+def assign_nonlin_parameters(model: list[str], values: list[float]) -> dict[str, dict | float]:
+    def assign(fcn: ModelFcn, idx: int) -> [dict, int]:
+        params = {param_name: float(values[idx + i]) for i, param_name in enumerate(fcn.variable_param_names)}
+        idx += len(fcn.variable_param_names)
+        if isinstance(fcn.fcn_input, ModelFcn):
+            params["input"], idx = assign(fcn.fcn_input, idx)
+        return params, idx
+    idx = 0
+    nonlinparams = {}
+    for mod in model:
+        nonlinparams[mod], idx = assign(model_fcns[mod], idx)
+    return nonlinparams
 
 def calc_model_contributions(X, paramArr, model):
     return {mod: param * X[:, i].transpose()
