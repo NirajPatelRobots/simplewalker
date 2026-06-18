@@ -2,8 +2,7 @@
 """
 Library for motor calibration
 TODO:
-    some way to deal with nonlinear parameters, like slowness threshold
-        Way to set them as model parameters, either definitively or a starting point for nonlinear optimization
+    Nonlinear optimization
     deadband model: modify angle measurements?
     measure battery voltage during calibration
     why angle jumps? Just remove them from test data?
@@ -23,6 +22,7 @@ import numpy as np
 import time
 from filter import FilterParams, filter_data, cut_first, moving_avg, derivative, remove_spikes
 import motor_model
+from model_functions import model_fcns
 
 
 def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()):
@@ -42,7 +42,6 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         for this_data in testdata:
             if filter_params.T is not None:
                 filter_params.set_N(N=None, t_data=this_data["t"])
-            results["filter_period"] = this_data["t"][filter_params.N] - this_data["t"][0]
             clean_up_test_data(this_data, results, filter_params)
             this_data["vel"] = derivative(this_data, "angle")
             this_data["acc"] = derivative(this_data, "vel")
@@ -60,6 +59,7 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         print(f"Angle noise std_dev [mrad]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
               f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
+        results["filter_period"] = results["t"][filter_params.N] - results["t"][0]
         results["filter_desc"] = str(filter_params)
         return results
 
@@ -112,7 +112,8 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
     results = filter_and_derivative_and_assemble(testdata, filter_params)
 
     model = motor_model.Model(model, params)
-    X = motor_model.make_independent_variable(results, model)
+    nonlin_paramarr = motor_model.get_nonlin_paramArr(model, model_fcns)
+    X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramarr)
     if params is None:
         startTime = time.perf_counter()
         paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
@@ -134,7 +135,7 @@ def printMotorResults(params, results):
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
     print("Regression R^2:", round(results["R^2_with_outliers"], 3))
-    print(f'\t-Without {results["num_outliers"]} outliers ({round(results["outlier%"], 2)}%):')
+    print(f'\t- Without {results["num_outliers"]} outliers ({round(results["outlier%"], 2)}%):')
     print("Average error =", round(results["avg_error_no_outs"], 3), "rad/s^2, Average acceleration",
           round(results["avg_acc_no_outliers"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev_no_outs"], 3), "rad/s^2")

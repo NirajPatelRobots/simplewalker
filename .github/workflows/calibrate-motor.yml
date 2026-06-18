@@ -8,6 +8,7 @@ on:
       - data/motortestdata.zip
       - calibrate/calibrate.py
       - calibrate/filter.py
+      - calibrate/model_functions.py
       - calibrate/motor_model.py
       - calibrate/calibrate_cli.py
       - pyproject.toml
@@ -23,6 +24,7 @@ jobs:
             calibrate/calibrate.py
             calibrate/calibrate_cli.py
             calibrate/filter.py
+            calibrate/model_functions.py
             calibrate/motor_model.py
             pyproject.toml
             scripts/json_to_md_table.sh
