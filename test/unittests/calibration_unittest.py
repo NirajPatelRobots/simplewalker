@@ -1,7 +1,6 @@
 """
-Unit tests for calibration
+Unit tests for calibration motor model
 TODO:
-    Test FilterParams initialization with N and T
 """
 
 import numpy as np
@@ -9,21 +8,21 @@ from os import path
 import pytest
 import sys
 sys.path.append(path.join(path.dirname(path.dirname(path.dirname(__file__))), "calibrate"))
-from motor_model import ModelFcn, get_nonlin_paramArr, assign_nonlin_parameters, loadParams, saveParams
+from motor_model import ModelFcn, get_nonlin_paramArr, assign_nonlin_parameters, loadParams, saveParams, Params
 
 
 class MultiplierModelFcn(ModelFcn):
     def __init__(self, fcn_input, **kwargs):
         super().__init__(fcn_input, {"mult": 1.0}, kwargs)
-    def __call__(self, results, nonlinparams) -> np.ndarray:
-        return super().__call__(results, nonlinparams) * self.mult
+    def __call__(self, results) -> np.ndarray:
+        return super().__call__(results) * self.mult
 
 
 class AdderModelFcn(ModelFcn):
     def __init__(self, fcn_input, **kwargs):
         super().__init__(fcn_input, {"to_add": 0.0}, kwargs)
-    def __call__(self, results, nonlinparams) -> np.ndarray:
-        return super().__call__(results, nonlinparams) + self.to_add
+    def __call__(self, results) -> np.ndarray:
+        return super().__call__(results) + self.to_add
 
 def get_mock_model_fcns():
     return {
@@ -66,34 +65,45 @@ class TestModelFcn:
         assert m.softness == 100
         assert m.fungibility == 3.14
 
+    def test_set_params_recursive(self):
+        m = ModelFcn("vel_f", {"softness": 4, "fungibility": 2.3}, {"fungibility": 9.81})
+        m2 = ModelFcn(m, {"immersiveness": 12.34}, {})
+        m2.set_params({"immersiveness": 0.1, "input": {"softness": 100, "fungibility": 3.14}})
+        assert m2.variable_param_names == ["immersiveness"]
+        assert m2.immersiveness == 0.1
+        assert m2.fcn_input.variable_param_names == ["softness"]
+        assert m2.fcn_input.softness == 100
+        assert m2.fcn_input.fungibility == 3.14
+
     def test_call_str(self):
         m = ModelFcn("vel_f", {}, {})
-        c = m(self.results, {})
+        c = m(self.results)
         assert np.all(c == self.results["vel_f"])
 
     def test_call_recursive(self):
         m = ModelFcn("vel_f", {}, {})
         m2 = ModelFcn(m, {}, {})
-        c = m2(self.results, {})
+        c = m2(self.results)
         assert np.all(c == self.results["vel_f"])
 
     def test_call_lambda(self):
         m = ModelFcn((lambda results: results["vel_f"]), {}, {})
-        c = m(self.results, {})
+        c = m(self.results)
         assert np.all(c == self.results["vel_f"])
 
     def test_call_recursive_with_params(self):
         m = MultiplierModelFcn("vel_f", mult=3.0)
         m2 = ModelFcn(m, {}, {})
-        c = m2(self.results, {})
+        c = m2(self.results)
         assert np.all(c == self.results["vel_f"] * 3.0)
-        c = m2(self.results, {"input": {"mult": 10.0}})
+        m2.set_params({"input": {"mult": 10.0}})
+        c = m2(self.results)
         assert np.all(c == self.results["vel_f"] * 10.0)
 
     def test_call_bad_input(self):
         with pytest.raises(TypeError) as excinfo:
             m = ModelFcn(self.results["vel_f"], {}, {})
-            m(self.results, {})
+            m(self.results)
         assert "ndarray" in str(excinfo.value)
 
     def test_init_bad_param_name(self):
@@ -123,9 +133,8 @@ class TestModelFcn:
             "10_nested_mult": self.results["vel_f"] * 8 * 10,
         }
         for mod in model:
-            assert np.all(new_model_fcns[mod](self.results, nonlinear_params[mod]) == expected_contributions[mod])
-            assert new_model_fcns[mod](self.results, nonlinear_params[mod]) \
-                    == pytest.approx(expected_contributions[mod])
+            new_model_fcns[mod].set_params(nonlinear_params[mod])
+            assert new_model_fcns[mod](self.results) == pytest.approx(expected_contributions[mod])
 
 
 class TestNonlinParamsConversion:
@@ -155,8 +164,10 @@ class TestNonlinParamsConversion:
                                     }
 
 def test_params_save_load(tmp_path):
-    params = {"horse": 1000., "battery_staple": 2.3}
+    params = Params(lin={"horse": 1000., "battery_staple": 2.3}, nonlin={"bendiness": 0.2})
+    np_params = Params(lin={"horse": np.float64(1000), "battery_staple": 2.3}, nonlin={"bendiness": np.float64(0.2)})
     filepath = tmp_path / "motorparams"
-    saveParams(params, filepath)
+    saveParams(np_params, filepath)
     new_params = loadParams(filepath)
-    assert new_params == params
+    assert new_params.lin == params.lin
+    assert new_params.nonlin == params.nonlin

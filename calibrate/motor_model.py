@@ -26,9 +26,10 @@ TODO:
         nonlinparam_ranges: list[(float | None, float | None)]
         Class for nonlinparams with names, current values, defaults, dict<->array conversion?
     Create model from string
+    Move validate_params to model_functions.py and validate nonlin parameters
 """
 import dataclasses
-
+import json
 import numpy as np
 from filter import moving_avg, continuous_threshold, continuous_sign
 from types import FunctionType
@@ -44,29 +45,23 @@ class ModelFcn:
         self.set_params(const_params)  # override defaults
     def set_params(self, new_params: dict):
         for param_name, param_value in new_params.items():
-            self.__dict__[param_name] = param_value
-    def __call__(self, results, nonlinparams) -> np.ndarray:
-        self.set_params(nonlinparams)
+            if param_name == "input":
+                self.fcn_input.set_params(param_value)
+            else:
+                self.__dict__[param_name] = param_value
+    def __call__(self, results) -> np.ndarray:
         if isinstance(self.fcn_input, str):
             return results[self.fcn_input]
         elif isinstance(self.fcn_input, ModelFcn):
-            return self.fcn_input(results, nonlinparams["input"] if "input" in nonlinparams else {})
+            return self.fcn_input(results)
         elif isinstance(self.fcn_input, FunctionType):
             return self.fcn_input(results)
         raise TypeError(type(self.fcn_input))
 
 @dataclasses.dataclass
 class Params:
-    lin = {}
-    nonlin = {}
-
-
-def Model(model, params):
-    if params is None:
-        model = model or []
-    else:
-        model = [m for m in params.keys() if m not in ["V", "omega"]]
-    return model
+    lin: dict = dict
+    nonlin: dict = dict
 
 
 """make array used for the independent variable in regression"""
@@ -74,17 +69,16 @@ def make_independent_variable(results, model, model_fcns, nonlinear_paramArr=Non
     X = np.hstack((results["V_f"].reshape(-1,1), results["vel_f"].reshape(-1,1)))
     results["slowness"] = 1 - continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=6)
     results["sign_vel_f"] = continuous_sign(moving_avg(results["vel_f"], 20), thresh=0.06, steepness=10)
-    if nonlinear_paramArr is None:
-        for mod in model:
-            X = np.hstack((X, model_fcns[mod](results, {}).reshape(-1, 1)))
-    else:
+    if nonlinear_paramArr is not None:
         nonlinearparams = assign_nonlin_parameters(model, nonlinear_paramArr, model_fcns)
         for mod in model:
-            X = np.hstack((X, model_fcns[mod](results, nonlinearparams[mod]).reshape(-1, 1)))
+            model_fcns[mod].set_params(nonlinearparams[mod])
+    for mod in model:
+        X = np.hstack((X, model_fcns[mod](results).reshape(-1, 1)))
     return X
 
 
-def assign_parameters(param_array, model):
+def assign_lin_parameters(param_array, model):
     """assigns parameters based on regression outputs and model"""
     params = {}
     for mod, param in zip(["V", "omega"] + model, param_array, strict=True):
@@ -101,7 +95,7 @@ def get_nonlin_paramArr(model: list[str], model_fcns: dict) -> np.ndarray:
         extract(model_fcns[mod], arr)
     return np.array(arr)
 
-def assign_nonlin_parameters(model: list[str], values: list[float], model_fcns: dict) -> dict[str, dict | float]:
+def assign_nonlin_parameters(model: list[str], values: np.ndarray, model_fcns: dict) -> dict[str, dict | float]:
     def assign(fcn: ModelFcn, idx: int) -> [dict, int]:
         params = {param_name: float(values[idx + i]) for i, param_name in enumerate(fcn.variable_param_names)}
         idx += len(fcn.variable_param_names)
@@ -121,23 +115,27 @@ def calc_model_contributions(X, paramArr, model):
 
 def validate_params(params):
     # Voltage should push forward
-    assert(params["V"] > 0)
+    assert(params.lin["V"] > 0)
     # Friction should oppose motion
-    assert(params["omega"] < 0)
-    assert("const_fric" not in params or params["const_fric"] < 0)
-    assert("const_opposing_fric" not in params or params["const_opposing_fric"] < 0)
-    if "static_fric" in params:
-        assert(params["static_fric"] + params["V"] > 0)
+    assert(params.lin["omega"] < 0)
+    assert("const_fric" not in params.lin or params.lin["const_fric"] < 0)
+    assert("const_opposing_fric" not in params.lin or params.lin["const_opposing_fric"] < 0)
+    if "static_fric" in params.lin:
+        assert(params.lin["static_fric"] + params.lin["V"] > 0)
 
+
+def sanitize_dict(d):
+    return {k: (sanitize_dict(v) if type(v) is dict else float(v)) for (k, v) in d.items()}
 
 def saveParams(params, filename = "new"):
-    with open(filename if "." in str(filename) else str(filename) + ".learnedparams", "wb") as file:
-        np.savez(file, **params)
+    with open(filename if "." in str(filename) else str(filename) + ".json", "w") as file:
+        json.dump(obj={"lin": sanitize_dict(params.lin), "nonlin": sanitize_dict(params.nonlin)}, fp=file, indent=2)
 
 
 def loadParams(filename = "motorparams"):
-    filename = filename if "." in str(filename) else str(filename) + ".learnedparams"
-    return {k: float(v) for (k, v) in np.load(filename, allow_pickle=True).items()}
+    with open(filename if "." in str(filename) else str(filename) + ".json") as file:
+        loaded = json.load(file)
+    return Params(sanitize_dict(loaded["lin"]), sanitize_dict(loaded["nonlin"]))
 
 
 if __name__ == "__main__":

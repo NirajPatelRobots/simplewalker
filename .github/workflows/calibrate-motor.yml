@@ -45,19 +45,19 @@ jobs:
       - name: Test calibration on squares
         run: >-
           uv run calibrate/calibrate_cli.py data/*_squ_*.motortest
-          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: echo && echo --- Test calibration on sines ------------------------------------- >> cal_summary.txt
       - name: Test calibration on sines
         run: >-
           uv run calibrate/calibrate_cli.py data/*_sin_*.motortest
-          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: echo && echo --- Test calibration on deadband ---------------------------------- >> cal_summary.txt
       - name: Test calibration on deadband
         run: >-
           uv run calibrate/calibrate_cli.py data/*_db_*.motortest
-          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: echo && echo --- Test calibration without punch ---------------------------------- >> cal_summary.txt
       - name: calibrate
@@ -69,13 +69,13 @@ jobs:
       - name: Test calibration with FIR filter
         run: >-
           uv run calibrate/calibrate_cli.py data/*.motortest --filt-fcn fir
-          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: echo && echo --- Test calibration @ filter_cutoff = 0.24s ----------------------- >> cal_summary.txt
       - name: Test calibration @ filter_cutoff = 0.24s
         run: >-
           uv run calibrate/calibrate_cli.py data/*.motortest -T 0.24
-          -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: >- 
           scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period filter_desc
@@ -86,7 +86,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: motorparams
-          path: ./data/motorparams.learnedparams
+          path: ./data/motorparams.json
           retention-days: 1
           overwrite: true
           if-no-files-found: error
@@ -128,6 +128,11 @@ jobs:
 
   unit_tests:
     runs-on: ubuntu-slim
+#    if: |
+#        contains(github.event.commits.*.modified, 'calibrate/filter.py')
+#        || contains(github.event.commits.*.modified, 'calibrate/motor_model.py')
+#        || contains(github.event.commits.*.modified, 'test/unittests/calibration_unittest.py')
+#        || contains(github.event.commits.*.modified, 'scripts/coverage.sh')
     steps:
       - uses: actions/checkout@v6
         with:

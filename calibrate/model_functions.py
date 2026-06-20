@@ -15,8 +15,8 @@ class Punch(ModelFcn):
         super().__init__(fcn_input, {"num_points": 100, "on_thresh": 0.1, "off_thresh": 0.1}, kwargs)
         self.early = early
     # off_thresh is None -> off_thresh = on_thresh
-    def __call__(self, results, nonlinparams) -> np.ndarray:
-        input_acc = super().__call__(results, nonlinparams)
+    def __call__(self, results) -> np.ndarray:
+        input_acc = super().__call__(results)
         off_thresh = self.off_thresh or self.on_thresh
         old_signal = input_acc if self.early else np.roll(input_acc, self.num_points)
         new_signal = np.roll(input_acc, -self.num_points) if self.early else input_acc
@@ -29,16 +29,16 @@ class Punch(ModelFcn):
 class Delay(ModelFcn):
     def __init__(self, fcn_input, **kwargs):
         super().__init__(fcn_input, {"delay_samples": 0}, kwargs)
-    def __call__(self, results, nonlinparams) -> np.ndarray:
-        input_acc = super().__call__(results, nonlinparams)
+    def __call__(self, results) -> np.ndarray:
+        input_acc = super().__call__(results)
         return np.roll(input_acc, self.delay_samples)
 
 
 class Spring(ModelFcn):
     def __init__(self, fcn_input, **kwargs):
         super().__init__(fcn_input, {"freq": 3, "damping_eta": 0.1}, kwargs)
-    def __call__(self, results, nonlinparams) -> np.ndarray:
-        unsprung_acc = super().__call__(results, nonlinparams)
+    def __call__(self, results) -> np.ndarray:
+        unsprung_acc = super().__call__(results)
         w = 2 * np.pi * self.freq;   k = w**2;   c = 2 * w * self.damping_eta
         spring_angle = np.zeros(unsprung_acc.shape)  # the secondary is pulled to the primary by the spring
         spring_vel = np.zeros(unsprung_acc.shape)
@@ -58,6 +58,7 @@ class Spring(ModelFcn):
         return spring_acc
 
 
+#############################################################################################
 
 
 # Model function classes are defined above. In model_fcns, the fcns are created with inputs and const params set.

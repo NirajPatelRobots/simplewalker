@@ -2,7 +2,7 @@ set -e
 SIMPLEWALKER_ROOT=$(dirname "$(dirname "$(realpath "${BASH_SOURCE[0]}")")")
 pushd "$SIMPLEWALKER_ROOT" > /dev/null
 uv tool install -q --with "pytest,numpy>=2.0,scipy>1.13" coverage
-coverage run -m pytest -q --capture=no
+coverage run --branch -m pytest -q --capture=no
 if [[ " $@ " =~ " md " ]]; then
   coverage report --format=markdown
 else

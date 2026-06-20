@@ -5,6 +5,7 @@ TODO:
     Nonlinear optimization
     deadband model: modify angle measurements?
     measure battery voltage during calibration
+    We don't need all of calc_result_stats in every optimization loop, make a minimal version
     why angle jumps? Just remove them from test data?
     electrically isolate angle sensors to reduce noise?
     structure: clear flow of sensor data -> /(sensor model) -> believed true values -> /(motor model) -> prediction
@@ -19,13 +20,14 @@ Created Jun 2021
 """
 
 import numpy as np
+from scipy.optimize import minimize
 import time
 from filter import FilterParams, filter_data, cut_first, moving_avg, derivative, remove_spikes
 import motor_model
 from model_functions import model_fcns
 
 
-def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()):
+def examineMotor(testdata, model, params, filter_params=FilterParams(), test_only=False):
     """return the model parameters (dict) of a motor.
     and the results of the examination (dict)
     V is 1D array of driving voltage, angle is same size array of sensed angle.
@@ -107,23 +109,47 @@ def examineMotor(testdata, model=None, params=None, filter_params=FilterParams()
         minutes, seconds = divmod(int(np.max(results["t"])), 60)
         results["runtime"] = f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s'
 
+    def calc_residual(nonlin_paramArr, results, model, model_fcns):
+        X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramArr)
+        paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
+        results["accel_predic"] = X @ paramArr
+        calc_result_stats(results)
+        return results["R^2_no_outliers"]
+
+    def optimize(initial_nonlin_paramArr, results, model, model_fcns) -> np.ndarray:
+        print("Start optimizing nonlinear params:", initial_nonlin_paramArr.transpose())
+        startTime = time.perf_counter()
+        result = minimize(calc_residual, initial_nonlin_paramArr, (results, model, model_fcns))
+        print("Parameter determination took", time.perf_counter() - startTime, "s\n", result)
+        if not result.success:
+            exit(1)
+        return result.x
+
     if len(testdata) == 0:
         raise ValueError("No testdata")
     results = filter_and_derivative_and_assemble(testdata, filter_params)
 
-    model = motor_model.Model(model, params)
-    nonlin_paramarr = motor_model.get_nonlin_paramArr(model, model_fcns)
-    X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramarr)
     if params is None:
-        startTime = time.perf_counter()
-        paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
-        print("Parameter determination took", time.perf_counter() - startTime, "s")
-        params = motor_model.assign_parameters(paramArr, model)
+        params = motor_model.Params()
+        model = model or []
     else:
-        paramArr = [params[m] for m in ["V", "omega"] + model]
+        if test_only:
+            model = [m for m in params.lin.keys() if m not in ["V", "omega"]]
+        else:
+            for mod in model:
+                model_fcns[mod].set_params(params.nonlin[mod])
+    # now set nonlin_paramArr from the model fcns, which are either defaults or just set from params.nonlin above^
+    nonlin_paramArr = motor_model.get_nonlin_paramArr(model, model_fcns)
+
+    if (not test_only) and (len(nonlin_paramArr) > 0):
+        nonlin_paramArr = optimize(nonlin_paramArr, results, model, model_fcns)
+    X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramArr)
+    paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
     results["accel_predic"] = X @ paramArr
     calc_result_stats(results)
     results["model_contributions"] = motor_model.calc_model_contributions(X, paramArr, model)
+    params.lin = motor_model.assign_lin_parameters(paramArr, model)
+    params.nonlin = motor_model.assign_nonlin_parameters(model, nonlin_paramArr, model_fcns)
     return params, results
 
 
