@@ -1,7 +1,7 @@
 """ filtering for offline calibration
 TODO:
     remove spikes: better removal of spikes that swing positive and negative
-    continuous_threshold get closer to 0
+    continuous_threshold get closer to 0: continuous_threshold_to_zero() which goes to 0 at a certain value
     filter_data() compensate for delay? FIR delay = order / 2
     organize chain of filters: spike removal -> moving_avg -> lowpass. DataCleaner?
 """
@@ -25,6 +25,7 @@ class FilterParams:
     fcn: str = "butter"   # 'cheby'
     ripple: float = 0.5  # only applies to cheby filters
     angle_moving_avg_N: int = None
+    fcn_options = ["butter", "fir", "cheby"]
     def __post_init__(self):
         if self.order is None:
             self.order = DEFAULT_FIR_ORDER if self.fcn == "fir" else DEFAULT_IIR_ORDER
@@ -43,8 +44,10 @@ class FilterParams:
         elif self.fcn == "fir":
             self.loPass_polynom = signal.firwin(self.order + 1, 2 / self.N), 1.0
             self.hiPass_polynom = signal.firwin(self.order + 1, 2 / self.N, pass_zero='highpass'), 1.0
+        else:
+            raise ValueError("Function must be one of: " + str(self.fcn_options))
     def N_from_T(self, t_data):
-        return np.argmax(t_data > self.T) - 1
+        return np.argmin(np.abs(t_data - self.T))
 
     def __str__(self):
         return f"N={self.N} order={self.order} {self.fcn}"

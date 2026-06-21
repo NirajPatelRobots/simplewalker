@@ -26,7 +26,7 @@ def parse_args(src=None):
     filter_N_group.add_argument("-T", "--filt-period", type=float)
     filter_N_group.add_argument("-N", "--filt-samples", type=int)
     filter_group.add_argument("--filt-order", type=int)
-    filter_group.add_argument("--filt-fcn", choices=['butter', 'cheby', 'fir'], default="butter")
+    filter_group.add_argument("--filt-fcn", choices=FilterParams.fcn_options, default=FilterParams.fcn)
     filter_group.add_argument("--filt-moving-avg", type=int)
     args = parser.parse_args(src)
     if args.test_only and (args.model is not None or args.params_out is not None):

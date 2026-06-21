@@ -129,10 +129,11 @@ jobs:
   unit_tests:
     runs-on: ubuntu-slim
 #    if: |
-#        contains(github.event.commits.*.modified, 'calibrate/filter.py')
-#        || contains(github.event.commits.*.modified, 'calibrate/motor_model.py')
-#        || contains(github.event.commits.*.modified, 'test/unittests/calibration_unittest.py')
-#        || contains(github.event.commits.*.modified, 'scripts/coverage.sh')
+#        contains(toJSON(github.event.commits.*.modified), 'calibrate/filter.py')
+#        || contains(toJSON(github.event.commits.*.modified), 'calibrate/motor_model.py')
+#        || contains(toJSON(github.event.commits.*.modified), 'test/unittests/calibration_model_unittest.py')
+#        || contains(toJSON(github.event.commits.*.modified), 'test/unittests/filter_unittest.py')
+#        || contains(toJSON(github.event.commits.*.modified), 'scripts/coverage.sh')
     steps:
       - uses: actions/checkout@v6
         with:
@@ -140,7 +141,8 @@ jobs:
             calibrate/filter.py
             calibrate/motor_model.py
             pyproject.toml
-            test/unittests/calibration_unittest.py
+            test/unittests/calibration_model_unittest.py
+            test/unittests/filter_unittest.py
             scripts/coverage.sh
           sparse-checkout-cone-mode: false
       - name: Install uv

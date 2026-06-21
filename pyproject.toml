@@ -30,10 +30,11 @@ ignore = ["E702",  # Multiple statements on one line
 
 [tool.pytest]
 minversion = "9.0"
-testpaths = ["test/unittests/calibration_unittest.py"]
+testpaths = ["test/unittests/calibration_model_unittest.py", "test/unittests/filter_unittest.py"]
 # other unit tests are unittest framework
 
 [tool.coverage.run]
 include = ["calibrate/filter.py", "calibrate/motor_model.py"]
 [tool.coverage.report]
 [tool.coverage.html]
+directory = "data/htmlcov"
