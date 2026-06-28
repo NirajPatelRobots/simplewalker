@@ -39,6 +39,26 @@ def test_continuous_threshold():
     assert output[0] < 0.1
     assert output[-1] > 0.95
 
+def test_continuous_sign():
+    output = continuous_sign(np.linspace(-100, 100, num=201), thresh=50, steepness=10)
+    assert output[0] < -0.95
+    assert abs(output[100]) < 0.05
+    assert output[-1] > 0.95
+
+def test_moving_avg_const():
+    signal_in = np.ones(101)
+    N = 10
+    output = moving_avg(signal_in, N, 12)
+    assert output[:N-1] == pytest.approx(12 * np.ones(N-1))
+    assert np.all(output[N-1:] == pytest.approx(1))
+
+def test_moving_avg_var():
+    N = 11
+    signal_in = np.concatenate((np.zeros(N), np.linspace(0, 10, 11)))
+    output = moving_avg(signal_in, N, 0)
+    assert output[N] == pytest.approx(0)
+    assert output[-1] == pytest.approx(5)
+
 
 class TestFilterSignal:
     t = np.linspace(0, 10, num=10000)  # 10s, 1000 Hz

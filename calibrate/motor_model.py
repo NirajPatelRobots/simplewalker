@@ -1,5 +1,5 @@
 # /// script
-# dependencies = ["calibrate"]
+# dependencies = ["numpy>=2.0"]
 # ///
 """ motor model for calibration
 
@@ -34,8 +34,6 @@ TODO:
 import dataclasses
 import json
 import numpy as np
-from filter import moving_avg, continuous_threshold, continuous_sign
-from types import FunctionType
 
 class ModelFcn:
     # fcn_input can be one of: a string key for results, another ModelFcn, or a (lambda) function(results) -> ndarray
@@ -56,11 +54,8 @@ class ModelFcn:
     def __call__(self, results) -> np.ndarray:
         if isinstance(self.fcn_input, str):
             return results[self.fcn_input]
-        elif isinstance(self.fcn_input, ModelFcn):
+        else:
             return self.fcn_input(results)
-        elif isinstance(self.fcn_input, FunctionType):
-            return self.fcn_input(results)
-        raise TypeError(type(self.fcn_input))
 
 @dataclasses.dataclass
 class Params:
@@ -76,8 +71,6 @@ class Params:
 """make array used for the independent variable in regression"""
 def make_independent_variable(results, model, model_fcns, nonlinear_paramArr=None):
     X = np.hstack((results["V_f"].reshape(-1,1), results["vel_f"].reshape(-1,1)))
-    results["slowness"] = 1 - continuous_threshold(moving_avg(np.abs(results["vel_f"]), 20), thresh=0.06, steepness=6)
-    results["sign_vel_f"] = continuous_sign(moving_avg(results["vel_f"], 20), thresh=0.06, steepness=10)
     if nonlinear_paramArr is not None:
         nonlinearparams = assign_nonlin_parameters(model, nonlinear_paramArr, model_fcns)
         for mod in model:

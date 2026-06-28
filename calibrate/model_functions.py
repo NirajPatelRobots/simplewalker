@@ -59,6 +59,11 @@ class Spring(ModelFcn):
         return spring_acc
 
 
+def slowness(vel_f: np.ndarray):
+    return 1 - continuous_threshold(moving_avg(np.abs(vel_f), 20), thresh=0.06, steepness=6)
+def sign_vel_f(vel_f: np.ndarray):
+    return continuous_sign(moving_avg(vel_f, 20), thresh=0.06, steepness=10)
+
 #############################################################################################
 
 
@@ -66,10 +71,10 @@ class Spring(ModelFcn):
 model_fcns = {
     "V": lambda results:                 results["V_f"],
     "omega": lambda results:             results["vel_f"],
-    "const_fric": lambda results:        results["sign_vel_f"],
+    "const_fric": lambda results:        sign_vel_f(results["vel_f"]),
     "const_opposing_fric": lambda results:
-    results["sign_vel_f"] * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), 1, 0),
-    "static_fric": lambda results:       results["slowness"] * results["V_f"],
+    sign_vel_f(results["vel_f"]) * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), 1, 0),
+    "static_fric": lambda results:       slowness(results["vel_f"]) * results["V_f"],
 
     # speed or Voltage punch "kicks-in" as signal is starting up
     # "s_punch":           Punch("vel_f", num_points=95, on_thresh=0.05, off_thresh=None, early=False),
@@ -82,9 +87,9 @@ model_fcns = {
     "spring_punch":      Spring(Punch("vel_f", num_points=10, on_thresh=0.05), freq=3, damping_eta=0.1),
     "delayed_punch":     Delay(Punch("vel_f", num_points=95, on_thresh=0.05, early=False), delay_samples=200),
 
-    "slow_omega": lambda results:        results["slowness"] * results["vel_f"],
+    "slow_omega": lambda results:        slowness(results["vel_f"]) * results["vel_f"],
     "sign_V": lambda results:            continuous_sign(results["V_f"], 0.15, 12),
-    "offset": lambda results:            1 - results["slowness"],
+    "offset": lambda results:            1 - slowness(results["vel_f"]),
     "Vsq": lambda results:               np.abs(results["V_f"]) * results["V_f"],
 
     "theta_3dot": lambda results:        derivative(results, "acc"),

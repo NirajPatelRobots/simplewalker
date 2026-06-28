@@ -2,7 +2,7 @@
 UI for experimenting with calibration
 Interactive command line and graphs
 TODO:
-    graph slowness factor and acceleration / accel error
+    graph model partials like slowness
     fancy modern interactive data frontend?
 """
 import matplotlib.pyplot as plt
@@ -21,7 +21,6 @@ def graphMotorResults(results, filter_params):
     graph_V_and_angle_and_derivatives(results)
     # graph_3d_acc_V_vel(results)
     #graph_torque_ripple(results)
-    #graph_slowness(results)
     # graph_sign_vel_f(results)
     #graph_acc_predict(results)
     #graph_time_error(results)
@@ -90,15 +89,6 @@ def graph_torque_ripple(results):
     plt.title("Torque Ripple")
     plt.xlabel("Angle [rad]")
     plt.ylabel("Acceleration error [rad/s^2]")
-    plt.grid()
-
-def graph_slowness(results):
-    plt.figure(5, clear=True)
-    plt.plot(results["t"], np.abs(results["vel_f"]), results["t"], results["slowness"])
-    plt.legend(["speed", "slowness"])
-    plt.title("Speed and Slowness Factor")
-    plt.xlabel("time [s]")
-    plt.ylabel("Speed [rad/s] and Slowness [arb. units]")
     plt.grid()
 
 def graph_sign_vel_f(results):

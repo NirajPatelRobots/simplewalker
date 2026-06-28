@@ -88,12 +88,12 @@ def filter_data(data, filter_params=FilterParams(), type='lowpass', cut=True):
 def cut_first(data, filter_params):
     return data[filter_params.N * CUT_FIRST_N_MULT:]
 
-
+# Moving average of the last N points. Starts with pad_val for the first N-1 points.
 def moving_avg(data, n_samples=1, pad_val=0):
     return np.concatenate((np.ones(n_samples-1) * pad_val, np.convolve(data, np.ones(n_samples), 'valid') / n_samples))
 
 
-def derivative(data, name):  # this isn't really a filter but motor_model needs it
+def derivative(data, name):  # this isn't really a filter but model functions need it
     return np.concatenate(([0], np.diff(data[name]) / np.diff(data["t"])))
 
 # naive numerical integration. Return (new_pos, new_vel)
