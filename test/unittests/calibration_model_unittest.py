@@ -65,6 +65,13 @@ class TestModelFcn:
         assert m.softness == 100
         assert m.fungibility == 3.14
 
+    def test_set_params_no_const(self):
+        m = ModelFcn("vel_f", {"softness": 4, "fungibility": 2.3}, {"fungibility": 9.81})
+        m.set_params({"softness": 100, "fungibility": 3.14}, set_const=False)
+        assert m.variable_param_names == ["softness"]
+        assert m.softness == 100
+        assert m.fungibility == 9.81  # still constant
+
     def test_set_params_recursive(self):
         m = ModelFcn("vel_f", {"softness": 4, "fungibility": 2.3}, {"fungibility": 9.81})
         m2 = ModelFcn(m, {"immersiveness": 12.34}, {})
@@ -163,11 +170,33 @@ class TestNonlinParamsConversion:
                                     "10_nested_mult": {"input": {"mult": 8.0}},
                                     }
 
+    def test_get_nonlin_dict_with_consts(self):
+        model = ["mult", "mult_copy", "mult_10", "add_mult", "nested_mult", "10_nested_mult"]
+        param_values = np.array([2.0, 3.0,  # mult, mult_copy, none from mult_10,
+                                 4.0, 5.0,  # add_mult
+                                 6.0, 7.0,  # nested_mult
+                                 8.0        # 10_nested_mult
+                                 ])
+        nonlinear_params = assign_nonlin_parameters(model, param_values, get_mock_model_fcns(), include_consts=True)
+        assert nonlinear_params == {"mult": {"mult": 2.0},
+                                    "mult_copy": {"mult": 3.0},
+                                    "mult_10": {"mult": 10.0},  # const 10
+                                    "add_mult": {"mult": 4.0, "input": {"to_add": 5.0}},
+                                    "nested_mult": {"mult": 6.0, "input": {"mult": 7.0}},
+                                    "10_nested_mult": {"mult": 10.0, "input": {"mult": 8.0}},  # const 10
+                                    }
+
 def test_params_save_load(tmp_path):
-    params = Params(lin={"horse": 1000., "battery_staple": 2.3}, nonlin={"bendiness": 0.2})
-    np_params = Params(lin={"horse": np.float64(1000), "battery_staple": 2.3}, nonlin={"bendiness": np.float64(0.2)})
+    params = Params(lin={"horse": 1000., "battery_staple": 2.3, "i": 1}, nonlin={"bendiness": 0.2})
+    np_params = Params(lin={"horse": np.float64(1000), "battery_staple": 2.3, "i": 1}, nonlin={"bendiness": np.float64(0.2)})
     filepath = tmp_path / "motorparams"
     saveParams(np_params, filepath)
     new_params = loadParams(filepath)
     assert new_params.lin == params.lin
     assert new_params.nonlin == params.nonlin
+
+def test_load_empty(tmp_path):
+    filepath = tmp_path / "motorparams.json"
+    with open(filepath, "w") as file:
+        file.write("\n")
+    assert loadParams(filepath) == Params()

@@ -11,8 +11,9 @@ from filter import moving_avg, derivative, continuous_threshold, continuous_sign
 from motor_model import ModelFcn
 
 class Punch(ModelFcn):
-    def __init__(self, fcn_input, early=False, **kwargs):
-        super().__init__(fcn_input, {"num_points": 100, "on_thresh": 0.1, "off_thresh": 0.1}, kwargs)
+    def __init__(self, fcn_input, early=False, start=None, **kwargs):
+        start_params = {"on_thresh": 0.1, "off_thresh": 0.1} | (start or {})
+        super().__init__(fcn_input, start_params, {"num_points": 100} | kwargs)
         self.early = early
     # off_thresh is None -> off_thresh = on_thresh
     def __call__(self, results) -> np.ndarray:
@@ -71,8 +72,10 @@ model_fcns = {
     "static_fric": lambda results:       results["slowness"] * results["V_f"],
 
     # speed or Voltage punch "kicks-in" as signal is starting up
-    # "s_punch":           Punch("vel_f", num_points=95, on_thresh=0.02, off_thresh=0.17, early=False),
-    "s_punch":           Punch("vel_f", num_points=95, on_thresh=0.05, off_thresh=None, early=False),
+    # "s_punch":           Punch("vel_f", num_points=95, on_thresh=0.05, off_thresh=None, early=False),
+    # "s_punch":           Punch("vel_f", num_points=95, on_thresh=0.17, off_thresh=0.25, early=False),
+    "s_punch":           Punch("vel_f", num_points=95, early=False,
+                               start={"on_thresh": 0.035, "off_thresh": 0.18}),
     "V_punch":           Punch("V_f",   num_points=130, on_thresh=0.5, off_thresh=0.4, early=False),
     "sharp_punch":       Punch("vel_f", num_points=30, on_thresh=0.02, off_thresh=0.05, early=False),
     "early_punch":       Punch("vel_f", num_points=80, on_thresh=0.05, early=True),

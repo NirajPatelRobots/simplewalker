@@ -24,9 +24,12 @@ TODO:
     Validate that d(acc_pred)/dV > 0
     Nonlinear params
         nonlinparam_ranges: list[(float | None, float | None)]
+            minimize::Constraint. Combined with param validation?
         Class for nonlinparams with names, current values, defaults, dict<->array conversion?
     Create model from string
+    Set const and default params from input
     Move validate_params to model_functions.py and validate nonlin parameters
+    Differentiability? Difficult.
 """
 import dataclasses
 import json
@@ -40,14 +43,15 @@ class ModelFcn:
         if "input" in default_params.keys() or "input" in const_params.keys():
             raise ValueError("'input' is not a valid param name")
         self.fcn_input = fcn_input
-        self.variable_param_names = [p for p in default_params.keys() if p not in const_params.keys()]
+        self.const_param_names = list(const_params.keys())
+        self.variable_param_names = [p for p in default_params.keys() if p not in self.const_param_names]
         self.set_params(default_params)
         self.set_params(const_params)  # override defaults
-    def set_params(self, new_params: dict):
+    def set_params(self, new_params: dict, set_const=True):
         for param_name, param_value in new_params.items():
             if param_name == "input":
                 self.fcn_input.set_params(param_value)
-            else:
+            elif set_const or param_name not in self.const_param_names:
                 self.__dict__[param_name] = param_value
     def __call__(self, results) -> np.ndarray:
         if isinstance(self.fcn_input, str):
@@ -62,6 +66,11 @@ class ModelFcn:
 class Params:
     lin: dict = dict
     nonlin: dict = dict
+    def __str__(self):
+        def strVal(d: dict):
+            return ", ".join([(f"{k}: ({strVal(v)})" if len(v) > 0 else k) if type(v) is dict
+                              else f"{k}={v:.3g}" for k, v in d.items()])
+        return f"Lin: ({strVal(self.lin)}); Nonlin: ({strVal(self.nonlin)})"
 
 
 """make array used for the independent variable in regression"""
@@ -95,10 +104,12 @@ def get_nonlin_paramArr(model: list[str], model_fcns: dict) -> np.ndarray:
         extract(model_fcns[mod], arr)
     return np.array(arr)
 
-def assign_nonlin_parameters(model: list[str], values: np.ndarray, model_fcns: dict) -> dict[str, dict | float]:
+def assign_nonlin_parameters(model: list[str], values: np.ndarray, model_fcns: dict, include_consts=False) -> dict[str, dict | float]:
     def assign(fcn: ModelFcn, idx: int) -> [dict, int]:
         params = {param_name: float(values[idx + i]) for i, param_name in enumerate(fcn.variable_param_names)}
         idx += len(fcn.variable_param_names)
+        if include_consts:
+            params |= {n: fcn.__dict__[n] for n in fcn.const_param_names}
         if isinstance(fcn.fcn_input, ModelFcn):
             params["input"], idx = assign(fcn.fcn_input, idx)
         return params, idx
@@ -125,7 +136,9 @@ def validate_params(params):
 
 
 def sanitize_dict(d):
-    return {k: (sanitize_dict(v) if type(v) is dict else float(v)) for (k, v) in d.items()}
+    return {k: (sanitize_dict(v) if type(v) is dict
+                else v if (v is None or type(v) is int)
+                else float(v)) for (k, v) in d.items()}
 
 def saveParams(params, filename = "new"):
     with open(filename if "." in str(filename) else str(filename) + ".json", "w") as file:
@@ -134,7 +147,11 @@ def saveParams(params, filename = "new"):
 
 def loadParams(filename = "motorparams"):
     with open(filename if "." in str(filename) else str(filename) + ".json") as file:
-        loaded = json.load(file)
+        try:
+            loaded = json.load(file)
+        except json.JSONDecodeError:
+            print("Could not load params from", filename)
+            return Params()
     return Params(sanitize_dict(loaded["lin"]), sanitize_dict(loaded["nonlin"]))
 
 

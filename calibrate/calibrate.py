@@ -2,10 +2,12 @@
 """
 Library for motor calibration
 TODO:
-    Nonlinear optimization
+    Nonlinear integer optimization
+    Indicate when parameter has little effect on optimization
     deadband model: modify angle measurements?
     measure battery voltage during calibration
     We don't need all of calc_result_stats in every optimization loop, make a minimal version
+    Another .py file for file IO? test data, params, results
     why angle jumps? Just remove them from test data?
     electrically isolate angle sensors to reduce noise?
     structure: clear flow of sensor data -> /(sensor model) -> believed true values -> /(motor model) -> prediction
@@ -80,11 +82,7 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
             results["outlier_thresh"] = 3 * np.std(accel_error)
             outliers = np.abs(accel_error) > results["outlier_thresh"]
             acc_f_clean = np.where(outliers, 0., acc_f)
-            X_clean = np.where(outliers.reshape((-1,1)) * np.ones((1,X.shape[1])), 0., X)
-            results["num_outliers"] = np.sum(outliers)
-            print("Removed", results["num_outliers"], "outliers out of", results["N"],
-                  "(" + str(round(results["num_outliers"] / results["N"] * 100, 2))
-                  + "%) where Error >", round(results["outlier_thresh"], 1), "rad/s^2")
+            X_clean = np.where(outliers.reshape((-1,1)), 0., X)
             return determine_params(X_clean, acc_f_clean, results, remove_outliers=False)
         else:
             return paramArr
@@ -114,15 +112,20 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
         results["accel_predic"] = X @ paramArr
         calc_result_stats(results)
-        return results["R^2_no_outliers"]
+        return 1 - results["R^2_no_outliers"]
 
-    def optimize(initial_nonlin_paramArr, results, model, model_fcns) -> np.ndarray:
-        print("Start optimizing nonlinear params:", initial_nonlin_paramArr.transpose())
+    def optimize(initial_nonlin_paramArr, results, model, model_fcns, xatol=1e-6, fatol=1e-5) -> np.ndarray:
         startTime = time.perf_counter()
-        result = minimize(calc_residual, initial_nonlin_paramArr, (results, model, model_fcns))
-        print("Parameter determination took", time.perf_counter() - startTime, "s\n", result)
+        result = minimize(lambda x: calc_residual(x, results, model, model_fcns),
+                          x0=initial_nonlin_paramArr,
+                          method="Nelder-Mead", options={"xatol": xatol, "fatol": fatol})
+        results["optimize_desc"] = f"N-M {xatol=} {fatol=}"
+        optimize_time = round(time.perf_counter() - startTime, 3)
+        print(f"Optimization ({results['optimize_desc']}) took {result.nfev} tries in {optimize_time}s")
+        print("- Start:", initial_nonlin_paramArr.transpose(), "End:", result.x.transpose())
         if not result.success:
-            exit(1)
+            print(result)
+            exit(result.status)
         return result.x
 
     if len(testdata) == 0:
@@ -136,8 +139,10 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         if test_only:
             model = [m for m in params.lin.keys() if m not in ["V", "omega"]]
         else:
+            print("Loaded nonlinear params:", params.nonlin)
             for mod in model:
-                model_fcns[mod].set_params(params.nonlin[mod])
+                if mod in params.nonlin:
+                    model_fcns[mod].set_params(params.nonlin[mod], set_const=False)
     # now set nonlin_paramArr from the model fcns, which are either defaults or just set from params.nonlin above^
     nonlin_paramArr = motor_model.get_nonlin_paramArr(model, model_fcns)
 
@@ -149,14 +154,14 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
     calc_result_stats(results)
     results["model_contributions"] = motor_model.calc_model_contributions(X, paramArr, model)
     params.lin = motor_model.assign_lin_parameters(paramArr, model)
-    params.nonlin = motor_model.assign_nonlin_parameters(model, nonlin_paramArr, model_fcns)
+    params.nonlin = motor_model.assign_nonlin_parameters(model, nonlin_paramArr, model_fcns, include_consts=True)
     return params, results
 
 
 def printMotorResults(params, results):
     print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total runtime:', results["runtime"])
-    print("Parameters:", params, end="\n\n")
     print(f'{results["filter_desc"]} filter; Period = {round(results["filter_period"] * 1000)}ms')
+    print("Parameters:", params, end="\n\n")
     print("Average error =", round(results["avg_error"], 3), "rad/s^2, Average acceleration =",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
