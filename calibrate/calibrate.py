@@ -58,10 +58,6 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         results["diff_t"] = np.diff(results["t"])
         if np.any(results["diff_t"] <= 0):
             raise ValueError("ERROR: time stops or goes backwards", np.flatnonzero(results["diff_t"] <= 0))
-        spiky_angle_noise = round(np.std(results["spiky_angle_hf"]) * 1000, 3)
-        clean_angle_noise = round(np.std(results["angle_hf"]) * 1000, 3)
-        print(f"Angle noise std_dev [mrad]: Spiky: {spiky_angle_noise} Clean: {clean_angle_noise}",
-              f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
         results["N"] = np.size(results["V_f"])
         results["filter_period"] = results["t"][filter_params.N] - results["t"][0]
         results["filter_desc"] = str(filter_params)
@@ -121,8 +117,8 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
                           method="Nelder-Mead", options={"xatol": xatol, "fatol": fatol})
         results["optimize_desc"] = f"N-M {xatol=} {fatol=}"
         optimize_time = round(time.perf_counter() - startTime, 3)
-        print(f"Optimization ({results['optimize_desc']}) took {result.nfev} tries in {optimize_time}s")
-        print("- Start:", initial_nonlin_paramArr.transpose(), "End:", result.x.transpose())
+        print(f"- Optimization ({results['optimize_desc']}) took {result.nfev} tries in {optimize_time}s")
+        print("Start:", initial_nonlin_paramArr.transpose(), "End:", result.x.transpose())
         if not result.success:
             print(result)
             exit(result.status)
@@ -138,11 +134,10 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
     else:
         if test_only:
             model = [m for m in params.lin.keys() if m not in ["V", "omega"]]
-        else:
-            print("Loaded nonlinear params:", params.nonlin)
-            for mod in model:
-                if mod in params.nonlin:
-                    model_fcns[mod].set_params(params.nonlin[mod], set_const=False)
+        print("Loaded nonlinear params:", params.nonlin)
+        for mod in model:
+            if mod in params.nonlin:
+                model_fcns[mod].set_params(params.nonlin[mod], set_const=False)
     # now set nonlin_paramArr from the model fcns, which are either defaults or just set from params.nonlin above^
     nonlin_paramArr = motor_model.get_nonlin_paramArr(model, model_fcns)
 
@@ -159,14 +154,18 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
 
 
 def printMotorResults(params, results):
-    print(f'dt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total runtime:', results["runtime"])
+    print(f'\ndt: {results["dt"]:.3} s; dt std dev: {results["dt_std_dev"]:.2e} s; total runtime:', results["runtime"])
+    spiky_angle_noise = np.std(results["spiky_angle_hf"]) * 1000
+    clean_angle_noise = np.std(results["angle_hf"]) * 1000
+    print(f"Angle noise std_dev [mrad]: Spiky: {round(spiky_angle_noise, 3)} Clean: {round(clean_angle_noise, 3)}",
+          f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
     print(f'{results["filter_desc"]} filter; Period = {round(results["filter_period"] * 1000)}ms')
     print("Parameters:", params, end="\n\n")
     print("Average error =", round(results["avg_error"], 3), "rad/s^2, Average acceleration =",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
     print("Regression R^2:", round(results["R^2_with_outliers"], 3))
-    print(f'\t- Without {results["num_outliers"]} outliers ({round(results["outlier%"], 2)}%):')
+    print(f'- Without {results["num_outliers"]} outliers ({round(results["outlier%"], 2)}%):')
     print("Average error =", round(results["avg_error_no_outs"], 3), "rad/s^2, Average acceleration",
           round(results["avg_acc_no_outliers"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev_no_outs"], 3), "rad/s^2")

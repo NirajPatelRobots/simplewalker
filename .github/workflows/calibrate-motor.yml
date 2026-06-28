@@ -78,8 +78,8 @@ jobs:
           --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: >- 
-          scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period filter_desc optimize_desc
-          --ignore dt dt_std_dev outlier_thresh N num_outliers --precision 3 >> $GITHUB_STEP_SUMMARY
+          scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period filter_desc
+          --ignore dt dt_std_dev outlier_thresh N num_outliers optimize_desc --precision 3 >> $GITHUB_STEP_SUMMARY
       - run: cat cal_summary.txt >> $GITHUB_STEP_SUMMARY
 
       - name: Upload calibrated motor parameters
@@ -135,7 +135,7 @@ jobs:
 #        || contains(toJSON(github.event.commits.*.modified), 'test/unittests/filter_unittest.py')
 #        || contains(toJSON(github.event.commits.*.modified), 'scripts/coverage.sh')
     steps:
-      - run: echo ${{ github.event.commits }}
+      - run: echo "${{ github.event.commits }}"
       - uses: actions/checkout@v6
         with:
           sparse-checkout: |
