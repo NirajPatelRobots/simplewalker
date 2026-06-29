@@ -1,6 +1,3 @@
-# /// script
-# dependencies = ["numpy>=2.0"]
-# ///
 """ motor model for calibration
 
 Fun facts:
@@ -28,7 +25,6 @@ TODO:
         Class for nonlinparams with names, current values, defaults, dict<->array conversion?
     Create model from string
     Set const and default params from input
-    Move validate_params to model_functions.py and validate nonlin parameters
     Differentiability? Difficult.
 """
 import dataclasses
@@ -117,17 +113,6 @@ def calc_model_contributions(X, paramArr, model):
             for mod, param, i in zip(["V", "omega"] + model, paramArr, range(len(paramArr)), strict=True)}
 
 
-def validate_params(params):
-    # Voltage should push forward
-    assert(params.lin["V"] > 0)
-    # Friction should oppose motion
-    assert(params.lin["omega"] < 0)
-    assert("const_fric" not in params.lin or params.lin["const_fric"] < 0)
-    assert("const_opposing_fric" not in params.lin or params.lin["const_opposing_fric"] < 0)
-    if "static_fric" in params.lin:
-        assert(params.lin["static_fric"] + params.lin["V"] > 0)
-
-
 def sanitize_dict(d):
     return {k: (sanitize_dict(v) if type(v) is dict
                 else v if (v is None or type(v) is int)
@@ -146,10 +131,3 @@ def loadParams(filename = "motorparams"):
             print("Could not load params from", filename)
             return Params()
     return Params(sanitize_dict(loaded["lin"]), sanitize_dict(loaded["nonlin"]))
-
-
-if __name__ == "__main__":
-    import sys
-    params = loadParams(sys.argv[1])
-    validate_params(params)
-    print("Success, No Validation Errors")

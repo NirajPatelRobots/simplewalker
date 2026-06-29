@@ -1,3 +1,6 @@
+# /// script
+# dependencies = ["calibrate"]
+# ///
 """ Specific motor model functions for calibration
 TODO:
     Better model sticky stops. Spring that stores and releases energy?
@@ -8,7 +11,7 @@ TODO:
 
 import numpy as np
 from filter import moving_avg, derivative, continuous_threshold, continuous_sign, integration
-from motor_model import ModelFcn
+from motor_model import ModelFcn, loadParams
 
 class Punch(ModelFcn):
     def __init__(self, fcn_input, early=False, start=None, **kwargs):
@@ -100,3 +103,23 @@ model_fcns = {
 for name, m in model_fcns.items():
     if not isinstance(m, ModelFcn):
         model_fcns[name] = ModelFcn(m, {}, {})
+
+
+#############################################################################################
+
+def validate_params(params):
+    # Voltage should push forward
+    assert(params.lin["V"] > 0)
+    # Friction should oppose motion
+    assert(params.lin["omega"] < 0)
+    assert("const_fric" not in params.lin or params.lin["const_fric"] < 0)
+    assert("const_opposing_fric" not in params.lin or params.lin["const_opposing_fric"] < 0)
+    if "static_fric" in params.lin:
+        assert(params.lin["static_fric"] + params.lin["V"] > 0)
+
+
+if __name__ == "__main__":
+    import sys
+    params = loadParams(sys.argv[1])
+    validate_params(params)
+    print("Success, No Validation Errors")

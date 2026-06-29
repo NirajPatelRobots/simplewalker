@@ -51,7 +51,7 @@ jq -r --argjson fixed "$FIXED_COLS" --argjson ignore "$IGNORE_COLS" --argjson pr
       (. // "-")  # Replace null with "-"
     end | tostring
   ;
-  def highlight: "<u>**" + . + "**</u>" ;
+  def highlight: "<ins>**" + . + "**</ins>" ;
   
   .[] |  # The input to the next section is the array of tests. The outputs are the rows.
   if length == 0 then "Empty dataset" else

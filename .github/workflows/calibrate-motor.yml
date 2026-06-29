@@ -41,37 +41,37 @@ jobs:
           -m static_fric const_fric s_punch
           -o data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration on squares ----------------------------------- >> cal_summary.txt
+      - run: echo -e "\n## Test calibration on squares" >> cal_summary.txt
       - name: Test calibration on squares
         run: >-
           uv run calibrate/calibrate_cli.py data/*_squ_*.motortest
           --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration on sines ------------------------------------- >> cal_summary.txt
+      - run: echo -e "\n## Test calibration on sines" >> cal_summary.txt
       - name: Test calibration on sines
         run: >-
           uv run calibrate/calibrate_cli.py data/*_sin_*.motortest
           --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration on deadband ---------------------------------- >> cal_summary.txt
+      - run: echo -e "\n## Test calibration on deadband" >> cal_summary.txt
       - name: Test calibration on deadband
         run: >-
           uv run calibrate/calibrate_cli.py data/*_db_*.motortest
           --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration without punch ---------------------------------- >> cal_summary.txt
+      - run: echo -e "\n## Test calibration without punch" >> cal_summary.txt
       - name: calibrate
         run: >-
           uv run calibrate/calibrate_cli.py data/*.motortest
           -m static_fric const_fric --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration with FIR filter -------------------------------- >> cal_summary.txt
+      - run: echo -e "\n## Test calibration with FIR filter" >> cal_summary.txt
       - name: Test calibration with FIR filter
         run: >-
           uv run calibrate/calibrate_cli.py data/*.motortest --filt-fcn fir
           --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
 
-      - run: echo && echo --- Test calibration @ filter_cutoff = 0.24s ----------------------- >> cal_summary.txt
+      - run: echo -e "\n## Test calibration @ filter_cutoff = 0.24s" >> cal_summary.txt
       - name: Test calibration @ filter_cutoff = 0.24s
         run: >-
           uv run calibrate/calibrate_cli.py data/*.motortest -T 0.24
@@ -99,6 +99,7 @@ jobs:
         with:
           sparse-checkout: |
             calibrate/filter.py
+            calibrate/model_functions.py
             calibrate/motor_model.py
             pyproject.toml
           sparse-checkout-cone-mode: false
@@ -108,7 +109,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
       - name: Validate parameters
-        run: uv run calibrate/motor_model.py motorparams
+        run: uv run calibrate/model_functions.py motorparams
 
   ruff_check:
     runs-on: ubuntu-slim
@@ -135,7 +136,7 @@ jobs:
 #        || contains(toJSON(github.event.commits.*.modified), 'test/unittests/filter_unittest.py')
 #        || contains(toJSON(github.event.commits.*.modified), 'scripts/coverage.sh')
     steps:
-      - run: echo "${{ github.event.commits }}"
+      - run: echo "${{ toJSON(github.event.commits) }}"
       - uses: actions/checkout@v6
         with:
           sparse-checkout: |
