@@ -3,10 +3,11 @@
 # ///
 """ Specific motor model functions for calibration
 TODO:
+    Validate that d(acc_pred)/dV > 0
     Better model sticky stops. Spring that stores and releases energy?
         Springs into action so it starts moving quickly, then oscillates.
-    Direct counter to low voltage
-    Punch is great for deadband but way too hard for squares. Find a compromise.
+    - Direct counter to low voltage
+    - Punch is great for deadband but way too hard for squares. Find a compromise.
 """
 
 import numpy as np

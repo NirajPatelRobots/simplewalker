@@ -18,10 +18,9 @@ Fun facts:
   - Adding slow_omega makes the prediction look more wrong, even if it matches the spikes into motion more closely.
     It made the prediction of the return to 0 speed worse! And it fails validation because da/dV < 0 for vel=0!
 TODO:
-    Validate that d(acc_pred)/dV > 0
     Nonlinear params
         nonlinparam_ranges: list[(float | None, float | None)]
-            minimize::Constraint. Combined with param validation?
+            - minimize::Constraint. Combined with param validation?
         Class for nonlinparams with names, current values, defaults, dict<->array conversion?
     Create model from string
     Set const and default params from input

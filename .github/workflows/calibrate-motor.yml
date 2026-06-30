@@ -137,6 +137,7 @@ jobs:
 #        || contains(toJSON(github.event.commits.*.modified), 'scripts/coverage.sh')
     steps:
       - run: echo "${{ toJSON(github.event.commits) }}"
+      - run: echo "${{ toJSON(github.event.commits.*.modified) }}"
       - uses: actions/checkout@v6
         with:
           sparse-checkout: |

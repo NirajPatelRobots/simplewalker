@@ -2,19 +2,17 @@
 """
 Library for motor calibration
 TODO:
+    - Another .py file for file IO? test data, params, results
     Nonlinear integer optimization
     Indicate when parameter has little effect on optimization
     deadband model: modify angle measurements?
     measure battery voltage during calibration
-    We don't need all of calc_result_stats in every optimization loop, make a minimal version
-    Another .py file for file IO? test data, params, results
     why angle jumps? Just remove them from test data?
     electrically isolate angle sensors to reduce noise?
     structure: clear flow of sensor data -> /(sensor model) -> believed true values -> /(motor model) -> prediction
     Way of representing how much data is lost when filtering is increased causing R^2 to increase
     prediction accuracy as fcn of vel?
     fourier analysis (compare F_V(w) with F_acc_pred(w)) to find frequency response of system
-        Is there any way or reason to have cli fourier analysis?
     Screw a second motor to the calibration motor, short its motor wires, and use it to measure with (2x) backlash?
 
 Created Jun 2021
@@ -83,25 +81,26 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         else:
             return paramArr
 
-    def calc_result_stats(results):
+    def calc_result_stats(results, calc_all=False):
         accel_error = results["accel_predic"] - results["acc_f"]
         results["error_std_dev"] = np.std(accel_error)
         results["outlier_thresh"] = 3 * results["error_std_dev"]
-        results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
-        results["outlier%"] = results["num_outliers"] / results["N"] * 100
-        results["accel_error"] = accel_error
-        results["avg_error"] = np.average(np.abs(accel_error))
-        results["R^2_with_outliers"] = 1 - np.sum(accel_error**2) / np.sum(results["acc_f"]**2)
         results["accel_error_nan"] = np.where(np.abs(accel_error) < results["outlier_thresh"], accel_error, np.nan)
         acc_f_nan = np.where(np.abs(accel_error) < results["outlier_thresh"], results["acc_f"], np.nan)
-        results["avg_acc_no_outliers"] = np.nanmean(np.abs(acc_f_nan))
         results["R^2_no_outliers"] = 1 - np.nansum(results["accel_error_nan"]**2) / np.nansum(acc_f_nan**2)
-        results["avg_error_no_outs"] = np.nanmean(np.abs(results["accel_error_nan"]))
-        results["error_std_dev_no_outs"] = np.nanstd(np.abs(results["accel_error_nan"]))
-        results["dt"] = float(np.mean(results["diff_t"]))
-        results["dt_std_dev"] = float(np.std(np.where(results["diff_t"] > 10 * results["dt"], results["dt"], results["diff_t"])))
-        minutes, seconds = divmod(int(np.max(results["t"])), 60)
-        results["runtime"] = f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s'
+        if calc_all:
+            results["accel_error"] = accel_error
+            results["num_outliers"] = np.sum(np.abs(accel_error) > results["outlier_thresh"])
+            results["outlier%"] = results["num_outliers"] / results["N"] * 100
+            results["avg_error"] = np.average(np.abs(accel_error))
+            results["R^2_with_outliers"] = 1 - np.sum(accel_error**2) / np.sum(results["acc_f"]**2)
+            results["avg_acc_no_outliers"] = np.nanmean(np.abs(acc_f_nan))
+            results["avg_error_no_outs"] = np.nanmean(np.abs(results["accel_error_nan"]))
+            results["error_std_dev_no_outs"] = np.nanstd(np.abs(results["accel_error_nan"]))
+            results["dt"] = float(np.mean(results["diff_t"]))
+            results["dt_std_dev"] = float(np.std(np.where(results["diff_t"] > 10 * results["dt"], results["dt"], results["diff_t"])))
+            minutes, seconds = divmod(int(np.max(results["t"])), 60)
+            results["runtime"] = f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s'
 
     def calc_residual(nonlin_paramArr, results, model, model_fcns):
         X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramArr)
@@ -146,7 +145,7 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
     X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramArr)
     paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
     results["accel_predic"] = X @ paramArr
-    calc_result_stats(results)
+    calc_result_stats(results, True)
     results["model_contributions"] = motor_model.calc_model_contributions(X, paramArr, model)
     params.lin = motor_model.assign_lin_parameters(paramArr, model)
     params.nonlin = motor_model.assign_nonlin_parameters(model, nonlin_paramArr, model_fcns, include_consts=True)

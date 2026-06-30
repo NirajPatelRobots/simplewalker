@@ -1,7 +1,8 @@
 """ filtering for offline calibration
 TODO:
     remove spikes: better removal of spikes that swing positive and negative
-    continuous_threshold get closer to 0: continuous_threshold_to_zero() which goes to 0 at a certain value
+    Better quantization removal. Markov graph to do this and spike removal?
+    - continuous_threshold get closer to 0: continuous_threshold_to_zero() which goes to 0 at a certain value
     filter_data() compensate for delay? FIR delay = order / 2
     organize chain of filters: spike removal -> moving_avg -> lowpass. DataCleaner?
 """
