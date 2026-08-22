@@ -38,7 +38,7 @@ jobs:
       - name: calibrate
         run: >-
           uv run calibrate/calibrate_cli.py data/*.motortest
-          -m static_fric const_fric s_punch
+          -m static_fric const_fric s_punch diff_since
           -o data/motorparams --results-json cal_results.json >> cal_summary.txt
 
       - run: echo -e "\n## Test calibration on squares" >> cal_summary.txt
@@ -64,6 +64,12 @@ jobs:
         run: >-
           uv run calibrate/calibrate_cli.py data/*.motortest
           -m static_fric const_fric --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration without diff_since" >> cal_summary.txt
+      - name: calibrate
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*.motortest
+          -m static_fric const_fric s_punch --results-json cal_results.json >> cal_summary.txt
 
       - run: echo -e "\n## Test calibration with FIR filter" >> cal_summary.txt
       - name: Test calibration with FIR filter
@@ -129,15 +135,7 @@ jobs:
 
   unit_tests:
     runs-on: ubuntu-slim
-#    if: |
-#        contains(toJSON(github.event.commits.*.modified), 'calibrate/filter.py')
-#        || contains(toJSON(github.event.commits.*.modified), 'calibrate/motor_model.py')
-#        || contains(toJSON(github.event.commits.*.modified), 'test/unittests/calibration_model_unittest.py')
-#        || contains(toJSON(github.event.commits.*.modified), 'test/unittests/filter_unittest.py')
-#        || contains(toJSON(github.event.commits.*.modified), 'scripts/coverage.sh')
     steps:
-      - run: echo "${{ toJSON(github.event.commits) }}"
-      - run: echo "${{ toJSON(github.event.commits.*.modified) }}"
       - uses: actions/checkout@v6
         with:
           sparse-checkout: |

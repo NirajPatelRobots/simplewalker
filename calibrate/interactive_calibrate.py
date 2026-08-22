@@ -4,6 +4,7 @@ Interactive command line and graphs
 TODO:
     graph model partials like slowness
     fancy modern interactive data frontend?
+    histogram of velocity
 """
 import matplotlib.pyplot as plt
 import numpy as np
@@ -215,7 +216,7 @@ def main():
           "model [[no] model_name]",
           "code", sep="\n ")
     testdata = []
-    model = ['static_fric', 'const_fric', 's_punch']
+    model = ['static_fric', 'const_fric', 's_punch', 'diff_since']
     filter_params = FilterParams(fcn="butter")
     params = None
     data_path = join(dirname(dirname(__file__)), "data")

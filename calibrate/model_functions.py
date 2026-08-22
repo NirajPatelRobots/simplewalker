@@ -4,10 +4,7 @@
 """ Specific motor model functions for calibration
 TODO:
     Validate that d(acc_pred)/dV > 0
-    Better model sticky stops. Spring that stores and releases energy?
-        Springs into action so it starts moving quickly, then oscillates.
-    - Direct counter to low voltage
-    - Punch is great for deadband but way too hard for squares. Find a compromise.
+    Punch (s_punch) matches db and big squares, but is too hard for smaller squares.
 """
 
 import numpy as np
@@ -15,28 +12,51 @@ from filter import moving_avg, derivative, continuous_threshold, continuous_sign
 from motor_model import ModelFcn, loadParams
 
 class Punch(ModelFcn):
-    def __init__(self, fcn_input, early=False, start=None, **kwargs):
+    def __init__(self, fcn_input, early=False, rise_only=True, start=None, **kwargs):
         start_params = {"on_thresh": 0.1, "off_thresh": 0.1} | (start or {})
         super().__init__(fcn_input, start_params, {"num_points": 100} | kwargs)
         self.early = early
+        self.rise_only = rise_only
     # off_thresh is None -> off_thresh = on_thresh
     def __call__(self, results) -> np.ndarray:
         input_acc = super().__call__(results)
         off_thresh = self.off_thresh or self.on_thresh
         old_signal = input_acc if self.early else np.roll(input_acc, self.num_points)
         new_signal = np.roll(input_acc, -self.num_points) if self.early else input_acc
-        punch_force = np.where((np.abs(old_signal) < off_thresh) & (np.abs(new_signal) > self.on_thresh),
-                               (new_signal - old_signal), 0)
+        punch_here = (np.abs(old_signal) < off_thresh) & (np.abs(new_signal) > self.on_thresh)
+        if self.rise_only:
+            punch_here &= (np.abs(new_signal) > np.abs(old_signal))
+        punch_force = np.where(punch_here, (new_signal - old_signal), 0)
         punch_force[0:self.num_points] = np.zeros(self.num_points)
         return punch_force
 
 
-class Delay(ModelFcn):
-    def __init__(self, fcn_input, **kwargs):
-        super().__init__(fcn_input, {"delay_samples": 0}, kwargs)
+class DifferenceSince(ModelFcn):
+    def __init__(self, fcn_input, delay_samples=0):
+        super().__init__(fcn_input, {}, {"delay_samples": delay_samples})
     def __call__(self, results) -> np.ndarray:
         input_acc = super().__call__(results)
-        return np.roll(input_acc, self.delay_samples)
+        out_acc = input_acc - np.roll(input_acc, self.delay_samples)
+        out_acc[0:self.delay_samples] *= 0
+        return out_acc
+
+
+class CutoffAbove(ModelFcn):
+    def __init__(self, fcn_input, start=None, **kwargs):
+        super().__init__(fcn_input, {"threshold": 0.0} | (start or {}), kwargs)
+    def __call__(self, results) -> np.ndarray:
+        input_signal = super().__call__(results)
+        return np.where(input_signal > self.threshold, 0, input_signal)
+
+
+class Delay(ModelFcn):
+    def __init__(self, fcn_input, delay_samples=0):
+        super().__init__(fcn_input, {}, {"delay_samples": delay_samples})
+    def __call__(self, results) -> np.ndarray:
+        input_acc = super().__call__(results)
+        out_acc = np.roll(input_acc, self.delay_samples)
+        out_acc[0:self.delay_samples] *= 0
+        return out_acc
 
 
 class Spring(ModelFcn):
@@ -79,12 +99,14 @@ model_fcns = {
     "const_opposing_fric": lambda results:
     sign_vel_f(results["vel_f"]) * np.where(np.sign(results["vel_f"]) == np.sign(results["V_f"]), 1, 0),
     "static_fric": lambda results:       slowness(results["vel_f"]) * results["V_f"],
+    "low_V":                             CutoffAbove("V_f", start={"threshold": 0.4}),
 
     # speed or Voltage punch "kicks-in" as signal is starting up
     # "s_punch":           Punch("vel_f", num_points=95, on_thresh=0.05, off_thresh=None, early=False),
     # "s_punch":           Punch("vel_f", num_points=95, on_thresh=0.17, off_thresh=0.25, early=False),
-    "s_punch":           Punch("vel_f", num_points=95, early=False,
-                               start={"on_thresh": 0.035, "off_thresh": 0.18}),
+    "s_punch":           Punch("vel_f", num_points=180, early=False, rise_only=True,
+                               start={"on_thresh": 0.0, "off_thresh": 0.03}),
+    "diff_since":        DifferenceSince("vel_f", delay_samples=180),
     "V_punch":           Punch("V_f",   num_points=130, on_thresh=0.5, off_thresh=0.4, early=False),
     "sharp_punch":       Punch("vel_f", num_points=30, on_thresh=0.02, off_thresh=0.05, early=False),
     "early_punch":       Punch("vel_f", num_points=80, on_thresh=0.05, early=True),
