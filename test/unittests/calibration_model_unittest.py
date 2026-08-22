@@ -1,6 +1,7 @@
 """
 Unit tests for calibration motor model
 TODO:
+    package to avoid sys.path.append?
 """
 
 import numpy as np
@@ -8,7 +9,8 @@ from os import path
 import pytest
 import sys
 sys.path.append(path.join(path.dirname(path.dirname(path.dirname(__file__))), "calibrate"))
-from motor_model import ModelFcn, get_nonlin_paramArr, assign_nonlin_parameters, loadParams, saveParams, Params
+from motor_model import ModelFcn, get_nonlin_paramArr, assign_nonlin_parameters, Params
+from calibrate_fileIO import saveParams, loadParams
 
 
 class MultiplierModelFcn(ModelFcn):

@@ -2,7 +2,6 @@
 """
 Library for motor calibration
 TODO:
-    - Another .py file for file IO? test data, params, results
     Nonlinear integer optimization
     Indicate when parameter has little effect on optimization
     deadband model: modify angle measurements?
@@ -14,6 +13,10 @@ TODO:
     prediction accuracy as fcn of vel?
     fourier analysis (compare F_V(w) with F_acc_pred(w)) to find frequency response of system
     Screw a second motor to the calibration motor, short its motor wires, and use it to measure with (2x) backlash?
+    Stop functions from "cheating" with perfect prediction by using true acc derivative of results
+        Perturb with noise?
+        Enforce Causality: Don't allow fcns to use vel_f values more recent than now (or now - start of filter period)?
+        vel_f used by model fcns has different filter?
 
 Created Jun 2021
 @author: Niraj
@@ -114,8 +117,8 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         result = minimize(lambda x: calc_residual(x, results, model, model_fcns),
                           x0=initial_nonlin_paramArr,
                           method="Nelder-Mead", options={"xatol": xatol, "fatol": fatol})
-        results["optimize_desc"] = f"N-M {xatol=} {fatol=}"
         optimize_time = round(time.perf_counter() - startTime, 3)
+        results["optimize_desc"] = f"N-M {xatol=} {fatol=}"
         print(f"- Optimization ({results['optimize_desc']}) took {result.nfev} tries in {optimize_time}s")
         print("Start:", initial_nonlin_paramArr.transpose(), "End:", result.x.transpose())
         if not result.success:
@@ -169,45 +172,6 @@ def printMotorResults(params, results):
           round(results["avg_acc_no_outliers"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev_no_outs"], 3), "rad/s^2")
     print("Regression R^2:", round(results["R^2_no_outliers"], 3))
-
-
-def saveResultsJson(filename, results, model):
-    from os import path; import json
-    if path.exists(filename):
-        with open(filename) as inFile:
-            output = json.load(inFile)
-    else:
-        output = {"tests": []}
-    this_test = {}
-    for k, v in results.items():
-        if (type(v) in [np.ndarray, np.float64] and v.size == 1) or type(v) is float:
-            this_test[k] = float(v)
-        elif (type(v) is np.int64 and v.size == 1) or type(v) is int:
-            this_test[k] = int(v)
-        elif type(v) is str:
-            this_test[k] = v
-    this_test["model"] = " ".join(model)
-    this_test["input_file_prefix"] = path.commonprefix(list(results["log_starts"].values())).split("/")[-1]
-    for test in output["tests"]:
-        if all([k in test and test[k] == v for k, v in this_test.items()]):
-            return
-    output["tests"].append(this_test)
-    with open(filename, "w") as outFile:
-        json.dump(output, outFile, indent=2)
-
-
-def loadRun(filename):
-    if "motortest" not in filename:
-        filename = filename + ".motortest"
-    try:
-        with open(filename, 'rb') as file:
-            data = dict(np.load(file, allow_pickle=True))
-            data["filename"] = filename
-            if "t" not in data:
-                data["t"] = np.linspace(0., len(data["V"]) * data["dt"], num=len(data["V"]))
-            return data
-    except Exception as e:
-        print("Load failed:", filename, " because \n", e)
 
 
 def clean_up_test_data(this_data, results, filter_params):

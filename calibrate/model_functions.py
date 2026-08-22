@@ -9,7 +9,9 @@ TODO:
 
 import numpy as np
 from filter import moving_avg, derivative, continuous_threshold, continuous_sign, integration
-from motor_model import ModelFcn, loadParams
+from motor_model import ModelFcn
+from calibrate_fileIO import loadParams
+
 
 class Punch(ModelFcn):
     def __init__(self, fcn_input, early=False, rise_only=True, start=None, **kwargs):

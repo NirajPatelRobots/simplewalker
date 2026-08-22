@@ -5,10 +5,8 @@
     Load model but not params from file, maybe plaintext list of model names with nonlin parameter names?
 """
 import argparse
-import glob
-from os.path import basename, splitext, commonprefix
-from calibrate import loadRun, examineMotor, printMotorResults, FilterParams, saveResultsJson
-from motor_model import saveParams, loadParams
+from calibrate import examineMotor, printMotorResults, FilterParams
+from calibrate_fileIO import load_runs, saveParams, loadParams, saveResultsJson
 
 
 def parse_args(src=None):
@@ -32,14 +30,6 @@ def parse_args(src=None):
     if args.test_only and (args.model is not None or args.params_out is not None):
         parser.error("Cannot set model or save params in test-only mode")
     return args
-
-
-def load_runs(filenames):
-    testdata = [loadRun(f) for f in sorted([g for f in filenames for g in glob.glob(f)])]  # :P
-    names = [splitext(basename(data["filename"]))[0] for data in testdata]
-    prefix = commonprefix(names)[:-1] if commonprefix(names).endswith("_a") else commonprefix(names)
-    print(f"File prefix: {prefix}, tags: {', '.join([n[len(prefix):] for n in names])}")
-    return testdata
 
 
 def main():

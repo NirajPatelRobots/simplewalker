@@ -11,6 +11,7 @@ on:
       - calibrate/model_functions.py
       - calibrate/motor_model.py
       - calibrate/calibrate_cli.py
+      - calibrate/calibrate_fileIO.py
       - pyproject.toml
       - scripts/json_to_md_table.sh
 
@@ -23,6 +24,7 @@ jobs:
           sparse-checkout: |
             calibrate/calibrate.py
             calibrate/calibrate_cli.py
+            calibrate/calibrate_fileIO.py
             calibrate/filter.py
             calibrate/model_functions.py
             calibrate/motor_model.py
@@ -107,6 +109,7 @@ jobs:
             calibrate/filter.py
             calibrate/model_functions.py
             calibrate/motor_model.py
+            calibrate/calibrate_fileIO.py
             pyproject.toml
           sparse-checkout-cone-mode: false
       - name: Download motorparams
@@ -141,6 +144,7 @@ jobs:
           sparse-checkout: |
             calibrate/filter.py
             calibrate/motor_model.py
+            calibrate/calibrate_fileIO.py
             pyproject.toml
             test/unittests/calibration_model_unittest.py
             test/unittests/filter_unittest.py

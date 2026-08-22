@@ -34,7 +34,7 @@ testpaths = ["test/unittests/calibration_model_unittest.py", "test/unittests/fil
 # other unit tests are unittest framework
 
 [tool.coverage.run]
-include = ["calibrate/filter.py", "calibrate/motor_model.py"]
+include = ["calibrate/filter.py", "calibrate/motor_model.py", "calibrate/calibrate_fileIO.py"]
 [tool.coverage.report]
 [tool.coverage.html]
 directory = "data/htmlcov"

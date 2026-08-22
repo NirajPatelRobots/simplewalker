@@ -12,9 +12,9 @@ from os import listdir
 from os.path import isfile, join, dirname, splitext
 import sys
 
-from calibrate import loadRun, examineMotor, printMotorResults
+from calibrate import examineMotor, printMotorResults
+from calibrate_fileIO import loadRun, saveParams, loadParams
 from filter import FilterParams, FourierAnalysis, FourierSignal
-from motor_model import saveParams, loadParams
 
 
 def graphMotorResults(results, filter_params):

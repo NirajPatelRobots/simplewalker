@@ -20,14 +20,15 @@ Fun facts:
 TODO:
     Nonlinear params
         nonlinparam_ranges: list[(float | None, float | None)]
-            - minimize::Constraint. Combined with param validation?
+            minimize::Constraint. Combined with param validation?
         Class for nonlinparams with names, current values, defaults, dict<->array conversion?
+        Inherit params up/down fcn signal chain, or have a way to set them equal
+        Model fcns with 2 inputs. Ex: Punch using vel_f to find when to punch and another input for values during punch.
     Create model from string
     Set const and default params from input
     Differentiability? Difficult.
 """
 import dataclasses
-import json
 import numpy as np
 
 class ModelFcn:
@@ -110,23 +111,3 @@ def assign_nonlin_parameters(model: list[str], values: np.ndarray, model_fcns: d
 def calc_model_contributions(X, paramArr, model):
     return {mod: param * X[:, i].transpose()
             for mod, param, i in zip(["V", "omega"] + model, paramArr, range(len(paramArr)), strict=True)}
-
-
-def sanitize_dict(d):
-    return {k: (sanitize_dict(v) if type(v) is dict
-                else v if (v is None or type(v) is int)
-                else float(v)) for (k, v) in d.items()}
-
-def saveParams(params, filename = "new"):
-    with open(filename if "." in str(filename) else str(filename) + ".json", "w") as file:
-        json.dump(obj={"lin": sanitize_dict(params.lin), "nonlin": sanitize_dict(params.nonlin)}, fp=file, indent=2)
-
-
-def loadParams(filename = "motorparams"):
-    with open(filename if "." in str(filename) else str(filename) + ".json") as file:
-        try:
-            loaded = json.load(file)
-        except json.JSONDecodeError:
-            print("Could not load params from", filename)
-            return Params()
-    return Params(sanitize_dict(loaded["lin"]), sanitize_dict(loaded["nonlin"]))
