@@ -24,8 +24,10 @@ interactive_calibration = [
 include = ["calibrate/*.py"]
 [tool.ruff.lint]
 ignore = ["E702",  # Multiple statements on one line
-          "F401"   # Unused import
+          "I001"   # Import order. Sure, some organization is good, but this is ridiculous.
 ]
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["filter.FilterParams"]
 
 
 [tool.pytest]

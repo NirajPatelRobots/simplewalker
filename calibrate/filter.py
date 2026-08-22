@@ -6,10 +6,10 @@ TODO:
     filter_data() compensate for delay? FIR delay = order / 2
     organize chain of filters: spike removal -> moving_avg -> lowpass. DataCleaner?
 """
+from dataclasses import dataclass
 import numpy as np
 from scipy import signal
 from scipy.fft import rfft, rfftfreq
-from dataclasses import dataclass
 
 DEFAULT_FILTER_CUTOFF_N = 180
 DEFAULT_IIR_ORDER = 5
@@ -26,7 +26,7 @@ class FilterParams:
     fcn: str = "butter"   # 'cheby'
     ripple: float = 0.5  # only applies to cheby filters
     angle_moving_avg_N: int = None
-    fcn_options = ["butter", "fir", "cheby"]
+    fcn_options = ("butter", "fir", "cheby")
     def __post_init__(self):
         if self.order is None:
             self.order = DEFAULT_FIR_ORDER if self.fcn == "fir" else DEFAULT_IIR_ORDER

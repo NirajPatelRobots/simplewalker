@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Library for motor calibration
 TODO:
@@ -24,7 +23,9 @@ Created Jun 2021
 
 import numpy as np
 from scipy.optimize import minimize
+import sys
 import time
+
 from filter import FilterParams, filter_data, cut_first, moving_avg, derivative, remove_spikes
 import motor_model
 from model_functions import model_fcns
@@ -123,7 +124,7 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         print("Start:", initial_nonlin_paramArr.transpose(), "End:", result.x.transpose())
         if not result.success:
             print(result)
-            exit(result.status)
+            sys.exit(result.status)
         return result.x
 
     if len(testdata) == 0:
@@ -135,7 +136,7 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         model = model or []
     else:
         if test_only:
-            model = [m for m in params.lin.keys() if m not in ["V", "omega"]]
+            model = [m for m in params.lin if m not in ["V", "omega"]]
         print("Loaded nonlinear params:", params.nonlin)
         for mod in model:
             if mod in params.nonlin:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Work with the motor controller to take data to calibrate the motor.
 The motor controller has to run calibrate_motor.
@@ -14,16 +13,16 @@ Created Jun 2021, reworked late 2023
 @author: Niraj
 """
 
-import numpy as np
-from os.path import sep
-import time
-import sys
 import json
-import types
+from os.path import sep
 import re
-import serial
 import struct
+import sys
+import time
+import types
 
+import numpy as np
+import serial
 
 def saveRun(filename, V_, angle_, motorNum, t_, test_type="motor"):
     with open("data" + sep + "m" +str(motorNum) + '_' + filename +".motortest", 'wb') as file:
@@ -32,12 +31,12 @@ def saveRun(filename, V_, angle_, motorNum, t_, test_type="motor"):
 
 class ControllerSerial(serial.Serial):
     def __init__(self, connect=True):
-        super(ControllerSerial, self).__init__()
+        super().__init__()
         if connect:
             self.connect()
 
     def connect(self) -> None:
-        super(ControllerSerial, self).__init__(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
+        super().__init__(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
                                                stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
         if self.is_open:
             print("Connected to", self.name)
@@ -106,7 +105,7 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
             for amp_scale in run["amp_scales"]:
                 for freq_scale in run["freq_scales"]:
                     filename = series_name + motortest_filename_tag(amp_scale, freq_scale, run_type_num)
-                    if ("dry_run" in series_config and series_config["dry_run"]) or ("skip" in run and run["skip"]):
+                    if (series_config.get("dry_run")) or (run.get("skip")):
                         print("Skipping", filename)
                         continue
                     print("\tRunning:", filename)
@@ -205,11 +204,11 @@ def interactive_main():
             ser.close()
             break
         elif command == "code":
-            while not command == "exit":
+            while command != "exit":
                 command = input(">>> ")
                 try:
                     print(eval(command))
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(e)
 
 

@@ -31,14 +31,15 @@ TODO:
 import dataclasses
 import numpy as np
 
+
 class ModelFcn:
     # fcn_input can be one of: a string key for results, another ModelFcn, or a (lambda) function(results) -> ndarray
     def __init__(self, fcn_input, default_params: dict, const_params: dict):
-        if "input" in default_params.keys() or "input" in const_params.keys():
+        if "input" in default_params or "input" in const_params:
             raise ValueError("'input' is not a valid param name")
         self.fcn_input = fcn_input
         self.const_param_names = list(const_params.keys())
-        self.variable_param_names = [p for p in default_params.keys() if p not in self.const_param_names]
+        self.variable_param_names = [p for p in default_params if p not in self.const_param_names]
         self.set_params(default_params)
         self.set_params(const_params)  # override defaults
     def set_params(self, new_params: dict, set_const=True):

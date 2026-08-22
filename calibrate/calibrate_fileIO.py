@@ -22,8 +22,8 @@ def saveResultsJson(filename, results, model):
             this_test[k] = v
     this_test["model"] = " ".join(model)
     this_test["input_file_prefix"] = commonprefix(list(results["log_starts"].values())).split("/")[-1]
-    for test in output["tests"]:
-        if all([k in test and test[k] == v for k, v in this_test.items()]):
+    for existing_test in output["tests"]:
+        if all(existing_test.get(k) == v for k, v in this_test.items()):
             return
     output["tests"].append(this_test)
     with open(filename, "w") as outFile:
@@ -40,7 +40,7 @@ def loadRun(filename):
             if "t" not in data:
                 data["t"] = np.linspace(0., len(data["V"]) * data["dt"], num=len(data["V"]))
             return data
-    except Exception as e:
+    except (FileNotFoundError, np.pickle.UnpicklingError) as e:
         print("Load failed:", filename, " because \n", e)
 
 

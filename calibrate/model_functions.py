@@ -8,9 +8,10 @@ TODO:
 """
 
 import numpy as np
+
+from calibrate_fileIO import loadParams
 from filter import moving_avg, derivative, continuous_threshold, continuous_sign, integration
 from motor_model import ModelFcn
-from calibrate_fileIO import loadParams
 
 
 class Punch(ModelFcn):
@@ -74,7 +75,7 @@ class Spring(ModelFcn):
         primary_vel = np.zeros(unsprung_acc.shape)
         for i in range(1, len(unsprung_acc)):
             dt = results["t"][i] - results["t"][i - 1]
-            if results["t"][i] in results["log_starts"].keys():
+            if results["t"][i] in results["log_starts"]:
                 for hidden_signal in [spring_angle, spring_vel, primary_angle, primary_vel]:
                     hidden_signal[i] = 0
             else:

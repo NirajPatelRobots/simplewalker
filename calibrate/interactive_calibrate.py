@@ -152,7 +152,7 @@ def graph_signal_filter_frequencies(results, name, unit, fourier: FourierAnalysi
     name_f = name + "_f"
     data_fourier = FourierSignal(results, name, fourier, moving_avg_pts)
 
-    fig, axs = plt.subplots(num=num, nrows=3, sharex='all', figsize=(8, 10), clear=True)
+    _, axs = plt.subplots(num=num, nrows=3, sharex='all', figsize=(8, 10), clear=True)
     plot_mag(axs, freqs, data_fourier.smooth_mag, 'C1', "moving avg", zorder=4)
     axs[0].set_ylim(axs[0].get_ylim())
     axs[1].set_ylim(axs[1].get_ylim())
@@ -246,13 +246,15 @@ def main():
                         if len(testdata) == 1:
                             test_type = testdata[0]["test_type"]
                         else:
-                            if not testdata[i]["test_type"] == test_type:
+                            if testdata[i]["test_type"] != test_type:
                                 print("mismatched test_type", test_type, testdata[i]["test_type"], "for", f)
             if len(testdata) > 0:
                 if test_type == "motor":
                     params, results = examineMotor(testdata, model, params, filter_params)
                     printMotorResults(params, results)
                     graphMotorResults(results, filter_params)
+                else:
+                    print("Error: Cannot examine, test_type is not motor. So what is it?")
         elif command == "saveparams":
             filename = args[1] if len(args) > 1 else "new"
             saveParams(params, join(data_path, filename))
@@ -277,11 +279,11 @@ def main():
         elif command.startswith("exit"):
             break
         elif command == "code":
-            while not command == "exit":
+            while command != "exit":
                 command = input(">>> ")
                 try:
                     print(eval(command))
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     print(e)
 
 
