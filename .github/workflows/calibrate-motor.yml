@@ -7,32 +7,150 @@ on:
       - .github/workflows/calibrate-motor.yml
       - data/motortestdata.zip
       - calibrate/calibrate.py
+      - calibrate/filter.py
+      - calibrate/model_functions.py
+      - calibrate/motor_model.py
+      - calibrate/calibrate_cli.py
+      - calibrate/calibrate_fileIO.py
       - pyproject.toml
+      - scripts/json_to_md_table.sh
 
 jobs:
   calibrate:
     runs-on: ubuntu-slim
-    strategy:
-      matrix:
-        include:
-          - python-version: ""
-            dependency-resolution: "highest"
-          - python-version: "3.11"
-            dependency-resolution: "lowest"
     steps:
       - uses: actions/checkout@v6
         with:
           sparse-checkout: |
             calibrate/calibrate.py
+            calibrate/calibrate_cli.py
+            calibrate/calibrate_fileIO.py
+            calibrate/filter.py
+            calibrate/model_functions.py
+            calibrate/motor_model.py
             pyproject.toml
+            scripts/json_to_md_table.sh
             data/motortestdata.zip
           sparse-checkout-cone-mode: false
       - name: Unzip motor test data
         run: unzip -d data/ data/motortestdata.zip
       - name: Install uv
         uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
-        with:
-          python-version: ${{ matrix.python-version }}
-          resolution-strategy: ${{ matrix.dependency-resolution }}
+
       - name: calibrate
-        run: uv run --extra calibration calibrate/calibrate.py data/*.motortest >> $GITHUB_STEP_SUMMARY
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*.motortest
+          -m static_fric const_fric s_punch diff_since
+          -o data/motorparams --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration on squares" >> cal_summary.txt
+      - name: Test calibration on squares
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*_squ_*.motortest
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration on sines" >> cal_summary.txt
+      - name: Test calibration on sines
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*_sin_*.motortest
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration on deadband" >> cal_summary.txt
+      - name: Test calibration on deadband
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*_db_*.motortest
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration without punch" >> cal_summary.txt
+      - name: calibrate
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*.motortest
+          -m static_fric const_fric --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration without diff_since" >> cal_summary.txt
+      - name: calibrate
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*.motortest
+          -m static_fric const_fric s_punch --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration with FIR filter" >> cal_summary.txt
+      - name: Test calibration with FIR filter
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*.motortest --filt-fcn fir
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+
+      - run: echo -e "\n## Test calibration @ filter_cutoff = 0.24s" >> cal_summary.txt
+      - name: Test calibration @ filter_cutoff = 0.24s
+        run: >-
+          uv run calibrate/calibrate_cli.py data/*.motortest -T 0.24
+          --test-only -i data/motorparams --results-json cal_results.json >> cal_summary.txt
+
+      - run: >- 
+          scripts/json_to_md_table.sh cal_results.json model input_file_prefix filter_period filter_desc
+          --ignore dt dt_std_dev outlier_thresh N num_outliers optimize_desc --precision 3 >> $GITHUB_STEP_SUMMARY
+      - run: cat cal_summary.txt >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload calibrated motor parameters
+        uses: actions/upload-artifact@v6
+        with:
+          name: motorparams
+          path: ./data/motorparams.json
+          retention-days: 1
+          overwrite: true
+          if-no-files-found: error
+
+  validate_motor_params:
+    needs: calibrate
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            calibrate/filter.py
+            calibrate/model_functions.py
+            calibrate/motor_model.py
+            calibrate/calibrate_fileIO.py
+            pyproject.toml
+          sparse-checkout-cone-mode: false
+      - name: Download motorparams
+        uses: actions/download-artifact@v8
+        with: { name: motorparams }
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+      - name: Validate parameters
+        run: uv run calibrate/model_functions.py motorparams
+
+  ruff_check:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            calibrate/*.py
+            pyproject.toml
+          sparse-checkout-cone-mode: false
+      - name: ruff check
+        uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b # v4.0.0
+        with:
+          args: check --output-format=github
+          src: "./calibrate"
+        continue-on-error: true
+
+  unit_tests:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            calibrate/filter.py
+            calibrate/motor_model.py
+            calibrate/calibrate_fileIO.py
+            pyproject.toml
+            test/unittests/calibration_model_unittest.py
+            test/unittests/filter_unittest.py
+            scripts/coverage.sh
+          sparse-checkout-cone-mode: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+      - name: run calibration unit tests
+        run: scripts/coverage.sh md >> $GITHUB_STEP_SUMMARY

@@ -18,3 +18,25 @@ interactive_calibration = [
     "pillow>=9.3",
     "scipy>=1.13",
 ]
+
+
+[tool.ruff]
+include = ["calibrate/*.py"]
+[tool.ruff.lint]
+ignore = ["E702",  # Multiple statements on one line
+          "I001"   # Import order. Sure, some organization is good, but this is ridiculous.
+]
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["filter.FilterParams"]
+
+
+[tool.pytest]
+minversion = "9.0"
+testpaths = ["test/unittests/calibration_model_unittest.py", "test/unittests/filter_unittest.py"]
+# other unit tests are unittest framework
+
+[tool.coverage.run]
+include = ["calibrate/filter.py", "calibrate/motor_model.py", "calibrate/calibrate_fileIO.py"]
+[tool.coverage.report]
+[tool.coverage.html]
+directory = "data/htmlcov"
