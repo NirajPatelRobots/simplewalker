@@ -23,7 +23,7 @@
 #ifndef SIMPLEWALKER_PICO_MOTOR_IO_HPP
 #define SIMPLEWALKER_PICO_MOTOR_IO_HPP
 #include "motor_output.hpp"
-#include "ADC_reader.hpp"
+#include "../sensors/ADC_reader.hpp"
 #include <string>
 #include <vector>
 

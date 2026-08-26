@@ -7,11 +7,11 @@ TODO:
         shouldn't include loop timing nor communication
  */
 
-#include "pico_comm.hpp"
-#include "../communication/messages.h"
+#include "communication/pico_comm.hpp"
+#include "../../communication/messages.h"
 #include "micro_parameters.h"
 #include "simplewalker_motors.hpp"
-#include "motor_control.hpp"
+#include "control/motor_control.hpp"
 #include "controller_info.hpp"
 #include <stdio.h>
 #include <memory>

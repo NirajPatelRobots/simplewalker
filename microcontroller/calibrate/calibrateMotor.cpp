@@ -10,7 +10,7 @@ TODO:
 
 
 #include "../simplewalker_motors.hpp"
-#include "../pico_comm.hpp"
+#include "../communication/pico_comm.hpp"
 #include "signal_generator.hpp"
 #include <stdio.h>
 #include <math.h>

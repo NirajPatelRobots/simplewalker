@@ -1,6 +1,6 @@
 //test motor reading and setting
-#include "micro_parameters.h"
-#include "simplewalker_motors.hpp"
+#include "../micro_parameters.h"
+#include "../simplewalker_motors.hpp"
 #include <stdio.h>
 #include "pico/stdlib.h"
 

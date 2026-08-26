@@ -3,7 +3,7 @@
 
 #ifndef SIMPLEWALKER_PICO_SIMPLEWALKER_MOTORS_HPP
 #define SIMPLEWALKER_PICO_SIMPLEWALKER_MOTORS_HPP
-#include "motor_IO.hpp"
+#include "motors/motor_IO.hpp"
 #include "micro_parameters.h"
 #include <memory>
 #include <vector>

@@ -6,7 +6,7 @@
 */
 #ifndef SIMPLEWALKER_PICO_COMM_HPP
 #define SIMPLEWALKER_PICO_COMM_HPP
-#include "../communication/communication.hpp"
+#include "communication.hpp"
 
 class PicoCommunication : public Communicator {
 public:

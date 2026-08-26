@@ -2,7 +2,7 @@
  * For IMU calibration or debugging
 Niraj April 2022 */
 
-#include "pico_comm.hpp"
+#include "communication/pico_comm.hpp"
 #include "micro_parameters.h"
 #include "pico/binary_info.h"
 #include "pico/sem.h"
