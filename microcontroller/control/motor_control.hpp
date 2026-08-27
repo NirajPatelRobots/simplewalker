@@ -6,7 +6,6 @@ TODO:
     calculates current and predicted state
     slow and stop if message not received
     */
-#include "pico/stdlib.h"
 #include "../micro_parameters.h"
 
 

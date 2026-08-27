@@ -13,6 +13,7 @@ TODO:
 #include "simplewalker_motors.hpp"
 #include "control/motor_control.hpp"
 #include "controller_info.hpp"
+#include "pico/stdlib.h"
 #include <stdio.h>
 #include <memory>
 #include <chrono>

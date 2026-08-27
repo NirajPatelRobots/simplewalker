@@ -44,3 +44,6 @@ add_executable(unittest_settings
         unittests/unittest_settings.cpp ../display/settings.cpp)
 target_link_libraries(unittest_settings GTest::gtest_main)
 gtest_discover_tests(unittest_settings)
+
+
+add_subdirectory(microcontroller_tests)

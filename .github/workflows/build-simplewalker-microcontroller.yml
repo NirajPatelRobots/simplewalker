@@ -9,6 +9,7 @@ on:
       - microcontroller/**CMakeLists.txt
       - communication/communication.*
       - communication/messages.h
+      - test/microcontroller_tests/**
 
 jobs:
   build:
@@ -81,3 +82,18 @@ jobs:
       - name: make IMU_main -j$(nproc)
         run: make IMU_main -j$(nproc)
         working-directory: ./microcontroller/build
+
+  unit_tests:
+    runs-on: ubuntu-24.04-arm  # Does not use pico SDK
+    steps:
+      - uses: actions/checkout@v6
+      - run: mkdir build
+        working-directory: ${{ github.workspace }}
+      - name: Configure cmake
+        run: cmake ..
+        working-directory: ./build
+      - name: make unittest_motor_model
+        run: make unittest_motor_model -j$(nproc)
+        working-directory: ./build
+      - run: chmod +x ./build/test/microcontroller_tests/unittest_motor_model
+      - run: ./build/test/microcontroller_tests/unittest_motor_model
