@@ -59,6 +59,23 @@ to make and run the main program.
 The built executables are simplewalker, test_localization, unittests, and collect_sensor_cal_data.
 
 
+## Motor Models
+A motor model predicts the change in state (acceleration) for any current state (velocity).
+
+A motor model has state terms and input terms.
+Motor models have the form:
+```
+accel = state_term_1(state) + state_term_2(state) + ... + Voltage * (input_term_1(state) + ...)
+```
+
+Each term is a chain of model functions.
+A function chain has the form:
+```
+state_term_1(state) = weight * f_1(f_2(f_base(state)))
+```
+In this example, f_2 is f_1's parent and f_base is f_2's parent. Base functions are special.
+
+
 ## Calibration
 ### IMU Calibration
 collect_sensor_cal_data saves files in `data/stationary_calibration_[number].log`.
