@@ -1,15 +1,15 @@
-name: Build Simplewalker Microcontroller
+name: Build Microcontroller Binaries
 
 on:
   push:
     paths:
-      - .github/workflows/build-simplewalker-microcontroller.yml
+      - .github/workflows/build-microcontroller-binaries.yml
       - microcontroller/**.*pp
       - microcontroller/**.h
       - microcontroller/**CMakeLists.txt
       - communication/communication.*
       - communication/messages.h
-      - test/microcontroller_tests/**
+      - '!microcontroller/control/motor_model.*pp'
 
 jobs:
   build:
@@ -18,6 +18,11 @@ jobs:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            microcontroller
+            communication
+            sensors
       - run: mkdir microcontroller/build
       - name: Configure cmake
         run: cmake ..
@@ -67,6 +72,11 @@ jobs:
       image: lukstep/raspberry-pi-pico-sdk:latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            microcontroller
+            communication
+            sensors
       - name: download mpu6050_i2c_lib
         uses: actions/download-artifact@v8
         with:
@@ -82,18 +92,3 @@ jobs:
       - name: make IMU_main -j$(nproc)
         run: make IMU_main -j$(nproc)
         working-directory: ./microcontroller/build
-
-  unit_tests:
-    runs-on: ubuntu-24.04-arm  # Does not use pico SDK
-    steps:
-      - uses: actions/checkout@v6
-      - run: mkdir build
-        working-directory: ${{ github.workspace }}
-      - name: Configure cmake
-        run: cmake ..
-        working-directory: ./build
-      - name: make unittest_motor_model
-        run: make unittest_motor_model -j$(nproc)
-        working-directory: ./build
-      - run: chmod +x ./build/test/microcontroller_tests/unittest_motor_model
-      - run: ./build/test/microcontroller_tests/unittest_motor_model

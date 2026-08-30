@@ -1,0 +1,34 @@
+name: Test Microcontroller
+
+on:
+  push:
+    paths:
+      - .github/workflows/test-microcontroller.yml
+      - CMakeLists.txt
+      - test/CMakeLists.txt
+      - test/microcontroller_tests/**
+      - microcontroller/CMakeLists.txt
+      - microcontroller/control/CMakeLists.txt
+      - microcontroller/control/motor_model.*pp
+
+jobs:
+  unit_tests:
+    # Does not use pico SDK
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+        # Can't sparse-checkout because cmake whines about missing files for other binaries 🙄
+      - run: mkdir build
+        working-directory: ${{ github.workspace }}
+      - name: Configure cmake
+        run: cmake ..
+        working-directory: ./build
+      - name: make unittest_motor_model
+        run: make unittest_motor_model -j$(nproc)
+        working-directory: ./build
+      - run: chmod +x ./build/test/microcontroller_tests/unittest_motor_model
+      - name: unittest motor_model
+        run: ./build/test/microcontroller_tests/unittest_motor_model
+      - uses: Ximaz/valgrind-action@v1.2.0
+        with:
+          binary_path: "./build/test/microcontroller_tests/unittest_motor_model"

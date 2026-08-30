@@ -91,10 +91,23 @@ Copy these to the base computer and run `sensorAnalysis.py` on them to get senso
 
 
 ## CI
-`Build Simplewalker` and `Build Simplewalker Microcontroller` jobs do what it sounds like they do.
-`Build Simplewalker` also runs unit tests and test_localization, which is printed to job results.
+Build and Test jobs do what they sound like. They run on Github ARM runners.
+- `Build and Test Simplewalker`
+- `Build Microcontroller Binaries` uses the pico sdk
+- `Test Microcontroller` doesn't use the sdk
 
-`Calibrate Motor` runs motor calibration on checked-in motor test data and prints results to job results.
+`Calibrate Motor` runs motor calibrations on checked-in motor test data.
+
+
+# Thank you to
+Thank you to all contributors to the open-source dependencies of this project.
+
+Also using work from:
+- lukstep/raspberry-pi-pico-sdk
+- https://github.com/Mad-Scientist-Monkey/sockets-ccpp-rpi
+- Silverlock on rpi forums for free heap size
+- Ximaz/valgrind-action@v1.2.0
+
 
 ---
 Niraj made this
