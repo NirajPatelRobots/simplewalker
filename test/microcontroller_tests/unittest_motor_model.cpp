@@ -29,6 +29,7 @@ TEST(FcnsTest, VelModelFcn) {
 
     EXPECT_NEAR(INPUT_EXAMPLE.velocity, vel_fcn->call(INPUT_EXAMPLE), TOLERANCE);
     EXPECT_FALSE(vel_fcn->set_param(0, 0.f));
+    delete vel_fcn;
 }
 
 TEST(FcnsTest, OneModelFcn) {
@@ -36,6 +37,7 @@ TEST(FcnsTest, OneModelFcn) {
 
     EXPECT_EQ(1.f, one_fcn->call(INPUT_EXAMPLE));
     EXPECT_FALSE(one_fcn->set_param(0, 0.f));
+    delete one_fcn;
 }
 
 TEST(FcnsTest, SignModelFcn) {
@@ -48,6 +50,7 @@ TEST(FcnsTest, SignModelFcn) {
     EXPECT_EQ(-1.f, sign_fcn->call(inputs));
     inputs.velocity = 0.f;
     EXPECT_EQ( 0.f, sign_fcn->call(inputs));
+    delete sign_fcn;
 }
 
 
@@ -67,6 +70,7 @@ TEST(FcnChainTest, OnlyVel) {
 }
 
 TEST(FcnChainTest, SignVel) {
+    // TODO replace with different fcn (param mult)?
     auto term = FcnChain(ModelFcns::Vel::create(), 1.0);
     term.add_function(ModelFcns::Sign::create());
 
@@ -128,24 +132,70 @@ TEST(FcnChainTest, TwoChainzDifferentBase) {
     EXPECT_EQ(MockModelFcn::num_instances, 0);
 }
 
-// test FcnChain last function (first entered) must be a type that doesn't reference a parent?
+TEST(FcnChainTest, MoveObject) {
+    float weight = 0.5;
+    auto term = FcnChain(ModelFcns::Vel::create(), weight);
+    term.add_function(MockModelFcn::create());
+
+    FcnChain moveConstructed = std::move(term);
+
+    EXPECT_EQ(weight, moveConstructed.weight);
+    EXPECT_NEAR(weight * INPUT_EXAMPLE.velocity, moveConstructed.call(INPUT_EXAMPLE), TOLERANCE);
+    
+    FcnChain moveAssigned(ModelFcns::One::create(), 1.0);
+    moveAssigned = std::move(moveConstructed);
+
+    EXPECT_EQ(weight, moveAssigned.weight);
+    EXPECT_NEAR(weight * INPUT_EXAMPLE.velocity, moveAssigned.call(INPUT_EXAMPLE), TOLERANCE);
+}
+
+// test FcnChain base function must be a type that doesn't reference a parent?
+
+
+// LinearGroup
+TEST(LinearGroupTest, CreateAddCallDelete) {
+    auto group = LinearGroup();
+    group.create_term(ModelFcns::Vel::create(), 1.0);
+    group.add_function(0, MockModelFcn::create());
+    
+    EXPECT_EQ(group.call(INPUT_EXAMPLE), INPUT_EXAMPLE.velocity);
+    EXPECT_EQ(MockModelFcn::num_instances, 1);
+    group.delete_term(0);
+    EXPECT_EQ(MockModelFcn::num_instances, 0);
+}
+
+
+TEST(LinearGroupTest, OnePlusOne) {
+    auto group = LinearGroup();
+    group.create_term(ModelFcns::One::create(), 1.0);
+    group.create_term(ModelFcns::One::create(), 1.0);
+    group.add_function(0, MockModelFcn::create());
+
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0, TOLERANCE);
+    EXPECT_EQ(MockModelFcn::num_instances, 1);
+    group.delete_term(1);
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 1.0, TOLERANCE);
+    EXPECT_EQ(MockModelFcn::num_instances, 1);
+}
+
+// Todo test set_param
 
 
 // Motor Model
-TEST(MotorModelTest, CreateAddToChain) {
+TEST(MotorModelTest, OnePlusOnePredictAccel) {
     auto model = MotorModel();
-    for (auto *terms : {&model.state_terms, &model.input_terms}) {
-        terms->emplace_back(ModelFcns::Vel::create(), 1.0);
-    }
+    model.state_terms.create_term(ModelFcns::One::create(), 1.0);
+    model.input_terms.create_term(ModelFcns::One::create(), 1.0);
+
+    EXPECT_NEAR(1., model.predict_accel(INPUT_EXAMPLE, 0.), TOLERANCE);
+    EXPECT_NEAR(2., model.predict_accel(INPUT_EXAMPLE, 1.), TOLERANCE);
 }
 
-TEST(MotorModelTest, AddToChain) {
+TEST(MotorModelTest, OnePlusOneChooseV) {
     auto model = MotorModel();
-    for (auto *terms : {&model.state_terms, &model.input_terms}) {
-        terms->emplace_back(ModelFcns::Vel::create(), 1.0);
-        terms->at(0).add_function(ModelFcns::Sign::create());
-    }
-}
+    model.state_terms.create_term(ModelFcns::One::create(), 1.0);
+    model.input_terms.create_term(ModelFcns::One::create(), 1.0);
 
-// predict_accel, choose_V
-// Create two chains, delete one and check the other still works
+    EXPECT_NEAR(0., model.choose_V(INPUT_EXAMPLE, 1.), TOLERANCE);
+    EXPECT_NEAR(1., model.choose_V(INPUT_EXAMPLE, 2.), TOLERANCE);
+}

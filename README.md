@@ -62,10 +62,11 @@ The built executables are simplewalker, test_localization, unittests, and collec
 ## Motor Models
 A motor model predicts the change in state (acceleration) for any current state (velocity).
 
-A motor model has state terms and input terms.
+A motor model has two linear groups of terms: state terms and input terms.
 Motor models have the form:
 ```
 accel = state_term_1(state) + state_term_2(state) + ... + Voltage * (input_term_1(state) + ...)
+accel = state_group(state) + Voltage * input_group(state)
 ```
 
 Each term is a chain of model functions.
@@ -74,6 +75,19 @@ A function chain has the form:
 state_term_1(state) = weight * f_1(f_2(f_base(state)))
 ```
 In this example, f_2 is f_1's parent and f_base is f_2's parent. Base functions are special.
+
+### Motor Model API
+Write API:
+
+| Name          | term_idx | fcn_field           | value  |
+|---------------|----------|---------------------|--------|
+| Create_Term   | -        | base fcn ID         | weight |
+| Delete_Term   | term_idx | -                   | -      |
+| Add_Function  | term_idx | nonbase fcn ID      | -      |
+| Set_Parameter | term_idx | fcn_idx & param_idx | value  |
+| Set_Weight    | term_idx | -                   | weight |
+
+API response: `{int status, int term_idx}` where status > 0 is success
 
 
 ## Calibration
