@@ -38,9 +38,9 @@ jobs:
         with:
           binary_path: "./build/test/microcontroller_tests/unittest_motor_model"
 
-      - run: chmod +x ./build/test/microcontroller_tests/unittest_motor_model
-      - name: unittest motor_model
-        run: ./build/test/microcontroller_tests/unittest_motor_model
+      - run: chmod +x ./build/test/microcontroller_tests/unittest_model_functions
+      - name: unittest model functions
+        run: ./build/test/microcontroller_tests/unittest_model_functions
       - uses: Ximaz/valgrind-action@v1.2.0
         with:
-          binary_path: "./build/test/microcontroller_tests/unittest_motor_model"
+          binary_path: "./build/test/microcontroller_tests/unittest_model_functions"
