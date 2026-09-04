@@ -87,6 +87,7 @@ Write API:
 | Set_Parameter | term_idx | fcn_idx & param_idx | value  |
 | Set_Weight    | term_idx | -                   | weight |
 
+fcn_idx = 0 for the first function, fcn_idx = (number of fcns - 1) for base
 API response: `{int status, int term_idx}` where status > 0 is success
 
 

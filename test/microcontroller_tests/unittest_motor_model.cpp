@@ -7,16 +7,24 @@ const model_inputs_t INPUT_EXAMPLE = {.velocity = 104.3};
 
 
 class MockModelFcn : public ModelFcn {
-    MockModelFcn() : ModelFcn(nullptr) {
+    MockModelFcn() : ModelFcn(nullptr), mult(1) {
         num_instances++;
     };
+    float mult;
 public:
     static ModelFcn *create() {return new MockModelFcn;}
-    virtual ~MockModelFcn() {
+    ~MockModelFcn() override {
         num_instances--;
     }
+    bool set_param(unsigned num, float value) override {
+        if (num == 0) {
+            mult = value;
+            return true;
+        }
+        return false;
+    }
     inline float call(const model_inputs_t &model_inputs) const override {
-        return parent->call(model_inputs);
+        return mult * parent->call(model_inputs);
     }
     static int num_instances;
 };
@@ -69,17 +77,16 @@ TEST(FcnChainTest, OnlyVel) {
     EXPECT_NEAR(INPUT_EXAMPLE.velocity, term.call(INPUT_EXAMPLE), TOLERANCE);
 }
 
-TEST(FcnChainTest, SignVel) {
-    // TODO replace with different fcn (param mult)?
+TEST(FcnChainTest, MultVel) {
     auto term = FcnChain(ModelFcns::Vel::create(), 1.0);
-    term.add_function(ModelFcns::Sign::create());
+    term.add_function(MockModelFcn::create());
 
     model_inputs_t inputs = {.velocity = 100.f};
-    EXPECT_EQ( 1.f, term.call(inputs));  // intentional float equality comparisons
+    EXPECT_NEAR(term.call(inputs), 100.f, TOLERANCE);
+    term.first_fcn->set_param(0, 2.0);
+    EXPECT_NEAR(term.call(inputs), 200.f, TOLERANCE);
     inputs.velocity = -100.f;
-    EXPECT_EQ(-1.f, term.call(inputs));
-    inputs.velocity = 0.f;
-    EXPECT_EQ( 0.f, term.call(inputs));
+    EXPECT_NEAR(term.call(inputs), -200.f, TOLERANCE);
 }
 
 
@@ -178,7 +185,40 @@ TEST(LinearGroupTest, OnePlusOne) {
     EXPECT_EQ(MockModelFcn::num_instances, 1);
 }
 
-// Todo test set_param
+
+TEST(LinearGroupTest, SetParam) {
+    auto group = LinearGroup();
+    group.create_term(ModelFcns::Vel::create(), 0.0);  // no effect
+    group.create_term(ModelFcns::Vel::create(), 1.0);
+    group.add_function(1, MockModelFcn::create());
+
+    EXPECT_TRUE(group.set_param(1, 0, 0, 2.0));
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0 * INPUT_EXAMPLE.velocity, TOLERANCE);
+
+    EXPECT_FALSE(group.set_param(1, 0, 1, 3.0));  // nonexistent param num
+    EXPECT_FALSE(group.set_param(1, 1, 0, 3.0));  // wrong fcn num
+    EXPECT_FALSE(group.set_param(1, 2, 0, 3.0));  // nonexistent fcn num
+    EXPECT_FALSE(group.set_param(0, 0, 0, 3.0));  // wrong term
+    EXPECT_FALSE(group.set_param(2, 0, 0, 3.0));  // nonexistent term
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0 * INPUT_EXAMPLE.velocity, TOLERANCE); // no effect
+}
+
+
+TEST(LinearGroupTest, SetWeight) {
+    auto group = LinearGroup();
+    group.create_term(ModelFcns::Vel::create(), 1.0);
+    group.create_term(ModelFcns::Vel::create(), 2.0);
+    const float weight_tolerance = 2e-5; // TODO: why do these comparisons (except 4.0?) need larger tolerance?
+
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, weight_tolerance);
+    EXPECT_TRUE(group.set_weight(1, 3.0));
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 4.0 * INPUT_EXAMPLE.velocity, TOLERANCE);
+    EXPECT_TRUE(group.set_weight(0, 0.0));
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, weight_tolerance);
+    
+    EXPECT_FALSE(group.set_weight(2, 2.0)); // nonexistent chain
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, weight_tolerance);
+}
 
 
 // Motor Model

@@ -6,11 +6,11 @@ bool ModelFcn::set_parent(ModelFcn *new_parent) {
     return parent == new_parent;
 }
 
-bool ModelFcn::set_param(size_t fcn_num, size_t param_num, float value) {
-    if (fcn_num == 0) {
+bool ModelFcn::set_param_recurse(unsigned fcn_idx, unsigned param_num, float value) {
+    if (fcn_idx == 0) {
         return set_param(param_num, value);
     } else {
-        return set_param(fcn_num - 1, param_num, value);
+        return parent && parent->set_param_recurse(fcn_idx - 1, param_num, value);
     }
 }
 

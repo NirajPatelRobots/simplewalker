@@ -1,9 +1,9 @@
 /* See README.md #"Motor Models"
  * TODO:
  *      FcnChain enforce initial base_fcn is a candidate base function (doesn't need parent)
- *      ModelFcns different data structure instead of subclass?
- *          Template<size_t num_params, float fcn(const model_inputs_t &model_inputs)>?
- *          std::pair<size_t, float fcn(const model_inputs_t &model_inputs)>?
+ *      Standardize ModelFcns params
+ *          const int ModelFcn::n_params; set by subclass constructor? 
+ *          float *ModelFcn::params; point to first param, equivalent to array of param?
  *      Programatically create function chains from a command API
  *      storage structure for modelFcns, index is ID
  */
@@ -23,7 +23,7 @@ public:
     // set_parent and set_param return true if the parent/param was set
     bool set_parent(ModelFcn *new_parent);
     virtual bool set_param([[maybe_unused]] unsigned num, [[maybe_unused]] float value) {return false;}
-    bool set_param(size_t fcn_idx, size_t param_num, float value);
+    bool set_param_recurse(unsigned fcn_idx, unsigned param_num, float value);
     virtual float call(const model_inputs_t &model_inputs) const = 0;
 };
 
@@ -54,9 +54,9 @@ struct LinearGroup {
     }
     inline bool set_param(unsigned term_idx, unsigned fcn_idx, unsigned param_num, float value) {
         return (term_idx < terms.size()
-            && terms[term_idx].first_fcn->set_param(fcn_idx, param_num, value));
+            && terms[term_idx].first_fcn->set_param_recurse(fcn_idx, param_num, value));
     }
-    inline bool set_weight(unsigned term_idx, float weight);
+    bool set_weight(unsigned term_idx, float weight);
     float call(const model_inputs_t &model_inputs) const;
 };
 
