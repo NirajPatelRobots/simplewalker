@@ -86,15 +86,4 @@ namespace ModelFcns {
             return 1;
         }
     };
-    
-    // non-base functions
-    class Sign : public ModelFcn {
-        Sign() : ModelFcn(nullptr) {};
-    public:
-        static ModelFcn *create() {return new Sign;}
-        inline float call(const model_inputs_t &model_inputs) const override {
-            float parentval = parent->call(model_inputs);
-            return parentval == 0 ? 0.f : parentval > 0 ? 1.f : -1.f;
-        }
-    };
 }  // namespace ModelFcns

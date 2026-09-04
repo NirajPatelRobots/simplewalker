@@ -10,6 +10,7 @@ on:
       - microcontroller/CMakeLists.txt
       - microcontroller/control/CMakeLists.txt
       - microcontroller/control/motor_model.*pp
+      - microcontroller/control/model_fcns.*pp
 
 jobs:
   unit_tests:
@@ -26,6 +27,17 @@ jobs:
       - name: make unittest_motor_model
         run: make unittest_motor_model -j$(nproc)
         working-directory: ./build
+      - name: make unittest_model_functions
+        run: make unittest_model_functions -j$(nproc)
+        working-directory: ./build
+        
+      - run: chmod +x ./build/test/microcontroller_tests/unittest_motor_model
+      - name: unittest motor_model
+        run: ./build/test/microcontroller_tests/unittest_motor_model
+      - uses: Ximaz/valgrind-action@v1.2.0
+        with:
+          binary_path: "./build/test/microcontroller_tests/unittest_motor_model"
+
       - run: chmod +x ./build/test/microcontroller_tests/unittest_motor_model
       - name: unittest motor_model
         run: ./build/test/microcontroller_tests/unittest_motor_model

@@ -9,7 +9,7 @@ on:
       - microcontroller/**CMakeLists.txt
       - communication/communication.*
       - communication/messages.h
-      - '!microcontroller/control/motor_model.*pp'
+      - '!microcontroller/control/**'
 
 jobs:
   build:

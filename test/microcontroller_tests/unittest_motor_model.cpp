@@ -31,37 +31,6 @@ public:
 int MockModelFcn::num_instances = 0 ;
 
 
-// Tested: sizeof(ModelFcns::x) / sizeof(char) = 16 byte
-TEST(FcnsTest, VelModelFcn) {
-    auto vel_fcn = ModelFcns::Vel::create();
-
-    EXPECT_NEAR(INPUT_EXAMPLE.velocity, vel_fcn->call(INPUT_EXAMPLE), TOLERANCE);
-    EXPECT_FALSE(vel_fcn->set_param(0, 0.f));
-    delete vel_fcn;
-}
-
-TEST(FcnsTest, OneModelFcn) {
-    auto one_fcn = ModelFcns::One::create();
-
-    EXPECT_EQ(1.f, one_fcn->call(INPUT_EXAMPLE));
-    EXPECT_FALSE(one_fcn->set_param(0, 0.f));
-    delete one_fcn;
-}
-
-TEST(FcnsTest, SignModelFcn) {
-    auto sign_fcn = ModelFcns::Sign::create();
-    sign_fcn->set_parent(ModelFcns::Vel::create());
-
-    model_inputs_t inputs = {.velocity = 100.f};
-    EXPECT_EQ( 1.f, sign_fcn->call(inputs));  // intentional float equality comparisons
-    inputs.velocity = -100.f;
-    EXPECT_EQ(-1.f, sign_fcn->call(inputs));
-    inputs.velocity = 0.f;
-    EXPECT_EQ( 0.f, sign_fcn->call(inputs));
-    delete sign_fcn;
-}
-
-
 // Fcn Chain
 TEST(FcnChainTest, Weight) {
     float weight = 0.5;
