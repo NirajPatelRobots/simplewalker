@@ -1,13 +1,14 @@
-name: Build Simplewalker
+name: Build and Test Simplewalker
 
 on:
   push:
     paths:
-      - .github/workflows/build-simplewalker.yml
+      - .github/workflows/build-test-simplewalker.yml
       - '**.*pp'
       - '**.h'
       - '**CMakeLists.txt'
       - '!microcontroller/**'
+      - '!test/microcontroller_tests/**'
 
 jobs:
   build:

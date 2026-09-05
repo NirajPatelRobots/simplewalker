@@ -4,3 +4,7 @@ add_subdirectory(../../microcontroller/control control/)
 add_executable(unittest_motor_model unittest_motor_model.cpp)
 target_link_libraries(unittest_motor_model GTest::gtest_main MotorModel)
 gtest_discover_tests(unittest_motor_model)
+
+add_executable(unittest_model_functions unittest_model_functions.cpp)
+target_link_libraries(unittest_model_functions GTest::gtest_main MotorModel)
+gtest_discover_tests(unittest_model_functions)

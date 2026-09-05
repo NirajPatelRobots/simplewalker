@@ -59,6 +59,38 @@ to make and run the main program.
 The built executables are simplewalker, test_localization, unittests, and collect_sensor_cal_data.
 
 
+## Motor Models
+A motor model predicts the change in state (acceleration) for any current state (velocity).
+
+A motor model has two linear groups of terms: state terms and input terms.
+Motor models have the form:
+```
+accel = state_term_1(state) + state_term_2(state) + ... + Voltage * (input_term_1(state) + ...)
+accel = state_group(state) + Voltage * input_group(state)
+```
+
+Each term is a chain of model functions.
+A function chain has the form:
+```
+state_term_1(state) = weight * f_1(f_2(f_base(state)))
+```
+In this example, f_2 is f_1's parent and f_base is f_2's parent. Base functions are special.
+
+### Motor Model API
+Write API:
+
+| Name          | term_idx | fcn_field           | value  |
+|---------------|----------|---------------------|--------|
+| Create_Term   | -        | base fcn ID         | weight |
+| Delete_Term   | term_idx | -                   | -      |
+| Add_Function  | term_idx | nonbase fcn ID      | -      |
+| Set_Parameter | term_idx | fcn_idx & param_idx | value  |
+| Set_Weight    | term_idx | -                   | weight |
+
+fcn_idx = 0 for the first function, fcn_idx = (number of fcns - 1) for base
+API response: `{int status, int term_idx}` where status > 0 is success
+
+
 ## Calibration
 ### IMU Calibration
 collect_sensor_cal_data saves files in `data/stationary_calibration_[number].log`.
@@ -74,10 +106,23 @@ Copy these to the base computer and run `sensorAnalysis.py` on them to get senso
 
 
 ## CI
-`Build Simplewalker` and `Build Simplewalker Microcontroller` jobs do what it sounds like they do.
-`Build Simplewalker` also runs unit tests and test_localization, which is printed to job results.
+Build and Test jobs do what they sound like. They run on Github ARM runners.
+- `Build and Test Simplewalker`
+- `Build Microcontroller Binaries` uses the pico sdk
+- `Test Microcontroller` doesn't use the sdk
 
-`Calibrate Motor` runs motor calibration on checked-in motor test data and prints results to job results.
+`Calibrate Motor` runs motor calibrations on checked-in motor test data.
+
+
+# Thank you to
+Thank you to all contributors to the open-source dependencies of this project.
+
+Also using work from:
+- lukstep/raspberry-pi-pico-sdk
+- https://github.com/Mad-Scientist-Monkey/sockets-ccpp-rpi
+- Silverlock on rpi forums for free heap size
+- Ximaz/valgrind-action@v1.2.0
+
 
 ---
 Niraj made this
