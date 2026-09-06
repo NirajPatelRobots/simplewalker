@@ -20,7 +20,7 @@ target_sources(MotorModel
         PUBLIC
             FILE_SET HEADERS
             BASE_DIRS .
-            FILES "motor_model.hpp" "motor_model_API.hpp"
+            FILES "motor_model.hpp" "model_fcns.hpp" "motor_model_API.hpp"
         )
 
 add_library(MotorModelMicrocontroller)

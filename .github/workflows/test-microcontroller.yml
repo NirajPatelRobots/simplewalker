@@ -32,24 +32,25 @@ jobs:
       - name: make test_motor_model_api
         run: make test_motor_model_api -j$(nproc)
         working-directory: ./build
-        
-      - run: chmod +x ./build/test/microcontroller_tests/unittest_motor_model
+      - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api
+        working-directory: ./build/test/microcontroller_tests
+
       - name: unittest motor_model
         run: ./build/test/microcontroller_tests/unittest_motor_model
-      - uses: Ximaz/valgrind-action@v1.2.0
-        with:
-          binary_path: "./build/test/microcontroller_tests/unittest_motor_model"
-
-      - run: chmod +x ./build/test/microcontroller_tests/unittest_model_functions
       - name: unittest model functions
         run: ./build/test/microcontroller_tests/unittest_model_functions
-      - uses: Ximaz/valgrind-action@v1.2.0
-        with:
-          binary_path: "./build/test/microcontroller_tests/unittest_model_functions"
-
-      - run: chmod +x ./build/test/microcontroller_tests/test_motor_model_api
       - name: test motor model API
         run: ./build/test/microcontroller_tests/test_motor_model_api
-      - uses: Ximaz/valgrind-action@v1.2.0
+      
+      - name: valgrind motor model
+        uses: Ximaz/valgrind-action@v1.2.0
+        with:
+          binary_path: "./build/test/microcontroller_tests/unittest_motor_model"
+      - name: valgrind model functions
+        uses: Ximaz/valgrind-action@v1.2.0
+        with:
+          binary_path: "./build/test/microcontroller_tests/unittest_model_functions"
+      - name: valgrind motor model API
+        uses: Ximaz/valgrind-action@v1.2.0
         with:
           binary_path: "./build/test/microcontroller_tests/test_motor_model_api"

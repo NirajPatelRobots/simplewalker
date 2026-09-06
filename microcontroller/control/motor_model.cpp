@@ -53,6 +53,12 @@ float LinearGroup::call(const model_inputs_t &model_inputs) const {
 }
 
 
+MotorModel::MotorModel() {
+    state_terms.create_term(ModelFcns::Vel::create(), 1.0);
+    input_terms.create_term(ModelFcns::One::create(), 1.0);
+}
+
+
 float MotorModel::predict_accel(const model_inputs_t &model_inputs, float V) const {
     return state_terms.call(model_inputs) + V * input_terms.call(model_inputs);
 }

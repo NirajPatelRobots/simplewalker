@@ -31,7 +31,7 @@ struct Response {
     uint8_t term_idx;
     enum STATUS : int8_t {
         SUCCESS = 1, HELLO = 2,
-        UNSET = 0, BAD_REQUEST = -1, BAD_TERM_IDX = -2, BAD_FCN_FIELD = -3, BAD_PARAM_IDX = -4,
+        UNSET = 0, BAD_REQUEST = -1, BAD_TERM_IDX = -2, BAD_FCN_FIELD = -3, BAD_PARAM = -4,
     };
     inline bool successful() {return status > 0;}
 };
@@ -40,8 +40,9 @@ struct Response {
 bool msg_create_term(GROUP group, const char *base_fcn_name, float weight, Request &msg_out);
 bool msg_delete_term(GROUP group, unsigned term_idx, Request &msg_out);
 bool msg_add_function(GROUP group, unsigned term_idx, const char *nonbase_fcn_name, Request &msg_out);
-bool msg_set_parameter(GROUP group, unsigned term_idx, unsigned fcn_idx, unsigned param_idx, Request &msg_out);
+bool msg_set_parameter(GROUP group, unsigned term_idx, unsigned fcn_idx, unsigned param_idx, float value, Request &msg_out);
 bool msg_set_weight(GROUP group, unsigned term_idx, float weight, Request &msg_out);
+const Request HELLO_REQUEST {};
 
 // Microcontroller API handler function
 void handle_request(const Request &msg, MotorModel &model, Response &response);

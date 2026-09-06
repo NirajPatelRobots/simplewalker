@@ -1,11 +1,10 @@
 /* See README.md #"Motor Models"
  * TODO:
- *      FcnChain enforce initial base_fcn is a candidate base function (doesn't need parent)
  *      Standardize ModelFcns params
  *          const int ModelFcn::n_params; set by subclass constructor? 
  *          float *ModelFcn::params; point to first param, equivalent to array of param?
- *      Programatically create function chains from a command API
- *      storage structure for modelFcns, index is ID
+ *              hack: Enforce first data of function past ModelFcn is function->param[0]?
+ *      MotorModel check input terms is not zero? (Skill issue?)
  */
 #include <array>
 #include <vector>
@@ -62,6 +61,7 @@ struct LinearGroup {
 
 class MotorModel {
 public:
+    MotorModel();
     LinearGroup state_terms;
     LinearGroup input_terms;
     float predict_accel(const model_inputs_t &model_inputs, float V) const;
