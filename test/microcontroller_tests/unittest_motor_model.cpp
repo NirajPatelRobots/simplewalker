@@ -193,6 +193,8 @@ TEST(LinearGroupTest, SetWeight) {
 // Motor Model
 TEST(MotorModelTest, OnePlusOnePredictAccel) {
     auto model = MotorModel();
+    model.state_terms = {};
+    model.input_terms = {};
     model.state_terms.create_term(ModelFcns::One::create(), 1.0);
     model.input_terms.create_term(ModelFcns::One::create(), 1.0);
 
@@ -202,6 +204,8 @@ TEST(MotorModelTest, OnePlusOnePredictAccel) {
 
 TEST(MotorModelTest, OnePlusOneChooseV) {
     auto model = MotorModel();
+    model.state_terms = {};
+    model.input_terms = {};
     model.state_terms.create_term(ModelFcns::One::create(), 1.0);
     model.input_terms.create_term(ModelFcns::One::create(), 1.0);
 
