@@ -35,9 +35,6 @@ jobs:
       - name: make test_motor_model_api
         run: make test_motor_model_api -j$(nproc)
         continue-on-error: true
-      - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api
-        working-directory: ./build/test/microcontroller_tests
-        continue-on-error: true
       - name: Upload unit tests
         uses: actions/upload-artifact@v6
         with:
@@ -57,6 +54,8 @@ jobs:
       - name: Download unit tests
         uses: actions/download-artifact@v8
         with: { name: microcontroller_unit_tests }
+      - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api
+        continue-on-error: true
       - parallel:  # run tests
         - name: unittest motor_model
           run: ./unittest_motor_model --gtest_output="xml:unittest_motor_model.xml"
