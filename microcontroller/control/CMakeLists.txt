@@ -20,5 +20,13 @@ target_sources(MotorModel
         PUBLIC
             FILE_SET HEADERS
             BASE_DIRS .
-            FILES "motor_model.hpp"
+            FILES "motor_model.hpp" "motor_model_API.hpp"
         )
+
+add_library(MotorModelMicrocontroller)
+target_sources(MotorModelMicrocontroller PRIVATE "motor_model_API_target.cpp")
+target_link_libraries(MotorModelMicrocontroller PUBLIC MotorModel)
+
+add_library(MotorModelUser)
+target_sources(MotorModelUser PRIVATE "motor_model_API_user.cpp")
+target_link_libraries(MotorModelUser MotorModel)

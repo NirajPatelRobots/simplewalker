@@ -77,17 +77,14 @@ state_term_1(state) = weight * f_1(f_2(f_base(state)))
 In this example, f_2 is f_1's parent and f_base is f_2's parent. Base functions are special.
 
 ### Motor Model API
-Write API:
+API Requests:
+- Create_Term(base function ID, weight)
+- Delete_Term(term index)
+- Add_Function(term index, nonbase function ID)
+- Set_Parameter(term index, function index, param index, value)
+- Set_Weight(term index, weight)
 
-| Name          | term_idx | fcn_field           | value  |
-|---------------|----------|---------------------|--------|
-| Create_Term   | -        | base fcn ID         | weight |
-| Delete_Term   | term_idx | -                   | -      |
-| Add_Function  | term_idx | nonbase fcn ID      | -      |
-| Set_Parameter | term_idx | fcn_idx & param_idx | value  |
-| Set_Weight    | term_idx | -                   | weight |
-
-fcn_idx = 0 for the first function, fcn_idx = (number of fcns - 1) for base
+Function index = 0 for the first function, = (number of fcns - 1) for base.
 API response: `{int status, int term_idx}` where status > 0 is success
 
 

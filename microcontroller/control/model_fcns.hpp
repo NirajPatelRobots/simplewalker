@@ -30,3 +30,17 @@ namespace ModelFcns {
         }
     };
 }  // namespace ModelFcns
+
+
+ModelFcn * (*const BASE_FUNCTIONS[])(void) = {
+    ModelFcns::Vel::create,
+    ModelFcns::One::create,
+};
+const size_t NUM_BASE_FUNCTIONS = sizeof(BASE_FUNCTIONS) / sizeof(BASE_FUNCTIONS[0]);
+
+
+ModelFcn * (*const NONBASE_FUNCTIONS[])(void) = {
+    ModelFcns::Sign::create,
+    ModelFcns::Mult::create,
+};
+const size_t NUM_NONBASE_FUNCTIONS = sizeof(NONBASE_FUNCTIONS) / sizeof(NONBASE_FUNCTIONS[0]);
