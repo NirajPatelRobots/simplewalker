@@ -13,44 +13,72 @@ on:
       - microcontroller/control/model_fcns.*pp
 
 jobs:
-  unit_tests:
+  build_unit_tests:
     # Does not use pico SDK
     runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: ./build
     steps:
       - uses: actions/checkout@v6
         # Can't sparse-checkout because cmake whines about missing files for other binaries 🙄
       - run: mkdir build
+        working-directory: ${{ github.workspace }}
       - name: Configure cmake
         run: cmake ..
-        working-directory: ./build
       - name: make unittest_motor_model
         run: make unittest_motor_model -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - name: make unittest_model_functions
         run: make unittest_model_functions -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - name: make test_motor_model_api
         run: make test_motor_model_api -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api
         working-directory: ./build/test/microcontroller_tests
-
-      - name: unittest motor_model
-        run: ./build/test/microcontroller_tests/unittest_motor_model
-      - name: unittest model functions
-        run: ./build/test/microcontroller_tests/unittest_model_functions
-      - name: test motor model API
-        run: ./build/test/microcontroller_tests/test_motor_model_api
-      
-      - name: valgrind motor model
-        uses: Ximaz/valgrind-action@v1.2.0
+        continue-on-error: true
+      - name: Upload unit tests
+        uses: actions/upload-artifact@v6
         with:
-          binary_path: "./build/test/microcontroller_tests/unittest_motor_model"
-      - name: valgrind model functions
-        uses: Ximaz/valgrind-action@v1.2.0
+          name: microcontroller_unit_tests
+          path: |
+            ./build/test/microcontroller_tests/unittest_motor_model
+            ./build/test/microcontroller_tests/unittest_model_functions
+            ./build/test/microcontroller_tests/test_motor_model_api
+          retention-days: 1
+          overwrite: true
+          if-no-files-found: error
+  
+  run_unit_tests:
+    runs-on: ubuntu-24.04-arm
+    needs: build_unit_tests
+    steps:
+      - name: Download unit tests
+        uses: actions/download-artifact@v8
+        with: { name: microcontroller_unit_tests }
+      - parallel:  # run tests
+        - name: unittest motor_model
+          run: ./unittest_motor_model --gtest_output="xml:unittest_motor_model.xml"
+        - name: unittest model functions
+          run: ./unittest_model_functions --gtest_output="xml:unittest_model_functions.xml"
+        - name: test motor model API
+          run: ./test_motor_model_api --gtest_output="xml:test_motor_model_api.xml"
+      - parallel:  # if all passed, run tests with valgrind
+        - name: valgrind motor model
+          uses: Ximaz/valgrind-action@v1.2.0
+          with:
+            binary_path: "./unittest_motor_model"
+        - name: valgrind model functions
+          uses: Ximaz/valgrind-action@v1.2.0
+          with:
+            binary_path: "./unittest_model_functions"
+        - name: valgrind motor model API
+          uses: Ximaz/valgrind-action@v1.2.0
+          with:
+            binary_path: "./test_motor_model_api"
+      - name: Summarize tests results
+        uses: jeantessier/test-summary-action@v2
         with:
-          binary_path: "./build/test/microcontroller_tests/unittest_model_functions"
-      - name: valgrind motor model API
-        uses: Ximaz/valgrind-action@v1.2.0
-        with:
-          binary_path: "./build/test/microcontroller_tests/test_motor_model_api"
+          paths: "*test*.xml"
+        if: ${{ always() }}
