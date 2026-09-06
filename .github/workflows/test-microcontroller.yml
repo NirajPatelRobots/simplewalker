@@ -78,7 +78,7 @@ jobs:
           with:
             binary_path: "./test_motor_model_api"
       - name: Summarize tests results
-        uses: jeantessier/test-summary-action@v2
+        uses: test-summary/action@v2.6
         with:
           paths: "*test*.xml"
         if: ${{ always() }}
