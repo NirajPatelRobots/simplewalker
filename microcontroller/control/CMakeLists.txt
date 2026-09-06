@@ -4,6 +4,7 @@
 # The pico sdk doesn't have file IO, not even pipes, so tests need 
 #   to be built with the host machine's os functions. That means this directory can
 #   only use minimal dependencies.
+# Currently uses only stdlib: array, stdint, vector. API User uses string and unordered_map.
 
 add_library(MotorControl)
 target_sources(MotorControl

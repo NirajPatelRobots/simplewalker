@@ -1,5 +1,6 @@
 #include "model_fcns.hpp"
 #include "motor_model_API.hpp"
+#include <string>
 #include <unordered_map>
 
 

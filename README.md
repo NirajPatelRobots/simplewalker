@@ -82,9 +82,9 @@ API Requests:
 - Delete_Term(term index)
 - Add_Function(term index, nonbase function ID)
 - Set_Parameter(term index, function index, param index, value)
+  - Function index = 0 for the first function, = (number of fcns - 1) for base.
 - Set_Weight(term index, weight)
 
-Function index = 0 for the first function, = (number of fcns - 1) for base.
 API response: `{int status, int term_idx}` where status > 0 is success
 
 
