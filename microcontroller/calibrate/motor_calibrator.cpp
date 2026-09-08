@@ -1,41 +1,17 @@
-/* calibrate the DC motor, reporting voltage and angle measurements.
-Created October 2021, reworked late 2023
-TODO:
-    way to cancel calibration
-    Invalid scale values error?
-    error if can't return to start
-        detect wrong direction
-    measure battery voltage variability?
-    */
-
-
-#include "../simplewalker_motors.hpp"
-#include "../communication/pico_comm.hpp"
-#include "signal_generator.hpp"
+#include "motor_calibrator.hpp"
 #include <stdio.h>
 #include <math.h>
 #include "pico/time.h"
 
 
-class MotorCalibrator {
-public:
-    std::unique_ptr<PicoCommunication> comm;
-    shared_ptr<ADCReader> ADC;
-    std::unique_ptr<MotorsIO> motors_IO;
-    shared_ptr<ADCChannel> batteryVoltage;
-    shared_ptr<MessageInbox<MotorCalibrationTriggerMsg>> trigger_inbox;
-    shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> state_outbox;
-    shared_ptr<MotorCalibrationTriggerMsg> instructions;
-    std::unique_ptr<ExcitationSignalGenerator> generator;
-    MotorCalibrationStatus status {MOTORCAL_IDLE};
-
-    MotorCalibrator()
-        : comm(std::make_unique<PicoCommunication>()),
-          ADC(make_shared<ADCReader>()),
-          motors_IO(std::make_unique<MotorsIO>(SIMPLEWALKER_MOTOR_IO_SETTINGS, ADC)),
-          batteryVoltage(ADC->set_channel("batteryVoltage", ADC_BATTERY_VOLTAGE_CHANNEL, 0, ADC_BATTERY_VOLTAGE_SCALE)),
-          trigger_inbox(make_shared<MessageInbox<MotorCalibrationTriggerMsg>>(MotorCalibrationTriggerMsgID, *comm)),
-          state_outbox(make_shared<MessageOutbox<MotorCalibrationStateMsg>>(MotorCalibrationStateMsgID, *comm)),
+MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_settings,
+    shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> _state_outbox,
+    int ADC_battery_voltage_channel, float ADC_battery_voltage_scale)
+        : ADC(make_shared<ADCReader>()),
+          motor_settings(_motor_settings),
+          motors_IO(std::make_unique<MotorsIO>(motor_settings, ADC)),
+          batteryVoltage(ADC->set_channel("batteryVoltage", ADC_battery_voltage_channel, 0, ADC_battery_voltage_scale)),
+          state_outbox(_state_outbox),
           instructions(make_shared<MotorCalibrationTriggerMsg>()) {
         ADC->connect_SPI();
         motors_IO->initialize_ADC_channels();
@@ -47,7 +23,7 @@ public:
         instructions->text_output = 1;
     }
 
-    int calibrate_motor() {
+    int MotorCalibrator::calibrate_motor() {
         float angVel = 0.0;
         generator = make_signal_generator(MotorCalibrationInputType(instructions->input_signal_type),
                                           instructions->frequency * instructions->dt,
@@ -55,10 +31,6 @@ public:
         if (!generator) {
             printf("Invalid input type: %u", instructions->input_signal_type);
             return -3;
-        }
-        if (is_servo((Motornum)(instructions->motorNum))) {
-            printf("implement servo pins\n");
-            return -2;
         }
 
         return_motor_to_start();
@@ -87,8 +59,8 @@ public:
         return 0;
     }
 
-    bool do_loop(float V, float &angVel, absolute_time_t &looptarget, absolute_time_t start_time) {
-        motors_IO->set_battery_voltage(ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL));
+    bool MotorCalibrator::do_loop(float V, float &angVel, absolute_time_t &looptarget, absolute_time_t start_time) {
+        motors_IO->set_battery_voltage(ADC->read_ADC_scaled(batteryVoltage->channel_num));
         float angle = read_angle();
         if (!safely_set_motor(V, angle)) return false;
         angVel = calc_angvel(angle);
@@ -98,7 +70,7 @@ public:
         return true;
     }
 
-    bool safely_set_motor(float voltage, float angle) {
+    bool MotorCalibrator::safely_set_motor(float voltage, float angle) {
         motors_IO->set_motor_voltage(instructions->motorNum, voltage);
         if (fabs(angle) > instructions->max_displacement || angle < instructions->min_displacement) {
             printf("Test went out of range and was terminated\n");
@@ -109,18 +81,18 @@ public:
         return true;
     }
 
-    float read_angle() {
-        return ADC->read_ADC_scaled(SIMPLEWALKER_MOTOR_IO_SETTINGS[instructions->motorNum].sensor_channel_num);
+    float MotorCalibrator::read_angle() {
+        return ADC->read_ADC_scaled(motor_settings[instructions->motorNum].sensor_channel_num);
     }
 
-    float calc_angvel(float angle) {
+    float MotorCalibrator::calc_angvel(float angle) {
         static float lastAngle{0.0};
         float angVel = (angle - lastAngle) / instructions->dt;
         lastAngle = angle;
         return angVel;
     }
 
-    void return_motor_to_start() {
+    void MotorCalibrator::return_motor_to_start() {
         float kp{3};
         int numInRange{0}, total_tries{0};
         status = MOTORCAL_CENTERING;
@@ -142,7 +114,7 @@ public:
         if (instructions->text_output) printf("Motor at start.\n");
     }
 
-    void report_result(float angle, float angvel, float voltage, float time) {
+    void MotorCalibrator::report_result(float angle, float angvel, float voltage, float time) {
         if (instructions->text_output) {
             printf("%f,%f,%f,%f\n", time, voltage, angle, angvel);
         } else {
@@ -153,32 +125,3 @@ public:
             state_outbox->send();
         }
     }
-};
-
-
-
-int main() {
-    MotorCalibrator calibrator{};
-    while (1) {
-        calibrator.comm->receive_messages();
-        if (calibrator.trigger_inbox->get_newest(*calibrator.instructions) >= 0) {
-            if (calibrator.instructions->motorNum >= SIMPLEWALKER_MOTOR_IO_SETTINGS.size()){
-                printf("Motor number doesn't exist, using motor 0\n");
-                calibrator.instructions->motorNum = 0;
-            }
-            printf("Calibrate motor %d; freq=%f, amp=%f, dt=%f\n",
-                   calibrator.instructions->motorNum, calibrator.instructions->frequency,
-                   calibrator.instructions->amplitude, calibrator.instructions->dt);
-            sleep_ms(500);
-            calibrator.calibrate_motor();
-        } else {
-            calibrator.instructions->dt = 0.5;
-            float battery_voltage = calibrator.ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL);
-            float angle = calibrator.read_angle();
-            float angVel = calibrator.calc_angvel(angle);
-            calibrator.motors_IO->set_motor_voltage(calibrator.instructions->motorNum, 0);
-            calibrator.report_result(angle, angVel, battery_voltage, to_us_since_boot(get_absolute_time()) * 1e-6 + 1000);
-            sleep_ms(500);
-        }
-    }
-}

@@ -6,6 +6,8 @@
  *              hack: Enforce first data of function past ModelFcn is function->param[0]?
  *      MotorModel check input terms is not zero? (Skill issue?)
  */
+#ifndef SIMPLEWALKER_PICO_MOTOR_MODEL_HPP
+#define SIMPLEWALKER_PICO_MOTOR_MODEL_HPP
 #include <array>
 #include <vector>
 
@@ -87,3 +89,5 @@ namespace ModelFcns {
         }
     };
 }  // namespace ModelFcns
+
+#endif  // SIMPLEWALKER_PICO_MOTOR_MODEL_HPP

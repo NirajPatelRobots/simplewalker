@@ -1,3 +1,5 @@
+#ifndef SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
+#define SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
 #include <stdint.h>
 
 class MotorModel;
@@ -48,3 +50,4 @@ const Request HELLO_REQUEST {};
 void handle_request(const Request &msg, MotorModel &model, Response &response);
 
 }
+#endif  // SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
