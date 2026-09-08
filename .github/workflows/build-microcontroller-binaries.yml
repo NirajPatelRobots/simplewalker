@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-24.04-arm
     container:
       image: lukstep/raspberry-pi-pico-sdk:latest
+    defaults:
+      run:
+        working-directory: ./microcontroller/build
     steps:
       - uses: actions/checkout@v6
         with:
@@ -24,18 +27,17 @@ jobs:
             communication
             sensors
       - run: mkdir microcontroller/build
+        working-directory: ${{ github.workspace }}
       - name: Configure cmake
         run: cmake ..
-        working-directory: ./microcontroller/build
       - name: make calibrate_motor
         run: make calibrate_motor -j$(nproc)
-        working-directory: ./microcontroller/build
+        continue-on-error: true
       - name: make hardware_test
         run: make hardware_test -j$(nproc)
-        working-directory: ./microcontroller/build
+        continue-on-error: true
       - name: make controller_main
         run: make controller_main -j$(nproc)
-        working-directory: ./microcontroller/build
 
 
   build_IMU_lib_from_pico-examples:

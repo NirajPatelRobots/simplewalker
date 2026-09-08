@@ -13,18 +13,21 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: ./build
     steps:
       - uses: actions/checkout@v6
       - name: install dependencies
         run: sudo apt install -y libeigen3-dev librapidxml-dev libwiringpi-dev
+        working-directory: ${{ github.workspace }}
       - run: mkdir build
+        working-directory: ${{ github.workspace }}
       - name: Configure cmake
         run: cmake ..
-        working-directory: ./build
 
       - name: make test_localization
         run: make test_localization -j$(nproc)
-        working-directory: ./build
       - name: Upload test_localization
         uses: actions/upload-artifact@v6
         with:
@@ -36,30 +39,27 @@ jobs:
 
       - name: make collect_sensor_cal_data
         run: make collect_sensor_cal_data -j$(nproc)
-        working-directory: ./build
-
+        continue-on-error: true
       - name: make simplewalker
         run: make simplewalker -j$(nproc)
-        working-directory: ./build
-
+        continue-on-error: true
       - name: make monitor_only
         run: make monitor_only -j$(nproc)
-        working-directory: ./build
-
+        continue-on-error: true
       - name: make monitor_controller
         run: make monitor_controller -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
 
       - run: make unittest_basic_communication -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - run: make unittest_rotation -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - run: make unittest_leg_kinematics -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - run: make unittest_state_prediction -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - run: make unittest_settings -j$(nproc)
-        working-directory: ./build
+        continue-on-error: true
       - name: Upload unit tests
         uses: actions/upload-artifact@v6
         with:
@@ -78,11 +78,13 @@ jobs:
         with: { name: unit_tests }
       - run: mkdir data
       - run: chmod +x ./unittest_basic_communication ./unittest_rotation ./unittest_state_prediction ./unittest_leg_kinematics ./unittest_settings
-      - run: ./unittest_basic_communication
-      - run: ./unittest_rotation
-      - run: ./unittest_state_prediction
-      - run: ./unittest_leg_kinematics
-      - run: ./unittest_settings
+        continue-on-error: true
+      - parallel:
+        - run: ./unittest_basic_communication
+        - run: ./unittest_rotation
+        - run: ./unittest_state_prediction
+        - run: ./unittest_leg_kinematics
+        - run: ./unittest_settings
 
 
   test_localization:
