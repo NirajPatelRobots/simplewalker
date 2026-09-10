@@ -1,4 +1,5 @@
 #include "motor_calibrator.hpp"
+#include "../control/motor_model.hpp"
 #include <stdio.h>
 #include <math.h>
 #include "pico/time.h"
@@ -12,7 +13,8 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
           motors_IO(std::make_unique<MotorsIO>(motor_settings, ADC)),
           batteryVoltage(ADC->set_channel("batteryVoltage", ADC_battery_voltage_channel, 0, ADC_battery_voltage_scale)),
           state_outbox(_state_outbox),
-          instructions(make_shared<MotorCalibrationTriggerMsg>()) {
+          instructions(make_shared<MotorCalibrationTriggerMsg>()),
+          motor_model() {
         ADC->connect_SPI();
         motors_IO->initialize_ADC_channels();
         state_outbox->message.ID = MotorCalibrationStateMsgID;
@@ -44,7 +46,8 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
                 break;
         }
         while(!generator->is_finished) {
-            if (!do_loop(generator->get_next_value(angVel), angVel, looptarget, start_time))
+            float voltage = signal_to_voltage(generator->get_next_value(angVel), angVel);
+            if (!do_loop(voltage, angVel, looptarget, start_time))
                 break;
         }
         for(int i = 0; i < ending_stationary_samples; i++) {
@@ -59,26 +62,40 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
         return 0;
     }
 
+    float MotorCalibrator::signal_to_voltage(float sig_value, float angVel) {
+        float voltage;
+        switch (instructions->command_signal_type) {
+        case CAL_SIGNAL_VOLTAGE:
+            voltage = sig_value;
+            break;
+        case CAL_SIGNAL_ACCEL:
+            voltage = motor_model.choose_V({.velocity = angVel}, sig_value);
+            break;
+        default:
+            printf("ERROR: command signal type does not exist\n");
+            voltage = 0;
+        }
+        return voltage;
+    }
+
     bool MotorCalibrator::do_loop(float V, float &angVel, absolute_time_t &looptarget, absolute_time_t start_time) {
         motors_IO->set_battery_voltage(ADC->read_ADC_scaled(batteryVoltage->channel_num));
         float angle = read_angle();
-        if (!safely_set_motor(V, angle)) return false;
+        bool motor_was_set = safely_set_motor(V, angle);
         angVel = calc_angvel(angle);
         report_result(angle, angVel, V, (looptarget - start_time) * 1e-6);
         looptarget = delayed_by_us(looptarget, (uint64_t)(instructions->dt * 1e6));
         sleep_until(looptarget);
-        return true;
+        return motor_was_set;
     }
 
     bool MotorCalibrator::safely_set_motor(float voltage, float angle) {
-        motors_IO->set_motor_voltage(instructions->motorNum, voltage);
         if (fabs(angle) > instructions->max_displacement || angle < instructions->min_displacement) {
             printf("Test went out of range and was terminated\n");
-            //return_motor_to_start();
             motors_IO->set_motor_voltage(instructions->motorNum, 0);
             return false;
         }
-        return true;
+        return motors_IO->set_motor_voltage(instructions->motorNum, voltage);;
     }
 
     float MotorCalibrator::read_angle() {

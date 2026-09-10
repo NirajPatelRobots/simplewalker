@@ -7,4 +7,4 @@ target_sources(motor_calibration
             BASE_DIRS .
             FILES "signal_generator.hpp" "motor_calibrator.hpp"
         )
-target_link_libraries(motor_calibration PUBLIC pico_motor_IO pico_comm)
+target_link_libraries(motor_calibration PUBLIC pico_motor_IO pico_comm MotorModelMicrocontroller)

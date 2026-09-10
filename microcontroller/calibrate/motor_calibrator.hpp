@@ -2,15 +2,16 @@
 Created October 2021, reworked late 2023
 TODO:
     way to cancel calibration
+        split up calibrate_motor() so it returns after each loop, main fcn waits and communicates
     Invalid scale values error?
     error if can't return to start
         detect wrong direction
     measure battery voltage variability?
-    different input mode for acceleration, uses motor model
     */
 #ifndef SIMPLEWALKER_PICO_MOTOR_CALIBRATOR_HPP
 #define SIMPLEWALKER_PICO_MOTOR_CALIBRATOR_HPP
 #include "../communication/pico_comm.hpp"
+#include "../control/motor_model.hpp"
 #include "../motors/motor_IO.hpp"
 #include "signal_generator.hpp"
 
@@ -24,11 +25,13 @@ public:
     shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> state_outbox;
     shared_ptr<MotorCalibrationTriggerMsg> instructions;
     std::unique_ptr<ExcitationSignalGenerator> generator;
+    MotorModel motor_model;
     MotorCalibrationStatus status {MOTORCAL_IDLE};
     MotorCalibrator(const std::vector<motorIOSettings> _motor_settings,
         shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> _state_outbox,
         int ADC_battery_voltage_channel, float ADC_battery_voltage_scale);
     int calibrate_motor();
+    float signal_to_voltage(float sig_value, float angVel);
     bool do_loop(float V, float &angVel, absolute_time_t &looptarget, absolute_time_t start_time);
     bool safely_set_motor(float voltage, float angle);
     float read_angle();
