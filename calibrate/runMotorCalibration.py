@@ -35,7 +35,11 @@ class ControllerSerial(serial.Serial):
         if connect:
             self.connect()
 
+    def __del__(self):
+        super().close()
+    
     def connect(self) -> None:
+        print("Connecting...", end="\r")
         super().__init__(port='/dev/ttyACM0', baudrate=115200, parity=serial.PARITY_NONE,
                                                stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=1)
         if self.is_open:
@@ -47,10 +51,10 @@ class ControllerSerial(serial.Serial):
         return self.read(2048).decode().replace("\r", "")
 
 
-def make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, send_skip_iterations,
+def make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, input_type, command_signal_type,
                                         max_displacement, min_displacement, text_output) -> bytes:
-    return struct.pack("<hhfffffhh", 0x0D11, motorNum, amp_scale, freq_scale, dt, max_displacement, min_displacement,
-                       send_skip_iterations, text_output)
+    return struct.pack("<hhfffffcch", 0x0D11, motorNum, amp_scale, freq_scale, dt, max_displacement, min_displacement,
+                       bytes([input_type]), bytes([command_signal_type]), text_output)
 
 
 def parse_MotorCalibrationStateMessage(message:bytes):
@@ -58,8 +62,8 @@ def parse_MotorCalibrationStateMessage(message:bytes):
     return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
 
 
-signal_type_names = ["sin", "squ", "db", "const"]
-
+input_type_names = ["sin", "squ", "db", "const"] # must match messages.h
+signal_type_names = ["voltage", "accel", "angle"]
 
 def print_from_micro(ser: ControllerSerial):
     text = ""
@@ -90,7 +94,7 @@ def print_from_micro(ser: ControllerSerial):
 
 
 def motortest_filename_tag(amp_scale, freq_scale, sig_type) -> str:
-    return f"_{signal_type_names[sig_type]}_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
+    return f"_{input_type_names[sig_type]}_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
 
 
 def run_tests_from_file_input(infile_name: str, series_name: str):
@@ -100,7 +104,8 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
     ser.reset_input_buffer()
     for run in series_config["runs"]:
         for run_type in run["types"]:
-            run_type_num = signal_type_names.index(run_type)
+            run_type_num = input_type_names.index(run_type)
+            signal_type_num = signal_type_names.index(series_config["signal_type"])
             print(f'{run_type} (type {run_type_num}) run')
             for amp_scale in run["amp_scales"]:
                 for freq_scale in run["freq_scales"]:
@@ -112,7 +117,7 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
                     time.sleep(0.5)
                     ser.reset_input_buffer()
                     ser.write(make_MotorCalibrationTriggerMessage(series_config["motorNum"], amp_scale, freq_scale,
-                                                        series_config["dt"], run_type_num,
+                                                        series_config["dt"], run_type_num, signal_type_num,
                                                         series_config["max_angle"], series_config["min_angle"], True))
                     V, angle, timestamp = print_from_micro(ser)
                     print("got V", V.shape, "angle", angle.shape, "time", timestamp.shape)
@@ -195,11 +200,11 @@ def interactive_main():
             print([d[5:-10] for d in glob.glob(ls_path)])
         elif command == "type":
             if len(args) > 1:
-                if args[1] in signal_type_names:
-                    sig_type = signal_type_names.index(args[1])
+                if args[1] in input_type_names:
+                    sig_type = input_type_names.index(args[1])
                 else:
                     sig_type = int(args[1])
-            print("Signal type:", signal_type_names[sig_type], f"({sig_type})")
+            print("Signal type:", input_type_names[sig_type], f"({sig_type})")
         elif command.startswith("exit"):
             ser.close()
             break

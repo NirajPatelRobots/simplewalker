@@ -10,12 +10,13 @@
 
 
 int main() {
-    std::unique_ptr<PicoCommunication> comm;
+    auto comm = std::make_unique<PicoCommunication>();
     auto trigger_inbox = make_shared<MessageInbox<MotorCalibrationTriggerMsg>>(MotorCalibrationTriggerMsgID, *comm);
     auto state_outbox = make_shared<MessageOutbox<MotorCalibrationStateMsg>>(MotorCalibrationStateMsgID, *comm);
     MotorCalibrator calibrator{SIMPLEWALKER_MOTOR_IO_SETTINGS, state_outbox,
          ADC_BATTERY_VOLTAGE_CHANNEL, ADC_BATTERY_VOLTAGE_SCALE};
     while (1) {
+        float battery_voltage = calibrator.ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL);
         comm->receive_messages();
         if (trigger_inbox->get_newest(*calibrator.instructions) >= 0) {
             if (calibrator.instructions->motorNum >= SIMPLEWALKER_MOTOR_IO_SETTINGS.size()){
@@ -25,11 +26,13 @@ int main() {
             printf("Calibrate motor %d; freq=%f, amp=%f, dt=%f\n",
                    calibrator.instructions->motorNum, calibrator.instructions->frequency,
                    calibrator.instructions->amplitude, calibrator.instructions->dt);
-            sleep_ms(500);
-            calibrator.calibrate_motor();
+            if (battery_voltage < 3.3) {
+                printf("Low battery, won't run calibration\n");
+            } else {
+                calibrator.calibrate_motor();
+            }
         } else {
             calibrator.instructions->dt = 0.5;
-            float battery_voltage = calibrator.ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL);
             float angle = calibrator.read_angle();
             float angVel = calibrator.calc_angvel(angle);
             calibrator.motors_IO->set_motor_voltage(calibrator.instructions->motorNum, 0);

@@ -5,6 +5,10 @@
 #include "pico/time.h"
 
 
+const char *const input_type_names[] = {"sine", "square", "deadband", "constant"}; 
+const char *const signal_type_names[] = {"voltage", "accel", "position"}; 
+
+
 MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_settings,
     shared_ptr<MessageOutbox<MotorCalibrationStateMsg>> _state_outbox,
     int ADC_battery_voltage_channel, float ADC_battery_voltage_scale)
@@ -27,6 +31,15 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
 
     int MotorCalibrator::calibrate_motor() {
         float angVel = 0.0;
+        if (instructions->command_signal_type > CAL_SIGNAL_POS) {
+            printf("Error: Invalid signal type\n");
+            return -1;
+        }
+        if (instructions->input_signal_type == CAL_INPUT_DEADBAND 
+         && instructions->command_signal_type != CAL_SIGNAL_VOLTAGE) {
+            printf("Error: Deadband is only possible for Voltage signals.\n");
+            return -2;
+        }
         generator = make_signal_generator(MotorCalibrationInputType(instructions->input_signal_type),
                                           instructions->frequency * instructions->dt,
                                           instructions->amplitude);
@@ -34,6 +47,8 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
             printf("Invalid input type: %u", instructions->input_signal_type);
             return -3;
         }
+        printf("Signal %s tracking waveform %s\n", signal_type_names[instructions->command_signal_type],
+                                                    input_type_names[instructions->input_signal_type]);
 
         return_motor_to_start();
         status = MOTORCAL_RUNNING;
