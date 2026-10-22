@@ -7,7 +7,8 @@ TODO: values accessible in multiple ways. bitfields for errcode and command?
 
 //everything in SI units and radians unless stated otherwise
 
-enum MotorCalibrationInputType : uint16_t {CAL_INPUT_SINES, CAL_INPUT_SQU, CAL_INPUT_DEADBAND, CAL_INPUT_CONST};
+enum MotorCalibrationInputType : uint8_t {CAL_INPUT_SINES, CAL_INPUT_SQU, CAL_INPUT_DEADBAND, CAL_INPUT_CONST};
+enum MotorCalibrationSignalType : uint8_t {CAL_SIGNAL_VOLTAGE, CAL_SIGNAL_ACCEL, CAL_SIGNAL_POS};
 struct MotorCalibrationTriggerMsg { //send to microcontroller to run motor calibration
     uint16_t ID;
     uint16_t motorNum;
@@ -15,7 +16,8 @@ struct MotorCalibrationTriggerMsg { //send to microcontroller to run motor calib
     float frequency;
     float dt;
     float max_displacement, min_displacement; // max and min angle
-    uint16_t input_signal_type;
+    uint8_t input_signal_type;
+    uint8_t command_signal_type;
     uint16_t text_output; // bool whether to output human-readable stdout or MotorCalibrationStateMsg
 };
 const uint16_t MotorCalibrationTriggerMsgID = 0x0D11;

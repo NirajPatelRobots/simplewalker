@@ -19,6 +19,15 @@ interactive_calibration = [
     "scipy>=1.13",
 ]
 
+notebook_calibration = [
+    "matplotlib>=3.9",
+    "pillow>=9.3",
+    "scipy>=1.13",
+    "ipympl>=0.9.6",
+    "ipykernel",
+    "jupyter",
+]
+
 
 [tool.ruff]
 include = ["calibrate/*.py"]
