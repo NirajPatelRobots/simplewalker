@@ -43,7 +43,10 @@ def graph_V_and_angle_and_derivatives(results):
     plt.suptitle("Raw and Filtered Data")
     plt.ylabel("Driving Voltage (V)")
     lines = plt.plot(results["t"], results["V"], results["t"], results["V_f"])
-    plt.legend(lines, ["Raw", "Filtered"])
+    if "ref" in results:
+        plt.legend(lines + [plt.Line2D([0], [0], color='C4')], ["Raw", "Filtered", "Filt. Ref"])
+    else:
+        plt.legend(lines, ["Raw", "Filtered"])
     plt.grid()
     plt.subplot(412, sharex=ax)
     plt.ylabel("Angle [rad]")
@@ -63,6 +66,10 @@ def graph_V_and_angle_and_derivatives(results):
                      results["t"], results["accel_predic"])
     plt.legend(lines, ["Raw", "Filtered", "Predicted"])
     ax.set_ylim(np.min(results["acc_f"]) * 1.1, np.max(results["acc_f"]) * 1.1)
+    for log_start, signal_type, ref, log_end in zip(results["log_starts"], results["signal_type"], results["ref"], sorted(results["log_starts"])[1:] + [len(results["t"])]):
+        if signal_type is not None and ref is not None:
+            plt.subplot({"voltage": 411, "accel": 414, "angle": 412}[signal_type])
+            plt.plot(results["t"][log_start:log_end], ref, 'C4')
     plt.grid()
 
 # 3D graph acceleration and acceleration error against voltage and speed

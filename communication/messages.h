@@ -29,6 +29,7 @@ struct MotorCalibrationStateMsg { // sent by microcontroller during motor calibr
     uint32_t timestamp_us;
     float angle;
     float voltage;
+    float reference;
 };
 const uint16_t MotorCalibrationStateMsgID = 0x0C11;
 

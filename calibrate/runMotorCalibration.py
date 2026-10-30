@@ -4,8 +4,6 @@ The motor controller has to run calibrate_motor.
 Can run interactively or read from a json file.
 TODO:
     receive binary data from controller
-    remove angvel from text comm (removed from MotorCalibrationStateMsg)
-    send reference path
     measure battery voltage during calibration
     improve stdout display
     compare reported controller time with system time?
@@ -70,28 +68,27 @@ signal_type_names = ["voltage", "accel", "angle"]
 def print_from_micro(ser: ControllerSerial):
     text = ""
     regex = re.compile(r"(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+),(-?\d+\.\d+)$", flags=re.MULTILINE)
-    voltage, angle, timestamp = ([], [], [])
+    voltage, angle, ref, timestamp = ([], [], [], [])
     is_finished = False
-    lines_read = 0
     while not is_finished:
         text += ser.readstr()
-        lines_read += 1
-        while len(text) and "\n" in text:
+        while "\n" in text:
             regex_match = regex.match(text)
             if regex_match:
                 text = text[regex_match.end()+1:]
-                print("Angle =", regex_match.group(3), "  V =", regex_match.group(2), "    ", end='\r')
                 voltage.append(float(regex_match.group(2)))
                 angle.append(float(regex_match.group(3)))
+                ref.append(float(regex_match.group(4)))
                 timestamp.append(float(regex_match.group(1)))
                 is_finished = (timestamp[-1] > 1000)
+                print(f"\rt = {timestamp[-1]}   Angle = {angle[-1]}  V = {voltage[-1]}    ", end='')
             else:
                 newlineplace = text.find('\n')
                 print("|Other text|>", text[:newlineplace], "<|Other text|")
                 is_finished = "finished calibration" in str(text[:newlineplace]) or "was terminated" in str(text[:newlineplace])
                 text = text[newlineplace+1:]
     print(text)
-    return np.array(voltage), np.array(angle), np.array(timestamp)
+    return np.array(voltage), np.array(angle), np.array(ref), np.array(timestamp)
 
 
 def motortest_filename_tag(amp_scale, freq_scale, sig_type, input_type) -> str:
@@ -104,8 +101,9 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
     ser = ControllerSerial()
     ser.reset_input_buffer()
     data = {k: series_config[k] for k in ("signal_type", "motorNum", "dt")}
+    print(data)
     for run in series_config["runs"]:
-        print(run["name"]) if "name" in run else None
+        print((run["name"] + ": ") if "name" in run else "", end='')
         for run_type in run["types"]:
             data["run_type"] = run_type
             run_type_num = input_type_names.index(run_type)
@@ -126,7 +124,7 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
                     ser.write(make_MotorCalibrationTriggerMessage(data["motorNum"], amp_scale, freq_scale,
                                                         data["dt"], run_type_num, signal_type_num,
                                                         series_config["max_angle"], series_config["min_angle"], True))
-                    data["V"], data["angle"], data["t"] = print_from_micro(ser)
+                    data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
                     print("got", ", ".join([k + ": " + str(data[k].shape) for k in ("V", "angle", "t")]))
                     saveRun(filename, data)
                     time.sleep(0.5)
@@ -173,8 +171,8 @@ def interactive_main():
             ser.reset_input_buffer()
             ser.write(message)
             print("sent:", message)
-            data["V"], data["angle"], data["t"] = print_from_micro(ser)
-            print("got", ", ".join([k + ": " + str(data[k].shape) for k in ("V", "angle", "t")]))
+            data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
+            print("got", ", ".join([k + ": " + str(data[k].shape) for k in ("V", "angle", "ref", "t")]))
             if filename:
                 saveRun(filename, data)
         elif command == "motornum":

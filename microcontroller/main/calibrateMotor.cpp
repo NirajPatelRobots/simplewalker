@@ -11,7 +11,7 @@
 
 void report_state(MotorCalibrationStateMsg &state, MessageOutbox<MotorCalibrationStateMsg> *outbox, bool text_output) {
     if (text_output) {
-        printf("%f,%f,%f\n", state.timestamp_us * 1e-6, state.voltage, state.angle);
+        printf("%f,%f,%f,%f\n", state.timestamp_us * 1e-6, state.voltage, state.angle, state.reference);
     } else {
         outbox->message = state;
         outbox->send();
@@ -30,9 +30,6 @@ void handle_instructions(MotorCalibrator &calibrator) {
     if (calibrator.state.voltage < 3.3) {
         printf("Low battery, won't run calibration\n");
     } else {
-        if (calibrator.instructions->text_output) {
-            printf("Time,Voltage,Angle\n");
-        }
         calibrator.start_calibration();
     }
 }
@@ -65,7 +62,7 @@ int main() {
             } else {
                 calibrator.motors_IO->set_motor_voltage(calibrator.instructions->motorNum, 0);
                 calibrator.read_angle();
-                calibrator.state.timestamp_us = (uint32_t)(looptarget);
+                calibrator.state.timestamp_us = (uint32_t)(get_absolute_time() + 1000'000'000);
                 report_state(calibrator.state, state_outbox.get(), calibrator.instructions->text_output);
                 sleep_ms(500);
             }

@@ -72,17 +72,20 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
         int startup_stationary_samples = floor(0.75 / instructions->dt);
         int ending_stationary_samples = floor(0.75 / instructions->dt);
         if (run_section == SECTION_START) {
+            state.reference = 0;
             state.voltage = 0;
             if (counter++ == startup_stationary_samples) {
                 run_section = SECTION_GOING;
             }
         } else if (run_section == SECTION_GOING) {
-            state.voltage = signal_to_voltage(generator->get_next_value(angVel), angVel);
+            state.reference = generator->get_next_value(angVel);
+            state.voltage = signal_to_voltage(state.reference, angVel);
             if(generator->is_finished) {
                 run_section = SECTION_END;
                 counter = 0;
             }
         } else {
+            state.reference = 0;
             state.voltage = 0;
             if (counter++ == ending_stationary_samples) {
                 printf("finished calibration\n");
@@ -124,7 +127,7 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
 
     float MotorCalibrator::calc_angvel() {
         static float lastAngle{0.0};
-        float angVel = (state.angle - lastAngle) / instructions->dt;
+        angVel = (state.angle - lastAngle) / instructions->dt;
         lastAngle = state.angle;
         return angVel;
     }
@@ -132,6 +135,7 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
     bool MotorCalibrator::return_motor_to_start() {
         float kp{3};
         float angle_tol = 0.02;
+        state.reference = 0;
         if (numInRange < 10 && (float)(++counter) <= 2.f / instructions->dt) {
             if (fabs(state.angle) < angle_tol) {
                 state.voltage = 0;
