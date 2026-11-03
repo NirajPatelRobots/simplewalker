@@ -1,3 +1,5 @@
+#ifndef SIMPLEWALKER_PICO_MODEL_FCNS_HPP
+#define SIMPLEWALKER_PICO_MODEL_FCNS_HPP
 #include "motor_model.hpp"
 
 
@@ -44,3 +46,4 @@ ModelFcn * (*const NONBASE_FUNCTIONS[])(void) = {
     ModelFcns::Mult::create,
 };
 const size_t NUM_NONBASE_FUNCTIONS = sizeof(NONBASE_FUNCTIONS) / sizeof(NONBASE_FUNCTIONS[0]);
+#endif  // SIMPLEWALKER_PICO_MODEL_FCNS_HPP

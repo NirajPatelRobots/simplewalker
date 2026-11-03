@@ -25,10 +25,13 @@ import numpy as np
 from scipy.optimize import minimize
 import sys
 import time
+from typing import TypeAlias
 
 from filter import FilterParams, filter_data, cut_first, moving_avg, derivative, remove_spikes
 import motor_model
 from model_functions import model_fcns
+
+ResultsType: TypeAlias = dict[str, float | int | np.ndarray | np.float64 | np.int64 | dict | str | list[str] | list[np.ndarray]]
 
 
 def examineMotor(testdata, model, params, filter_params=FilterParams(), test_only=False):
@@ -40,11 +43,10 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
     Motor model d2(angle)/dt2 = param[V] * V + param[omega] * d(angle)/dt
     model is a list of strings naming additional model dynamics"""
 
-    results_t = dict[str, float | int | np.ndarray | np.float64 | np.int64 | dict | str]
-
-    def filter_and_derivative_and_assemble(testdata, filter_params) -> results_t:
-        results: results_t = {m: np.empty(0) for m in ["t", "angle_hf", "spiky_angle_hf"]
+    def filter_and_derivative_and_assemble(testdata, filter_params) -> ResultsType:
+        results: ResultsType = {m: np.empty(0) for m in ["t", "angle_hf", "spiky_angle_hf"]
                    + [n + f for n in ["V", "angle", "vel", "acc", "spiky_angle"] for f in ("", "_f")]}
+        results |= {n: [] for n in ("signal_type", "ref", "log_starts", "filename")}
         for this_data in testdata:
             if filter_params.T is not None:
                 filter_params.set_N(N=None, t_data=this_data["t"])
@@ -57,6 +59,8 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
                 results[m+"_f"] = np.concatenate((results[m+"_f"], filter_data(this_data[m], filter_params)))
             for m in ["spiky_angle", "angle"]:
                 results[m + "_hf"] = np.concatenate((results[m+"_hf"], filter_data(this_data[m], filter_params, type='high')))
+            for n, f in [("signal_type", str), ("filename", str), ("ref", lambda x: filter_data(x, filter_params))]:
+                results[n].append(f(this_data[n]) if n in this_data else None)
         results["diff_t"] = np.diff(results["t"])
         if np.any(results["diff_t"] <= 0):
             raise ValueError("ERROR: time stops or goes backwards", np.flatnonzero(results["diff_t"] <= 0))
@@ -66,12 +70,10 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         return results
 
     def assemble_t(this_data, results, filter_params):
+        results["log_starts"].append(len(results["t"]))
         this_t = cut_first(this_data["t"], filter_params)
         new_start_t = results["t"][-1] + (this_t[1] - this_t[0]) if len(results["t"]) > 0 else 0.
         results["t"] = np.concatenate((results["t"], this_t - this_t[0] + new_start_t))
-        if "log_starts" not in results:
-            results["log_starts"] = {}
-        results["log_starts"][new_start_t] = this_data["filename"]
 
     def determine_params(X, acc_f, results, remove_outliers=True):
         paramArr = np.linalg.inv(X.T @ X) @ X.T @ acc_f  # linear least squares
@@ -177,12 +179,13 @@ def printMotorResults(params, results):
 
 def clean_up_test_data(this_data, results, filter_params):
     def remove_idle_messages(this_data, t_max=100):
+        cleanup_cols = [c for c in ("V", "angle", "ref", "t") if c in this_data]
         index_first = np.flatnonzero(this_data["t"] < t_max)[0]
-        for m in ["V", "angle", "t"]:
+        for m in cleanup_cols:
             this_data[m] = this_data[m][index_first:]
         high_t = np.flatnonzero(this_data["t"] > t_max)
         index_last = high_t[0] if len(high_t) > 0 else len(this_data["t"])
-        for m in ["V", "angle", "t"]:
+        for m in cleanup_cols:
             this_data[m] = this_data[m][:index_last]
 
     remove_idle_messages(this_data)

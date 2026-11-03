@@ -22,6 +22,7 @@ add_subdirectory(sensors)
 add_subdirectory(communication)
 add_subdirectory(control)
 add_subdirectory(motors)  # requires sensors
+add_subdirectory(calibrate)  # requires motors and communication
 
 add_library(ControllerInfo)
 target_sources(ControllerInfo
@@ -48,7 +49,7 @@ add_executable(hardware_test main/hardwareTest.cpp)
 target_link_libraries(hardware_test pico_motor_IO pico_comm)
 controller_exe_common(hardware_test)
 
-add_executable(calibrate_motor calibrate/calibrateMotor.cpp calibrate/signal_generator.cpp)
-target_link_libraries(calibrate_motor pico_motor_IO pico_comm)
+add_executable(calibrate_motor main/calibrateMotor.cpp)
+target_link_libraries(calibrate_motor motor_calibration)
 controller_exe_common(calibrate_motor)
 

@@ -61,14 +61,17 @@ fi
 
 rsync -zaiR calibrate/runMotorCalibration.py $inputs_file pi@raspberrypi:/home/pi/simplewalker/
 
-ssh -l pi raspberrypi "cd simplewalker && python3 calibrate/runMotorCalibration.py $inputs_file $output_tag"
-
+if ! timeout 10 ssh pi@raspberrypi "ls simplewalker/calibrate" > /dev/null ; then
+  echo "Error: ssh timeout attempting to access robot :("
+  exit 5
+fi
+ssh pi@raspberrypi "cd simplewalker && python3 calibrate/runMotorCalibration.py $inputs_file $output_tag"
 
 fi  # end if not pull-only mode
 
 echo "Sync motortest files from robot"
 rsync -zict pi@raspberrypi:/home/pi/simplewalker/data/m0_"${output_tag}"*.motortest ./data/
 
-uv run --extra calibration calibrate/calibrate_cli.py data/m0_${output_tag}* -m static_fric const_fric s_punch
+uv run calibrate/calibrate_cli.py data/m0_${output_tag}* -m static_fric const_fric s_punch
 
 popd > /dev/null

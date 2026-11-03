@@ -1,4 +1,7 @@
 /* Generate signals to use as input voltage for motor calibration */
+#ifndef SIMPLEWALKER_PICO_SIGNAL_GENERATOR_HPP
+#define SIMPLEWALKER_PICO_SIGNAL_GENERATOR_HPP
+
 #include <memory>
 #include "../../communication/messages.h"
 
@@ -12,3 +15,5 @@ public:
 
 std::unique_ptr<ExcitationSignalGenerator> make_signal_generator(
         MotorCalibrationInputType type, float frequency_scale, float amplitude_scale);
+
+#endif  // SIMPLEWALKER_PICO_SIGNAL_GENERATOR_HPP
