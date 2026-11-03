@@ -59,7 +59,7 @@ jobs:
       - name: Download unit tests
         uses: actions/download-artifact@v8
         with: { name: microcontroller_unit_tests }
-      - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api
+      - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api unittest_filter
         continue-on-error: true
       - parallel:  # run tests
         - name: unittest motor_model
