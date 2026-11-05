@@ -69,7 +69,6 @@ TEST(MovingAverageTest, AllSame) {
     EXPECT_NEAR(averager.get(), TEST_VAL, TOLERANCE);
 }
 
-
 TEST(MovingAverageTest, UpDownDownUpNormal) {
     MovingAverage<TEST_N> averager{};
     const float TEST_VAL{5.2}, SPIKE_VAL{28.4};
@@ -102,13 +101,11 @@ protected:
     }
 };
 
-
 TEST_F(SymmDespikerTest, InitializeSymmDespiker) {
     EXPECT_NEAR(despiker.get(), TEST_VAL, TOLERANCE);
     SymmDespiker<4> despiker_4{};
     EXPECT_EQ(despiker_4.get(), 0.0);
 }
-
 
 // velocity when position has a step down
 TEST_F(SymmDespikerTest, Width1Downspike) {
@@ -120,7 +117,6 @@ TEST_F(SymmDespikerTest, Width1Downspike) {
     // Downspike value comes out unchanged
     EXPECT_NEAR(despiker.get(), TEST_VAL - BUMP_VAL, TOLERANCE);
 }
-
 
 // velocity when position has a 1-width downspike
 TEST_F(SymmDespikerTest, RemoveWidth2SymmDownSpike) {
@@ -135,7 +131,6 @@ TEST_F(SymmDespikerTest, RemoveWidth2SymmDownSpike) {
         EXPECT_NEAR(despiker.get(), TEST_VAL, 3 * TOLERANCE);  // low tolerance :/
     }
 }
-
 
 // velocity when position has a 1-width downspike that doesn't come all the way back up
 TEST_F(SymmDespikerTest, RemoveWidth2AsymmDownSpike) {
@@ -152,3 +147,104 @@ TEST_F(SymmDespikerTest, RemoveWidth2AsymmDownSpike) {
     despiker.new_value(TEST_VAL);                         // 5 ticks post-change, still normal
     EXPECT_NEAR(despiker.get(), TEST_VAL, TOLERANCE);
 }
+
+
+// Test wider despiker which can handle wider spikes
+class SymmDespikerWideTest : public testing::Test {
+protected:
+    SymmDespiker<4> despiker{};
+    const float TEST_VAL{5.2}, SPIKE_VAL{28.4}, BUMP_VAL{1.9};
+    unsigned num_pushed {0};
+
+    void SetUp() override {
+        reset();
+    }
+    void reset() {
+        for (size_t i = 0; i < despiker.SCAN_SIZE; i++) {
+            despiker.new_value(TEST_VAL);
+        }
+        num_pushed = 0;
+    }
+    void expect_neutral_output() {
+        for (size_t i = 0; i < despiker.SCAN_SIZE + 1; i++) {
+            EXPECT_NEAR(despiker.get(), TEST_VAL, 3 * TOLERANCE);  // low tolerance :/
+            despiker.new_value(TEST_VAL);
+        }
+        EXPECT_NEAR(despiker.get(), TEST_VAL, 3 * TOLERANCE);
+    }
+    void push_val(float value) {
+        EXPECT_NEAR(despiker.get(), TEST_VAL, TOLERANCE);
+        despiker.new_value(value);
+        num_pushed++;
+    }
+    void expect_bump(float bump_val, size_t spike_width) {
+        EXPECT_NEAR(despiker.get(), TEST_VAL, TOLERANCE);
+        while (num_pushed < despiker.SCAN_SIZE) {
+            push_val(TEST_VAL);
+        }
+        // bump can be spread out anywhere over the next spike_width samples
+        float total_over_spike = 0;
+        for (size_t i = 0; i < spike_width; i++) {
+            total_over_spike += despiker.get();
+            despiker.new_value(TEST_VAL);
+        }
+        EXPECT_NEAR(total_over_spike, 
+                    spike_width * TEST_VAL + bump_val,  // the bump is somewhere in the total
+                    despiker.SCAN_SIZE * TOLERANCE);    // very low tolerance :(
+    }
+};
+
+// velocity when position has a 1-width downspike
+TEST_F(SymmDespikerWideTest, RemoveWidth2SymmDownSpike) {
+    push_val(TEST_VAL - SPIKE_VAL);
+    push_val(TEST_VAL + SPIKE_VAL);
+    expect_neutral_output();
+}
+
+// velocity when position has a 2-width downspike with the same value twice
+TEST_F(SymmDespikerWideTest, RemoveWidth3SymmDownSpikeCenterNeutral) {
+    push_val(TEST_VAL - SPIKE_VAL);
+    push_val(TEST_VAL);
+    push_val(TEST_VAL + SPIKE_VAL);
+    expect_neutral_output();
+}
+
+// velocity when position has a 2-width downspike with different values
+TEST_F(SymmDespikerWideTest, RemoveWidth3SymmSpikeCenterOffset) {
+    for (float spike_sign : {-1.0, 1.0}) {
+        for (float bump_sign : {-1.0, 1.0}) {
+            push_val(TEST_VAL + SPIKE_VAL * spike_sign + BUMP_VAL * bump_sign);
+            push_val(TEST_VAL - BUMP_VAL * bump_sign);
+            push_val(TEST_VAL - SPIKE_VAL * spike_sign);
+            expect_neutral_output();
+            reset();
+        }
+    }
+}
+
+// velocity when position has a 2-width downspike with same values and comes out changed
+TEST_F(SymmDespikerWideTest, RemoveWidth3AsymmSpikeCenterNeutral) {
+    for (float spike_sign : {-1.0, 1.0}) {
+        for (float bump_sign : {-1.0, 1.0}) {
+            push_val(TEST_VAL + SPIKE_VAL * spike_sign + BUMP_VAL * bump_sign);
+            push_val(TEST_VAL);
+            push_val(TEST_VAL - SPIKE_VAL * spike_sign);
+            expect_bump(bump_sign * BUMP_VAL, 3);
+            reset();
+        }
+    }
+}
+
+// velocity when position spikes down, steps down, and spikes most of the way back up, but maintining the step change
+TEST_F(SymmDespikerWideTest, RemoveWidth3AsymmSpikeCenterOffset) {
+    for (float spike_sign : {-1.0, 1.0}) {
+        for (float bump_sign : {-1.0, 1.0}) {
+            push_val(TEST_VAL + SPIKE_VAL * spike_sign);
+            push_val(TEST_VAL + BUMP_VAL * bump_sign);
+            push_val(TEST_VAL - SPIKE_VAL * spike_sign);
+            expect_bump(bump_sign * BUMP_VAL, 3);
+            reset();
+        }
+    }
+}
+
