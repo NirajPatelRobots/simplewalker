@@ -6,14 +6,19 @@ TODO:
     error if can't return to start
         detect wrong direction
     measure battery voltage variability?
-    send reference signal from micro during calibration
     better names used consistently for input_signal_type and command_signal_type
+    configure which signal to send? (reference, velocity, battery voltage)
     */
 #ifndef SIMPLEWALKER_PICO_MOTOR_CALIBRATOR_HPP
 #define SIMPLEWALKER_PICO_MOTOR_CALIBRATOR_HPP
 #include "../control/motor_model.hpp"
+#include "../filter/micro_filter.hpp"
 #include "../motors/motor_IO.hpp"
 #include "signal_generator.hpp"
+
+
+const int VEL_FILT_DESPIKE_N = 4, VEL_FILT_AVG_N = 10;
+const bool BYPASS_FILT_DESPIKE = false, BYPASS_FILT_AVG = false;
 
 
 class MotorCalibrator {
@@ -26,18 +31,18 @@ public:
     shared_ptr<ADCReader> ADC;
     const std::vector<motorIOSettings> motor_settings;
     std::unique_ptr<MotorsIO> motors_IO;
-    shared_ptr<ADCChannel> batteryVoltage;
     MotorCalibrationStateMsg state;
     shared_ptr<MotorCalibrationTriggerMsg> instructions;
     std::unique_ptr<ExcitationSignalGenerator> generator;
     MotorModel motor_model;
+    SymmDespiker<VEL_FILT_DESPIKE_N> despiker;
+    MovingAverage<VEL_FILT_AVG_N> movingAvg;
     float angVel;
-    MotorCalibrator(const std::vector<motorIOSettings> _motor_settings,
-        int ADC_battery_voltage_channel, float ADC_battery_voltage_scale);
+    MotorCalibrator(const std::vector<motorIOSettings> _motor_settings);
     int start_calibration();
     bool run_calibration_loop();
     void read_angle();
-    float calc_angvel();
+    void calc_angvel();
 };
 
 #endif  //SIMPLEWALKER_PICO_MOTOR_CALIBRATOR_HPP

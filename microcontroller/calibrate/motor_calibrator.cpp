@@ -7,12 +7,10 @@ const char *const input_type_names[] = {"sine", "square", "deadband", "constant"
 const char *const signal_type_names[] = {"voltage", "accel", "position"}; 
 
 
-MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_settings,
-    int ADC_battery_voltage_channel, float ADC_battery_voltage_scale)
+MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_settings)
         : ADC(make_shared<ADCReader>()),
           motor_settings(_motor_settings),
           motors_IO(std::make_unique<MotorsIO>(motor_settings, ADC)),
-          batteryVoltage(ADC->set_channel("batteryVoltage", ADC_battery_voltage_channel, 0, ADC_battery_voltage_scale)),
           state(),
           instructions(make_shared<MotorCalibrationTriggerMsg>()),
           motor_model(),
@@ -65,7 +63,7 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
         }
         read_angle();
         calc_angvel();
-        motors_IO->set_battery_voltage(ADC->read_ADC_scaled(batteryVoltage->channel_num));
+        motors_IO->set_battery_voltage(ADC->read_ADC_scaled("batteryVoltage"));
         if (state.status == MOTORCAL_CENTERING) {
             return return_motor_to_start();
         }
@@ -125,11 +123,22 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
         state.angle = ADC->read_ADC_scaled(motor_settings[instructions->motorNum].sensor_channel_num);
     }
 
-    float MotorCalibrator::calc_angvel() {
+    void MotorCalibrator::calc_angvel() {
         static float lastAngle{0.0};
-        angVel = (state.angle - lastAngle) / instructions->dt;
+        float despiked, raw_angvel = (state.angle - lastAngle) / instructions->dt;
+        if constexpr (BYPASS_FILT_DESPIKE) {
+            despiked = raw_angvel;
+        } else {
+            despiker.new_value(raw_angvel);
+            despiked = despiker.get();
+        }
+        if constexpr (BYPASS_FILT_AVG) {
+            angVel = despiked;
+        } else {
+            movingAvg.new_value(despiked);
+            angVel = movingAvg.get();
+        }
         lastAngle = state.angle;
-        return angVel;
     }
 
     bool MotorCalibrator::return_motor_to_start() {
