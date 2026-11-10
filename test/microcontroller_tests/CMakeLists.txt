@@ -1,5 +1,6 @@
-# microcontroller/control is built in the microcontroller project as well as here
-add_subdirectory(../../microcontroller/control control/)
+# microcontroller/control is built in the microcontroller project
+#   and in the non-test code for this project 
+# microcontroller/filter is built in the microcontroller project and here
 add_subdirectory(../../microcontroller/filter filter/)
 
 add_executable(unittest_motor_model unittest_motor_model.cpp)

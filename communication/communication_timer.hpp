@@ -9,9 +9,23 @@
 
 namespace chrono = std::chrono;
 
+chrono::microseconds MAX_LISTEN_INTERVAL {20000};  // guess
+
+
 template< class Rep, class Period >
 long count_us(chrono::duration<Rep, Period> duration) {
     return chrono::duration_cast<std::chrono::microseconds>(duration).count();
+}
+
+
+void listen_timeout(Communicator &comm, chrono::microseconds wait_us,
+                        chrono::time_point<chrono::steady_clock> start_point = chrono::steady_clock::now()) {
+    auto sleep_target = start_point;
+    while (sleep_target < start_point + wait_us) {
+        sleep_target = std::min(start_point + wait_us, sleep_target + MAX_LISTEN_INTERVAL);
+        std::this_thread::sleep_until(sleep_target);
+        comm.receive_messages();
+    }
 }
 
 class CommTimer {
@@ -21,7 +35,6 @@ class CommTimer {
 public:
     chrono::microseconds timestep;
     chrono::microseconds msgwaittime;
-    chrono::microseconds max_listen_interval {20000};  // guess
     chrono::microseconds acceptable_delay;
     bool print_stdout;
     CommTimer(unsigned timestep_us, unsigned max_wait_time, unsigned acceptable_delay_us = 0, unsigned start_delay_us = 0) :
@@ -42,7 +55,9 @@ public:
             inbox.clear();
         }
         bool message_was_missing = message_is_missing();
-        sleep_until_next_loop(inbox.comm);
+        listen_timeout(inbox.comm, timestep, loopstart);
+
+        loopstart = loopstart + timestep;
         bool waiting_for_late = false;
         chrono::time_point<chrono::steady_clock> late_readtime;
         while (inbox.get_newest(message) < 0) {
@@ -75,16 +90,6 @@ public:
     const chrono::time_point<chrono::steady_clock> &initial_timestamp() { return timestart; };
     const chrono::time_point<chrono::steady_clock> &loop_timestamp() { return loopstart; };
     auto duration() const { return loopstart - timestart; };
-protected:
-    void sleep_until_next_loop(Communicator &comm) {
-        auto sleep_target = loopstart;
-        while (sleep_target < loopstart + timestep) {
-            sleep_target = std::min(loopstart + timestep, sleep_target + max_listen_interval);
-            std::this_thread::sleep_until(sleep_target);
-            comm.receive_messages();
-        }
-        loopstart = sleep_target;  // = loopstart + timestep
-    }
 };
 
 #endif // SIMPLEWALKER_COMM_TIMER_HPP

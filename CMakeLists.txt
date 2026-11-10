@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -O")
 set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE "${CMAKE_COMMAND} -E time")
+cmake_policy(SET CMP0135 NEW)
 include(FetchContent)
 
 # TODO: sort out which directory to run from / find settings file
@@ -13,10 +14,15 @@ include_directories(../rapidxml)
 include_directories(/usr/include/rapidxml)
 include_directories(/usr/include/eigen3)
 
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
+
 include_directories(mainsrc display physics)
 add_subdirectory(communication)
 add_subdirectory(state_estimation)
 add_subdirectory(display)
+# Subdirectory shared with microcontroller
+add_subdirectory(microcontroller/control)
 
 
 # simplewalker main
@@ -34,6 +40,10 @@ target_link_libraries(collect_sensor_cal_data wiringPi stdc++fs IO InterboardCom
 # measure motor angle manually
 add_executable(monitor_controller mainsrc/monitor_controller.cpp)
 target_link_libraries(monitor_controller IO InterboardComm)
+
+# motor model user API
+add_executable(motor_model_user_API mainsrc/motor_model_user_main.cpp)
+target_link_libraries(motor_model_user_API MotorModelUser InterboardComm nlohmann_json::nlohmann_json)
 
 
 add_subdirectory(test)

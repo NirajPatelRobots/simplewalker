@@ -104,6 +104,11 @@ struct IMUInfoMsg {
 const uint16_t IMUInfoMsgID = 0x0C00;
 
 
+// Motor model API types are in motor_model_API.hpp
+const uint16_t MotorModelAPIRequestID = 0x0F01;
+const uint16_t MotorModelAPIResponseID = 0x0F02;
+
+
 struct RobotStateMsg {
     uint16_t ID;
     uint16_t errcode;

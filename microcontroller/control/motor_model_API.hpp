@@ -44,7 +44,10 @@ bool msg_delete_term(GROUP group, unsigned term_idx, Request &msg_out);
 bool msg_add_function(GROUP group, unsigned term_idx, const char *nonbase_fcn_name, Request &msg_out);
 bool msg_set_parameter(GROUP group, unsigned term_idx, unsigned fcn_idx, unsigned param_idx, float value, Request &msg_out);
 bool msg_set_weight(GROUP group, unsigned term_idx, float weight, Request &msg_out);
+// Additional user functions
 const Request HELLO_REQUEST {};
+const char *response_status_name(Response::STATUS status);
+const char *request_command_name(COMMAND cmd);
 
 // Microcontroller API handler function
 void handle_request(const Request &msg, MotorModel &model, Response &response);

@@ -1,5 +1,6 @@
 #include "model_fcns.hpp"
 #include "motor_model_API.hpp"
+#include <array>
 #include <string>
 #include <unordered_map>
 
@@ -91,5 +92,26 @@ bool msg_set_weight(GROUP group, unsigned term_idx, float weight, Request &msg_o
     msg_out.term_idx = term_idx;
     msg_out.value = weight;
     return true;
+}
+
+
+const std::array<std::string, 3> success_status_names{"UNSET", "SUCCESS", "HELLO"};
+const std::array<std::string, 5> failure_status_names{
+    "UNSET", "BAD_REQUEST", "BAD_TERM_IDX", "BAD_FCN_FIELD", "BAD_PARAM"
+};
+const std::array<std::string, 6> request_command_names{
+    "HELLO", "CREATE_TERM", "DELETE_TERM", "ADD_FCN", "SET_PARAM", "SET_WEIGHT"
+};
+
+const char *response_status_name(Response::STATUS status) {
+    if (status >= 0) {
+        return success_status_names.at(status).c_str();
+    } else {
+        return failure_status_names.at(-status).c_str();
+    }
+}
+
+const char *request_command_name(COMMAND cmd) {
+    return request_command_names.at((uint8_t)cmd).c_str();
 }
 }
