@@ -27,7 +27,3 @@ target_sources(MotorModel
 add_library(MotorModelMicrocontroller)
 target_sources(MotorModelMicrocontroller PRIVATE "motor_model_API_target.cpp")
 target_link_libraries(MotorModelMicrocontroller PUBLIC MotorModel)
-
-add_library(MotorModelUser)
-target_sources(MotorModelUser PRIVATE "motor_model_API_user.cpp")
-target_link_libraries(MotorModelUser MotorModel)

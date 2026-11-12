@@ -1,24 +1,17 @@
 /* TODO:
-    Have motor model json define motor model, and logic converts it to commands?
-        json -> MotorModel object -> (logic) -> commands to create that motor model?
+    Have motor model json define motor model, and logic converts it to commands
+        json -> MotorModel object -> (logic) -> commands to create that motor model
         then MotorModel -> commands can be reused by Read Model API
     Reset model command
-    command names hardcoded in motor_model_API_user.cpp
 */
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include <stdexcept>
 #include "comm_serial.hpp"
 #include "communication_timer.hpp"
-#include "motor_model_API.hpp"
+#include "motor_model_file_IO.hpp"
 
-using nlohmann::json, std::string, MotorModelAPI::Request, MotorModelAPI::Response;
+using std::string, MotorModelAPI::Request, MotorModelAPI::Response;
 
-
-class MotorModelAPIException : public std::runtime_error {
-public:
-    MotorModelAPIException(const string& msg) : std::runtime_error(msg) {}
-};
 
 const chrono::microseconds TIMEOUT_US{2'000'000};
 const unsigned             NUM_RETRIES{4};
@@ -58,66 +51,6 @@ struct motorModelUserAPIComm {
     }
 };
 
-template <typename T>
-T get_or_throw(const json &entry, const string &entry_key) {
-    if (!entry.contains(entry_key)) {
-        throw MotorModelAPIException("Entry is missing " + entry_key + ": " + entry.dump());
-    }
-    return entry[entry_key].get<T>();
-}
-
-// Read json data, either create a list of requests or throw an exception
-void parse_json(json &data, std::vector<Request> &requests) {
-    for (auto &entry : data["requests"]) {
-        MotorModelAPI::GROUP group = MotorModelAPI::GROUP::STATE;
-        if (entry.contains("group")) {
-            string group_str = entry["group"].get<string>();
-            if (group_str == "input") {
-                group = MotorModelAPI::GROUP::INPUT;
-            } else if (group_str != "state") {
-                throw MotorModelAPIException("Group must be 'input' or 'state', got " + group_str);
-            }
-        }
-        string cmd = get_or_throw<string>(entry, "cmd");
-        requests.emplace_back();
-        if (cmd == "create_term") {
-            string fcn_name = get_or_throw<string>(entry, "fcn_name");
-            float weight = get_or_throw<float>(entry, "weight");
-            if (!MotorModelAPI::msg_create_term(group, fcn_name.c_str(), weight, requests.back())) {
-                throw MotorModelAPIException("create_term. Check fcn_name.");
-            }
-        } else if (cmd == "delete_term") {
-            int term_idx = get_or_throw<int>(entry, "term_idx");
-            if (!MotorModelAPI::msg_delete_term(group, term_idx, requests.back())) {
-                throw MotorModelAPIException("delete_term");
-            }
-        } else if (cmd == "add_function") {
-            string fcn_name = get_or_throw<string>(entry, "fcn_name");
-            int term_idx = get_or_throw<int>(entry, "term_idx");
-            if (!MotorModelAPI::msg_add_function(group, term_idx, fcn_name.c_str(), requests.back())) {
-                throw MotorModelAPIException("add_function. Check fcn_name.");
-            }
-        } else if (cmd == "set_parameter") {
-            int term_idx = get_or_throw<int>(entry, "term_idx");
-            int fcn_idx = get_or_throw<int>(entry, "fcn_idx");
-            int param_idx = get_or_throw<int>(entry, "param_idx");
-            float value = get_or_throw<float>(entry, "value");
-            if (!MotorModelAPI::msg_set_parameter(group, term_idx, fcn_idx, param_idx, value, requests.back())) {
-                throw MotorModelAPIException("set_parameter");
-            }
-        } else if (cmd == "set_weight") {
-            int term_idx = get_or_throw<int>(entry, "term_idx");
-            float weight = get_or_throw<float>(entry, "weight");
-            if (!MotorModelAPI::msg_set_weight(group, term_idx, weight, requests.back())) {
-                throw MotorModelAPIException("set_weight");
-            }
-        } else {
-            throw MotorModelAPIException("Invalid cmd: " + cmd);
-        }
-        printf("Created message for cmd %s\n", cmd.c_str());
-    }
-}
-
 
 int main(int argc, char *argv[]) {
     string filename = "settings/motor_model.json";
@@ -139,27 +72,10 @@ int main(int argc, char *argv[]) {
     printf("Loading motor model from %s\n", filename.c_str());
     if (dry_run)
         printf("Check only: Will check file but won't start communication\n");
-    
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        fprintf(stderr, "Error, could not open %s\n", filename.c_str());
-        return 1;
-    }
 
-    json data;
-    try {
-        data = json::parse(file);
-    } catch (const json::exception &e) {
-        printf("Error parsing json:\n\t%s\n", e.what());
-        return 2;
-    }
     std::vector<Request> requests;
-    try {
-        parse_json(data, requests);
-    } catch (const MotorModelAPIException &e) {
-        printf("Error creating message:\n\t%s\n", e.what());
-        return 3;
-    }
+    parse_json_file(filename, requests);
+
     if (dry_run) {
         printf("Parsed input, check completed, exiting\n");
         return 0;

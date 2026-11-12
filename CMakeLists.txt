@@ -23,6 +23,8 @@ add_subdirectory(state_estimation)
 add_subdirectory(display)
 # Subdirectory shared with microcontroller
 add_subdirectory(microcontroller/control)
+# motor_model needs microcontroller motor_model for now
+add_subdirectory(motor_model)
 
 
 # simplewalker main
@@ -43,7 +45,7 @@ target_link_libraries(monitor_controller IO InterboardComm)
 
 # motor model user API
 add_executable(motor_model_user_API mainsrc/motor_model_user_main.cpp)
-target_link_libraries(motor_model_user_API MotorModelUser InterboardComm nlohmann_json::nlohmann_json)
+target_link_libraries(motor_model_user_API MotorModelUser MotorModelFileIO InterboardComm)
 
 
 add_subdirectory(test)
