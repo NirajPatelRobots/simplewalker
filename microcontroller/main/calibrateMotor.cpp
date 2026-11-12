@@ -5,6 +5,7 @@
 #include "../simplewalker_motors.hpp"
 #include "../communication/pico_comm.hpp"
 #include "../calibrate/motor_calibrator.hpp"
+#include "../microcontroller/control/motor_model_API.hpp"
 #include <stdio.h>
 #include "pico/time.h"
 
@@ -36,10 +37,34 @@ void handle_instructions(MotorCalibrator &calibrator) {
 }
 
 
+class MotorModelAPITargetComms {
+public:
+    shared_ptr<MessageInbox<MotorModelAPI::Request>> model_request_inbox;
+    shared_ptr<MessageOutbox<MotorModelAPI::Response>> model_response_outbox;
+    MotorModelAPI::Request model_request;
+    unsigned num_messages;
+    MotorModelAPITargetComms(Communicator *comm) :
+        model_request_inbox(make_shared<MessageInbox<MotorModelAPI::Request>>(MotorModelAPIRequestID, *comm)),
+        model_response_outbox(make_shared<MessageOutbox<MotorModelAPI::Response>>(MotorModelAPIResponseID, *comm)),
+        model_request(), num_messages() {}
+    // call after comm.receive_messages()
+    void handle(MotorModel &model) {
+        if (model_request_inbox->get_newest(model_request) >= 0) {
+            MotorModelAPI::handle_request(model_request, model, model_response_outbox->message);
+            sleep_ms(100);
+            model_response_outbox->send();
+            sleep_ms(500);
+            num_messages++;
+        }
+    }
+};
+
+
 int main() {
     auto comm = std::make_unique<PicoCommunication>();
     auto trigger_inbox = make_shared<MessageInbox<MotorCalibrationTriggerMsg>>(MotorCalibrationTriggerMsgID, *comm);
     auto state_outbox = make_shared<MessageOutbox<MotorCalibrationStateMsg>>(MotorCalibrationStateMsgID, *comm);
+    MotorModelAPITargetComms motorModelAPIComms{comm.get()};
     MotorCalibrator calibrator{SIMPLEWALKER_MOTOR_IO_SETTINGS};
     calibrator.ADC->set_channel("batteryVoltage", ADC_BATTERY_VOLTAGE_CHANNEL, 0, ADC_BATTERY_VOLTAGE_SCALE);
     absolute_time_t looptarget = get_absolute_time();
@@ -58,6 +83,7 @@ int main() {
         } else {
             calibrator.state.voltage = calibrator.ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL);
             comm->receive_messages();
+            motorModelAPIComms.handle(calibrator.motor_model);
             if (trigger_inbox->get_newest(*calibrator.instructions) >= 0) {
                 handle_instructions(calibrator);
                 looptarget = get_absolute_time();
@@ -66,7 +92,8 @@ int main() {
                 calibrator.motors_IO->set_motor_voltage(calibrator.instructions->motorNum, 0);
                 calibrator.read_angle();
                 calibrator.state.timestamp_us = (uint32_t)(get_absolute_time() + 1000'000'000);
-                report_state(calibrator.state, state_outbox.get(), calibrator.instructions->text_output);
+                // report_state(calibrator.state, state_outbox.get(), calibrator.instructions->text_output);
+                // printf("num motor model messages: %d\n", motorModelAPIComms.num_messages);
                 sleep_ms(500);
             }
         }

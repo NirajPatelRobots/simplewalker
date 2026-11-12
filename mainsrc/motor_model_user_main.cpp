@@ -10,7 +10,6 @@
 #include <stdexcept>
 #include "comm_serial.hpp"
 #include "communication_timer.hpp"
-#include "messages.h"
 #include "motor_model_API.hpp"
 
 using nlohmann::json, std::string, MotorModelAPI::Request, MotorModelAPI::Response;
@@ -21,7 +20,8 @@ public:
     MotorModelAPIException(const string& msg) : std::runtime_error(msg) {}
 };
 
-const chrono::microseconds timeout_us{2'000'000};
+const chrono::microseconds TIMEOUT_US{2'000'000};
+const unsigned             NUM_RETRIES{4};
 
 struct motorModelUserAPIComm {
     std::unique_ptr<SerialCommunicator> controller_comm;
@@ -37,10 +37,16 @@ struct motorModelUserAPIComm {
             controller_comm->clear_all_messages();
         }
     
-    void send_and_receive(Request &request) {
+    void send_and_receive(const Request &request) {
         APIOutbox.message = request;
-        APIOutbox.send();
-        listen_timeout(*controller_comm, timeout_us);
+        for (unsigned tries = 0; tries < NUM_RETRIES; tries++) {
+            controller_comm->clear_buffer();
+            APIOutbox.send();
+            listen_timeout(*controller_comm, TIMEOUT_US);
+            if (APIInbox.num_available() > 0) 
+                break;
+            printf("Try again...%u\n", tries + 1);
+        }
         if (APIInbox.get_newest(response) < 0) {
             throw MotorModelAPIException("Did not get a response");
         }

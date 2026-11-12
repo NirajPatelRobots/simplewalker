@@ -1,8 +1,17 @@
+/* Common header for motor model API user and target.
+    TODO:
+        Separate TermRequest (create, delete, set weight) and FunctionRequest structs?
+        user API imports model_fcns to get IDs. Separate them. Parse IDs to file? Common enum?
+*/
 #ifndef SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
 #define SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
 #include <stdint.h>
 
 class MotorModel;
+
+
+const uint16_t MotorModelAPIRequestID = 0x0F01;
+const uint16_t MotorModelAPIResponseID = 0x0F02;
 
 namespace MotorModelAPI {
 
@@ -21,6 +30,7 @@ const uint8_t MAX_FCN_IDX{0xF};
 const uint8_t MAX_PARAM_IDX{0xF};
 
 struct Request {
+    uint16_t message_ID{MotorModelAPIRequestID};
     GROUP   group;
     COMMAND command;
     uint8_t term_idx;
@@ -29,6 +39,7 @@ struct Request {
 };
 
 struct Response {
+    uint16_t message_ID{MotorModelAPIResponseID};
     int8_t status;
     uint8_t term_idx;
     enum STATUS : int8_t {
@@ -51,6 +62,7 @@ const char *request_command_name(COMMAND cmd);
 
 // Microcontroller API handler function
 void handle_request(const Request &msg, MotorModel &model, Response &response);
+
 
 }
 #endif  // SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
