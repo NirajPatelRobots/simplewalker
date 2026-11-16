@@ -4,7 +4,10 @@
  *          const int ModelFcn::n_params; set by subclass constructor? 
  *          float *ModelFcn::params; point to first param, equivalent to array of param?
  *              hack: Enforce first data of function past ModelFcn is function->param[0]?
+ *          2D array[term_idx, fcn_idx] of optional parameters_t passed as arg to call(), ModelFcns have no data
  *      MotorModel check input terms is not zero? (Skill issue?)
+ *      How to remove functions? Remove all above given fcn_idx. Don't allow delete base?
+ *      Non-parameterized functions could be singletons?
  */
 #ifndef SIMPLEWALKER_PICO_MOTOR_MODEL_HPP
 #define SIMPLEWALKER_PICO_MOTOR_MODEL_HPP
@@ -16,46 +19,38 @@ struct model_inputs_t {
 };
 
 class ModelFcn {
-protected:
-    ModelFcn *parent;
 public:
-    ModelFcn(ModelFcn *_parent) : parent(_parent) {}
-    virtual ~ModelFcn() {delete parent;}
-    // set_parent and set_param return true if the parent/param was set
-    bool set_parent(ModelFcn *new_parent);
+    // set_param return true if the param was set
     virtual bool set_param([[maybe_unused]] unsigned num, [[maybe_unused]] float value) {return false;}
-    bool set_param_recurse(unsigned fcn_idx, unsigned param_num, float value);
-    virtual float call(const model_inputs_t &model_inputs) const = 0;
+    virtual float call(const model_inputs_t &model_inputs, float parent_val) const = 0;
+    virtual ~ModelFcn() = default;
 };
 
-// FcnChain owns the memory for its first_fcn, functions own their parent memory
+// FcnChain takes ownership of the memory of its functions
 struct FcnChain {
-    FcnChain(ModelFcn *base_fcn, float _weight) : first_fcn(base_fcn), weight(_weight) {}
+    FcnChain(ModelFcn *base_fcn) : fcns(), weight(1.0) {
+        fcns.emplace_back(base_fcn);
+    }
     FcnChain(FcnChain &&other) noexcept;  // movable but not copyable
     FcnChain& operator=(FcnChain&& other) noexcept;
-    ~FcnChain() {delete first_fcn;}
-    ModelFcn *first_fcn;
-    float weight;
-    bool add_function(ModelFcn *new_fcn);
-    inline float call(const model_inputs_t &model_inputs) const {
-        return weight * first_fcn->call(model_inputs);
+    ~FcnChain() {
+        for (auto *const fcn : fcns) delete fcn;
     }
+    std::vector<ModelFcn*> fcns;
+    float weight;
+    bool set_function(unsigned fcn_idx, ModelFcn *new_fcn);
+    float call(const model_inputs_t &model_inputs) const;
 };
 
 struct LinearGroup {
     std::vector<FcnChain> terms;
-    inline void create_term(ModelFcn *base_fcn, float weight) {
-        terms.emplace_back(base_fcn, weight);
-    }
     inline void delete_term(unsigned term_idx) {
         terms.erase(terms.begin() + term_idx);
     }
-    inline bool add_function(unsigned term_idx, ModelFcn *fcn) {
-        return (term_idx < terms.size() && terms[term_idx].add_function(fcn));
-    }
+    bool set_function(unsigned term_idx, unsigned fcn_idx, ModelFcn *new_fcn);
     inline bool set_param(unsigned term_idx, unsigned fcn_idx, unsigned param_num, float value) {
-        return (term_idx < terms.size()
-            && terms[term_idx].first_fcn->set_param_recurse(fcn_idx, param_num, value));
+        return (term_idx < terms.size() && fcn_idx < terms[term_idx].fcns.size()
+            && terms[term_idx].fcns[fcn_idx]->set_param(param_num, value));
     }
     bool set_weight(unsigned term_idx, float weight);
     float call(const model_inputs_t &model_inputs) const;
@@ -73,18 +68,18 @@ public:
 namespace ModelFcns {
     // base functions
     class Vel : public ModelFcn {
-        Vel() : ModelFcn(nullptr) {}
+        Vel() : ModelFcn() {}
     public:
         static ModelFcn *create() {return new Vel;}
-        inline float call(const model_inputs_t &model_inputs) const override {
+        inline float call(const model_inputs_t &model_inputs, [[maybe_unused]] float _) const override {
             return model_inputs.velocity;
         }
     };
     class One : public ModelFcn {
-        One() : ModelFcn(nullptr) {}
+        One() : ModelFcn() {}
     public:
         static ModelFcn *create() {return new One;}
-        inline float call([[maybe_unused]] const model_inputs_t &_) const override {
+        inline float call([[maybe_unused]] const model_inputs_t &_, [[maybe_unused]] float __) const override {
             return 1;
         }
     };

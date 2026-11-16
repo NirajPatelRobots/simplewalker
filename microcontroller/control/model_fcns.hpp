@@ -1,3 +1,10 @@
+/* ModelFcns sub-classes implement specific functions. 
+   They must be copy-constructable and assignable.
+   TODO:
+        get rid of mult?
+        continuous threshold (static_fric), continuous sign (const fric)
+        Punch
+*/
 #ifndef SIMPLEWALKER_PICO_MODEL_FCNS_HPP
 #define SIMPLEWALKER_PICO_MODEL_FCNS_HPP
 #include "motor_model.hpp"
@@ -6,17 +13,16 @@
 namespace ModelFcns {
     // non-base functions
     class Sign : public ModelFcn {
-        Sign() : ModelFcn(nullptr) {};
+        Sign() : ModelFcn() {};
     public:
         static ModelFcn *create() {return new Sign;}
-        inline float call(const model_inputs_t &model_inputs) const override {
-            float parentval = parent->call(model_inputs);
+        inline float call([[maybe_unused]] const model_inputs_t &_, float parentval) const override {
             return parentval == 0 ? 0.f : parentval > 0 ? 1.f : -1.f;
         }
     };
     
     class Mult : public ModelFcn {
-        Mult() : ModelFcn(nullptr), mult(1) {};
+        Mult() : ModelFcn(), mult(1) {};
         float mult;
     public:
         static ModelFcn *create() {return new Mult;}
@@ -27,8 +33,8 @@ namespace ModelFcns {
             }
             return false;
         }
-        inline float call(const model_inputs_t &model_inputs) const override {
-            return mult * parent->call(model_inputs);
+        inline float call([[maybe_unused]] const model_inputs_t &_, float parent_val) const override {
+            return mult * parent_val;
         }
     };
 }  // namespace ModelFcns

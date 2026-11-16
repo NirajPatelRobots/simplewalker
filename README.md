@@ -72,21 +72,22 @@ accel = state_group(state) + Voltage * input_group(state)
 Each term is a chain of model functions.
 A function chain has the form:
 ```
-state_term_1(state) = weight * f_1(f_2(f_base(state)))
+state_term_1(state) = weight * f_2(f_1(f_base(state)))
 ```
-In this example, f_2 is f_1's parent and f_base is f_2's parent. Base functions are special.
+In this example, f_base is f_1's parent and f_1 is f_2's parent. The function which outputs the value to be multiplied by the weight has the highest index. Base functions are special.
 
 ### Motor Model API
 API Requests:
-- Create_Term(base function ID, weight)
-- Delete_Term(term index)
-- Add_Function(term index, nonbase function ID)
+- Set_Function(term index, function index, function name)
+  - Function index = 0 for the base function, = (number of fcns - 1) for the last child.
+  - If there is already a function with this index in this term, it sets the function.
+  - If the function or term index is == the number of functions or terms, it creates a new function or term.
+  - If the function index is 0, function name is a base function name, otherwise it's a nonbase function name.
 - Set_Parameter(term index, function index, param index, value)
-  - Function index = 0 for the first function, = (number of fcns - 1) for base.
 - Set_Weight(term index, weight)
 
-API response: `{int status, int term_idx}` where status > 0 is success
-
+API response: `{int status, int group, int term_idx, int fcn_idx}` where status > 0 is success.
+See `motor_model_API.hpp`.
 
 ## Calibration
 ### IMU Calibration

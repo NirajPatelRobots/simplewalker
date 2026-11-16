@@ -1,5 +1,6 @@
 #include "motor_model_API.hpp"
 #include <stdexcept>
+#include <vector>
 
 
 class MotorModelAPIException : public std::runtime_error {

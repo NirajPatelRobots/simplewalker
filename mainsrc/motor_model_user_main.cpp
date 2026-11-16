@@ -13,8 +13,8 @@
 using std::string, MotorModelAPI::Request, MotorModelAPI::Response;
 
 
-const chrono::microseconds TIMEOUT_US{2'000'000};
-const unsigned             NUM_RETRIES{4};
+const unsigned TIMEOUT_US{2'000'000};
+const unsigned NUM_RETRIES{4};
 
 struct motorModelUserAPIComm {
     std::unique_ptr<SerialCommunicator> controller_comm;

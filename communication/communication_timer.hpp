@@ -8,6 +8,7 @@
 #include "communication.hpp"
 
 namespace chrono = std::chrono;
+typedef chrono::time_point<chrono::steady_clock> time_point;
 
 chrono::microseconds MAX_LISTEN_INTERVAL {20000};  // guess
 
@@ -19,7 +20,7 @@ long count_us(chrono::duration<Rep, Period> duration) {
 
 
 void listen_timeout(Communicator &comm, chrono::microseconds wait_us,
-                        chrono::time_point<chrono::steady_clock> start_point = chrono::steady_clock::now()) {
+                        time_point start_point = chrono::steady_clock::now()) {
     auto sleep_target = start_point;
     while (sleep_target < start_point + wait_us) {
         sleep_target = std::min(start_point + wait_us, sleep_target + MAX_LISTEN_INTERVAL);
@@ -28,10 +29,16 @@ void listen_timeout(Communicator &comm, chrono::microseconds wait_us,
     }
 }
 
+void listen_timeout(Communicator &comm, unsigned wait_us,
+                        time_point start_point = chrono::steady_clock::now()) {
+    listen_timeout(comm, chrono::microseconds(wait_us), start_point);
+}
+
+
 class CommTimer {
-    chrono::time_point<chrono::steady_clock> timestart;
-    chrono::time_point<chrono::steady_clock> loopstart;
-    chrono::time_point<chrono::steady_clock> missing_readtime;
+    time_point timestart;
+    time_point loopstart;
+    time_point missing_readtime;
 public:
     chrono::microseconds timestep;
     chrono::microseconds msgwaittime;
@@ -59,7 +66,7 @@ public:
 
         loopstart = loopstart + timestep;
         bool waiting_for_late = false;
-        chrono::time_point<chrono::steady_clock> late_readtime;
+        time_point late_readtime;
         while (inbox.get_newest(message) < 0) {
             inbox.comm.receive_messages();
             late_readtime = chrono::steady_clock::now();
@@ -86,9 +93,9 @@ public:
     }
 
     inline bool message_is_missing() { return missing_readtime + timestep == loopstart; }
-    const chrono::time_point<chrono::steady_clock> &last_missing_msg_time() { return missing_readtime; };
-    const chrono::time_point<chrono::steady_clock> &initial_timestamp() { return timestart; };
-    const chrono::time_point<chrono::steady_clock> &loop_timestamp() { return loopstart; };
+    const time_point &last_missing_msg_time() { return missing_readtime; };
+    const time_point &initial_timestamp() { return timestart; };
+    const time_point &loop_timestamp() { return loopstart; };
     auto duration() const { return loopstart - timestart; };
 };
 

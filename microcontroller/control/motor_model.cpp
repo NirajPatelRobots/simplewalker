@@ -1,38 +1,52 @@
 #include "motor_model.hpp"
 
 
-bool ModelFcn::set_parent(ModelFcn *new_parent) {
-    if (!parent) parent = new_parent;
-    return parent == new_parent;
-}
-
-bool ModelFcn::set_param_recurse(unsigned fcn_idx, unsigned param_num, float value) {
-    if (fcn_idx == 0) {
-        return set_param(param_num, value);
+bool FcnChain::set_function(unsigned fcn_idx, ModelFcn *new_fcn) {
+    if (fcn_idx > fcns.size()) return false;
+    if (fcn_idx == fcns.size()) {
+        fcns.emplace_back(new_fcn);
     } else {
-        return parent && parent->set_param_recurse(fcn_idx - 1, param_num, value);
+        fcns[fcn_idx] = new_fcn;
     }
+    return true;
 }
 
 
 FcnChain::FcnChain(FcnChain &&other) noexcept
-    : first_fcn(other.first_fcn), weight(other.weight) {
-    other.first_fcn = nullptr;
+    : fcns(other.fcns), weight(other.weight) {
+    other.fcns = {};
 }
 
 FcnChain &FcnChain::operator=(FcnChain &&other) noexcept {
     if (this != &other) {
-        delete first_fcn;
-        first_fcn = other.first_fcn;
+        fcns = other.fcns;
         weight = other.weight;
-        other.first_fcn = nullptr;
+        other.fcns = {};
     }
     return *this;
 }
 
-bool FcnChain::add_function(ModelFcn *new_fcn) {
-    if (new_fcn->set_parent(first_fcn)) first_fcn = new_fcn;
-    return first_fcn == new_fcn;
+
+float FcnChain::call(const model_inputs_t &model_inputs) const {
+    float return_val; // not used by base fcn, which is the first fcn called
+    for (const auto &fcn : fcns) {
+        return_val = fcn->call(model_inputs, return_val);
+    }
+    return weight * return_val;
+}
+
+
+// pass ownership of new_fcn to FcnChain, or delete it if it couldn't be added
+bool LinearGroup::set_function(unsigned term_idx, unsigned fcn_idx, ModelFcn *new_fcn) {
+    if (term_idx > terms.size() || (term_idx == terms.size() && fcn_idx != 0)) { 
+        delete new_fcn;
+        return false;
+    }
+    if (term_idx == terms.size()) {
+        terms.push_back(new_fcn);
+        return true;
+    }
+    return terms[term_idx].set_function(fcn_idx, new_fcn);
 }
 
 
@@ -54,8 +68,8 @@ float LinearGroup::call(const model_inputs_t &model_inputs) const {
 
 
 MotorModel::MotorModel() {
-    state_terms.create_term(ModelFcns::Vel::create(), 1.0);
-    input_terms.create_term(ModelFcns::One::create(), 1.0);
+    state_terms.set_function(0, 0, ModelFcns::Vel::create());
+    input_terms.set_function(0, 0, ModelFcns::One::create());
 }
 
 

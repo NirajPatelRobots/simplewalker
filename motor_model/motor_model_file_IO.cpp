@@ -28,22 +28,12 @@ void parse_json(nlohmann::json &data, std::vector<Request> &requests) {
         }
         string cmd = get_or_throw<string>(entry, "cmd");
         requests.emplace_back();
-        if (cmd == "create_term") {
-            string fcn_name = get_or_throw<string>(entry, "fcn_name");
-            float weight = get_or_throw<float>(entry, "weight");
-            if (!MotorModelAPI::msg_create_term(group, fcn_name.c_str(), weight, requests.back())) {
-                throw MotorModelAPIException("create_term. Check fcn_name.");
-            }
-        } else if (cmd == "delete_term") {
-            int term_idx = get_or_throw<int>(entry, "term_idx");
-            if (!MotorModelAPI::msg_delete_term(group, term_idx, requests.back())) {
-                throw MotorModelAPIException("delete_term");
-            }
-        } else if (cmd == "add_function") {
+        if (cmd == "set_function") {
             string fcn_name = get_or_throw<string>(entry, "fcn_name");
             int term_idx = get_or_throw<int>(entry, "term_idx");
-            if (!MotorModelAPI::msg_add_function(group, term_idx, fcn_name.c_str(), requests.back())) {
-                throw MotorModelAPIException("add_function. Check fcn_name.");
+            int fcn_idx = get_or_throw<int>(entry, "fcn_idx");
+            if (!MotorModelAPI::msg_set_function(group, term_idx, fcn_idx, fcn_name.c_str(), requests.back())) {
+                throw MotorModelAPIException("Error creating set_function message. Check fcn_name.");
             }
         } else if (cmd == "set_parameter") {
             int term_idx = get_or_throw<int>(entry, "term_idx");
@@ -51,13 +41,13 @@ void parse_json(nlohmann::json &data, std::vector<Request> &requests) {
             int param_idx = get_or_throw<int>(entry, "param_idx");
             float value = get_or_throw<float>(entry, "value");
             if (!MotorModelAPI::msg_set_parameter(group, term_idx, fcn_idx, param_idx, value, requests.back())) {
-                throw MotorModelAPIException("set_parameter");
+                throw MotorModelAPIException("Error creating set_parameter message");
             }
         } else if (cmd == "set_weight") {
             int term_idx = get_or_throw<int>(entry, "term_idx");
             float weight = get_or_throw<float>(entry, "weight");
             if (!MotorModelAPI::msg_set_weight(group, term_idx, weight, requests.back())) {
-                throw MotorModelAPIException("set_weight");
+                throw MotorModelAPIException("Error creating set_weight message");
             }
         } else {
             throw MotorModelAPIException("Invalid cmd: " + cmd);

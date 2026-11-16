@@ -3,11 +3,12 @@
 #include "../../microcontroller/control/motor_model.hpp"
 
 const float TOLERANCE = 1e-6;
+const float RAISED_TOLERANCE = 2e-5; // TODO: why do these comparisons (except 4.0?) need larger tolerance?
 const model_inputs_t INPUT_EXAMPLE = {.velocity = 104.3};
 
 
 class MockModelFcn : public ModelFcn {
-    MockModelFcn() : ModelFcn(nullptr), mult(1) {
+    MockModelFcn() : ModelFcn(), mult(1) {
         num_instances++;
     };
     float mult;
@@ -23,8 +24,8 @@ public:
         }
         return false;
     }
-    inline float call(const model_inputs_t &model_inputs) const override {
-        return mult * parent->call(model_inputs);
+    inline float call([[maybe_unused]] const model_inputs_t &_, float parent_val) const override {
+        return mult * parent_val;
     }
     static int num_instances;
 };
@@ -34,25 +35,25 @@ int MockModelFcn::num_instances = 0 ;
 // Fcn Chain
 TEST(FcnChainTest, Weight) {
     float weight = 0.5;
-    FcnChain term = FcnChain(ModelFcns::Vel::create(), weight);
+    FcnChain term = FcnChain(ModelFcns::Vel::create());
+    term.weight = weight;
 
-    EXPECT_EQ(weight, term.weight);
     EXPECT_NEAR(weight * INPUT_EXAMPLE.velocity, term.call(INPUT_EXAMPLE), TOLERANCE);
 }
 
 TEST(FcnChainTest, OnlyVel) {
-    FcnChain term = FcnChain(ModelFcns::Vel::create(), 1.0);
+    FcnChain term = FcnChain(ModelFcns::Vel::create());
 
     EXPECT_NEAR(INPUT_EXAMPLE.velocity, term.call(INPUT_EXAMPLE), TOLERANCE);
 }
 
 TEST(FcnChainTest, MultVel) {
-    auto term = FcnChain(ModelFcns::Vel::create(), 1.0);
-    term.add_function(MockModelFcn::create());
+    auto term = FcnChain(ModelFcns::Vel::create());
+    term.set_function(1, MockModelFcn::create());
 
     model_inputs_t inputs = {.velocity = 100.f};
     EXPECT_NEAR(term.call(inputs), 100.f, TOLERANCE);
-    term.first_fcn->set_param(0, 2.0);
+    term.fcns.at(1)->set_param(0, 2.0);
     EXPECT_NEAR(term.call(inputs), 200.f, TOLERANCE);
     inputs.velocity = -100.f;
     EXPECT_NEAR(term.call(inputs), -200.f, TOLERANCE);
@@ -60,9 +61,9 @@ TEST(FcnChainTest, MultVel) {
 
 
 TEST(FcnChainTest, ThreeDeep) {
-    auto term = new FcnChain(ModelFcns::Vel::create(), 1.0);
-    term->add_function(MockModelFcn::create());
-    term->add_function(MockModelFcn::create());
+    auto term = new FcnChain(ModelFcns::Vel::create());
+    term->set_function(1, MockModelFcn::create());
+    term->set_function(2, MockModelFcn::create());
 
     EXPECT_EQ(INPUT_EXAMPLE.velocity, term->call(INPUT_EXAMPLE));
     EXPECT_EQ(MockModelFcn::num_instances, 2);
@@ -73,11 +74,11 @@ TEST(FcnChainTest, ThreeDeep) {
 
 
 TEST(FcnChainTest, TwoChainzSameBase) {
-    auto term1 = new FcnChain(ModelFcns::Vel::create(), 1.0);
-    term1->add_function(MockModelFcn::create());
+    auto term1 = new FcnChain(ModelFcns::Vel::create());
+    term1->set_function(1, MockModelFcn::create());
 
-    auto term2 = new FcnChain(ModelFcns::Vel::create(), 1.0);
-    term2->add_function(MockModelFcn::create());
+    auto term2 = new FcnChain(ModelFcns::Vel::create());
+    term2->set_function(1, MockModelFcn::create());
 
     EXPECT_EQ(MockModelFcn::num_instances, 2);
     EXPECT_EQ(term1->call(INPUT_EXAMPLE), INPUT_EXAMPLE.velocity);
@@ -91,11 +92,11 @@ TEST(FcnChainTest, TwoChainzSameBase) {
 
 
 TEST(FcnChainTest, TwoChainzDifferentBase) {
-    auto termOne = new FcnChain(ModelFcns::One::create(), 1.0);
-    termOne->add_function(MockModelFcn::create());
+    auto termOne = new FcnChain(ModelFcns::One::create());
+    termOne->set_function(1, MockModelFcn::create());
     
-    auto termVel = new FcnChain(ModelFcns::Vel::create(), 1.0);
-    termVel->add_function(MockModelFcn::create());
+    auto termVel = new FcnChain(ModelFcns::Vel::create());
+    termVel->set_function(1, MockModelFcn::create());
     
     model_inputs_t inputs = {.velocity = -100.f};
 
@@ -110,29 +111,28 @@ TEST(FcnChainTest, TwoChainzDifferentBase) {
 
 TEST(FcnChainTest, MoveObject) {
     float weight = 0.5;
-    auto term = FcnChain(ModelFcns::Vel::create(), weight);
-    term.add_function(MockModelFcn::create());
+    auto term = FcnChain(ModelFcns::Vel::create());
+    term.weight = weight;
+    EXPECT_TRUE(term.set_function(1, MockModelFcn::create()));
 
     FcnChain moveConstructed = std::move(term);
 
     EXPECT_EQ(weight, moveConstructed.weight);
     EXPECT_NEAR(weight * INPUT_EXAMPLE.velocity, moveConstructed.call(INPUT_EXAMPLE), TOLERANCE);
     
-    FcnChain moveAssigned(ModelFcns::One::create(), 1.0);
+    FcnChain moveAssigned(ModelFcns::One::create());
     moveAssigned = std::move(moveConstructed);
 
     EXPECT_EQ(weight, moveAssigned.weight);
     EXPECT_NEAR(weight * INPUT_EXAMPLE.velocity, moveAssigned.call(INPUT_EXAMPLE), TOLERANCE);
 }
 
-// test FcnChain base function must be a type that doesn't reference a parent?
-
 
 // LinearGroup
 TEST(LinearGroupTest, CreateAddCallDelete) {
     auto group = LinearGroup();
-    group.create_term(ModelFcns::Vel::create(), 1.0);
-    group.add_function(0, MockModelFcn::create());
+    EXPECT_TRUE(group.set_function(0, 0, ModelFcns::Vel::create()));
+    EXPECT_TRUE(group.set_function(0, 1, MockModelFcn::create()));
     
     EXPECT_EQ(group.call(INPUT_EXAMPLE), INPUT_EXAMPLE.velocity);
     EXPECT_EQ(MockModelFcn::num_instances, 1);
@@ -143,9 +143,9 @@ TEST(LinearGroupTest, CreateAddCallDelete) {
 
 TEST(LinearGroupTest, OnePlusOne) {
     auto group = LinearGroup();
-    group.create_term(ModelFcns::One::create(), 1.0);
-    group.create_term(ModelFcns::One::create(), 1.0);
-    group.add_function(0, MockModelFcn::create());
+    EXPECT_TRUE(group.set_function(0, 0, ModelFcns::One::create()));
+    EXPECT_TRUE(group.set_function(1, 0, ModelFcns::One::create()));
+    EXPECT_TRUE(group.set_function(0, 1, MockModelFcn::create()));
 
     EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0, TOLERANCE);
     EXPECT_EQ(MockModelFcn::num_instances, 1);
@@ -157,36 +157,53 @@ TEST(LinearGroupTest, OnePlusOne) {
 
 TEST(LinearGroupTest, SetParam) {
     auto group = LinearGroup();
-    group.create_term(ModelFcns::Vel::create(), 0.0);  // no effect
-    group.create_term(ModelFcns::Vel::create(), 1.0);
-    group.add_function(1, MockModelFcn::create());
+    EXPECT_TRUE(group.set_function(0, 0, ModelFcns::Vel::create()));
+    EXPECT_TRUE(group.set_function(1, 0, ModelFcns::Vel::create()));
+    EXPECT_TRUE(group.set_function(1, 1, MockModelFcn::create()));
 
-    EXPECT_TRUE(group.set_param(1, 0, 0, 2.0));
     EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0 * INPUT_EXAMPLE.velocity, TOLERANCE);
+    EXPECT_TRUE(group.set_param(1, 1, 0, 2.0));
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, RAISED_TOLERANCE);
 
-    EXPECT_FALSE(group.set_param(1, 0, 1, 3.0));  // nonexistent param num
-    EXPECT_FALSE(group.set_param(1, 1, 0, 3.0));  // wrong fcn num
+    EXPECT_FALSE(group.set_param(1, 1, 1, 3.0));  // nonexistent param num
+    EXPECT_FALSE(group.set_param(1, 0, 0, 3.0));  // wrong fcn num
     EXPECT_FALSE(group.set_param(1, 2, 0, 3.0));  // nonexistent fcn num
-    EXPECT_FALSE(group.set_param(0, 0, 0, 3.0));  // wrong term
-    EXPECT_FALSE(group.set_param(2, 0, 0, 3.0));  // nonexistent term
-    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0 * INPUT_EXAMPLE.velocity, TOLERANCE); // no effect
+    EXPECT_FALSE(group.set_param(0, 1, 0, 3.0));  // wrong term
+    EXPECT_FALSE(group.set_param(2, 1, 0, 3.0));  // nonexistent term
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, RAISED_TOLERANCE); // no effect
+}
+
+
+TEST(LinearGroupTest, ReplaceBase) {
+    auto group = LinearGroup();
+    EXPECT_TRUE(group.set_function(0, 0, ModelFcns::One::create()));
+    EXPECT_TRUE(group.set_function(0, 1, MockModelFcn::create()));
+    EXPECT_TRUE(group.set_param(0, 1, 0, 2.0));
+
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0, TOLERANCE);
+    EXPECT_EQ(MockModelFcn::num_instances, 1);
+
+    EXPECT_TRUE(group.set_function(0, 0, ModelFcns::Vel::create()));
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0 * INPUT_EXAMPLE.velocity, TOLERANCE);
+    EXPECT_EQ(MockModelFcn::num_instances, 1);
 }
 
 
 TEST(LinearGroupTest, SetWeight) {
     auto group = LinearGroup();
-    group.create_term(ModelFcns::Vel::create(), 1.0);
-    group.create_term(ModelFcns::Vel::create(), 2.0);
-    const float weight_tolerance = 2e-5; // TODO: why do these comparisons (except 4.0?) need larger tolerance?
+    group.set_function(0, 0, ModelFcns::Vel::create());
+    group.set_function(1, 0, ModelFcns::Vel::create());
 
-    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, weight_tolerance);
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 2.0 * INPUT_EXAMPLE.velocity, RAISED_TOLERANCE);
+    EXPECT_TRUE(group.set_weight(1, 2.0));
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, RAISED_TOLERANCE);
     EXPECT_TRUE(group.set_weight(1, 3.0));
     EXPECT_NEAR(group.call(INPUT_EXAMPLE), 4.0 * INPUT_EXAMPLE.velocity, TOLERANCE);
     EXPECT_TRUE(group.set_weight(0, 0.0));
-    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, weight_tolerance);
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, RAISED_TOLERANCE);
     
     EXPECT_FALSE(group.set_weight(2, 2.0)); // nonexistent chain
-    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, weight_tolerance);
+    EXPECT_NEAR(group.call(INPUT_EXAMPLE), 3.0 * INPUT_EXAMPLE.velocity, RAISED_TOLERANCE);
 }
 
 
@@ -195,8 +212,8 @@ TEST(MotorModelTest, OnePlusOnePredictAccel) {
     auto model = MotorModel();
     model.state_terms = {};
     model.input_terms = {};
-    model.state_terms.create_term(ModelFcns::One::create(), 1.0);
-    model.input_terms.create_term(ModelFcns::One::create(), 1.0);
+    model.state_terms.set_function(0, 0, ModelFcns::One::create());
+    model.input_terms.set_function(0, 0, ModelFcns::One::create());
 
     EXPECT_NEAR(1., model.predict_accel(INPUT_EXAMPLE, 0.), TOLERANCE);
     EXPECT_NEAR(2., model.predict_accel(INPUT_EXAMPLE, 1.), TOLERANCE);
@@ -206,8 +223,8 @@ TEST(MotorModelTest, OnePlusOneChooseV) {
     auto model = MotorModel();
     model.state_terms = {};
     model.input_terms = {};
-    model.state_terms.create_term(ModelFcns::One::create(), 1.0);
-    model.input_terms.create_term(ModelFcns::One::create(), 1.0);
+    model.state_terms.set_function(0, 0, ModelFcns::One::create());
+    model.input_terms.set_function(0, 0, ModelFcns::One::create());
 
     EXPECT_NEAR(0., model.choose_V(INPUT_EXAMPLE, 1.), TOLERANCE);
     EXPECT_NEAR(1., model.choose_V(INPUT_EXAMPLE, 2.), TOLERANCE);
