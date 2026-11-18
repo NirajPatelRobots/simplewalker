@@ -6,7 +6,7 @@
 
 const float TOLERANCE = 1e-5;
 const model_inputs_t INPUT_EXAMPLE = {.velocity = 104.3};
-const float VOLTAGE_EX_0 = -INPUT_EXAMPLE.velocity;
+const float VOLTAGE_EX_0 = INPUT_EXAMPLE.velocity;
 const float VOLTAGE_EX_1 = VOLTAGE_EX_0 + 1.0;
 const int BASE_IDX_0 = 0;
 const MotorModelAPI::GROUP bad_group = (MotorModelAPI::GROUP)(3);
@@ -74,11 +74,17 @@ TEST_F(MotorModelAPITest, Hello) {
 TEST_F(MotorModelAPITest, CreateTerm) {
     EXPECT_TRUE(MotorModelAPI::msg_set_function(GROUP_STATE, 1, BASE_IDX_0, "vel", request));
     do_api_call();
+    // accel = vel - vel + V
+    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 2.0), 2.0, TOLERANCE);
+    EXPECT_TRUE(MotorModelAPI::msg_set_weight(GROUP_STATE, 1, -1.0, request));
+    do_api_call();
+    // accel = vel + vel + V
     EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), 2* VOLTAGE_EX_0, TOLERANCE);
     EXPECT_EQ(model.state_terms.terms.size(), 2);
 
     EXPECT_TRUE(MotorModelAPI::msg_set_function(GROUP_INPUT, 1, BASE_IDX_0, "one", request));
     do_api_call();
+    // accel = vel + vel + (1 + 1) * V
     EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), VOLTAGE_EX_0, TOLERANCE);
     EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 2.0), VOLTAGE_EX_1, TOLERANCE);
     EXPECT_EQ(model.input_terms.terms.size(), 2);
@@ -116,18 +122,18 @@ TEST_F(MotorModelAPITest, ReplaceTerm) {
     do_api_call();
     EXPECT_TRUE(MotorModelAPI::msg_set_parameter(GROUP_STATE, 0, 1, 0, 3.0, request));
     do_api_call();
-    // model: acc = V + 3 * vel
+    // model: acc = V - 3 * vel
     EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), 3* VOLTAGE_EX_0, TOLERANCE);
     EXPECT_TRUE(MotorModelAPI::msg_set_function(GROUP_STATE, 0, 0, "one", request));
     do_api_call();
-    // replace vel with const 1, acc = V + 3
-    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), -3, TOLERANCE);
-    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 1.0), -2, TOLERANCE);
+    // replace vel with const 1, acc = V - 3
+    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), 3, TOLERANCE);
+    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 1.0), 4, TOLERANCE);
     EXPECT_TRUE(MotorModelAPI::msg_set_function(GROUP_STATE, 0, 1, "mult", request));
     do_api_call();
-    // replace mult with itself, which resets its parameter to 1, acc = V + 1
-    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), -1, TOLERANCE);
-    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 1.0), 0, TOLERANCE);
+    // replace mult with itself, which resets its parameter to 1, acc = V - 1
+    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), 1, TOLERANCE);
+    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, -1.0), 0, TOLERANCE);
     EXPECT_EQ(model.state_terms.terms.size(), 1);
 }
 
@@ -135,11 +141,11 @@ TEST_F(MotorModelAPITest, ReplaceTerm) {
 TEST_F(MotorModelAPITest, SetWeight) {
     EXPECT_TRUE(MotorModelAPI::msg_set_weight(GROUP_STATE, 0, 3.0, request));
     do_api_call();
-    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), 3* VOLTAGE_EX_0, TOLERANCE);
+    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), -3 * VOLTAGE_EX_0, TOLERANCE);
 
     EXPECT_TRUE(MotorModelAPI::msg_set_weight(GROUP_INPUT, 0, 3.0, request));
     do_api_call();
-    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), VOLTAGE_EX_0, TOLERANCE);
+    EXPECT_NEAR(model.choose_V(INPUT_EXAMPLE, 0.0), -VOLTAGE_EX_0, TOLERANCE);
 }
 
 // BAD_REQUEST and BAD_FCN_ID aren't tested because you shouldn't be able to make bad requests or bad fcn ids

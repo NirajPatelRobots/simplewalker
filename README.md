@@ -62,7 +62,8 @@ The built executables are simplewalker, test_localization, unittests, and collec
 ## Motor Models
 A motor model predicts the change in state (acceleration) for any current state (velocity).
 
-A motor model has two linear groups of terms: state terms and input terms.
+A motor model has two linear groups of terms: state terms and input terms. "Input" terms refer to the Control Theory definition of "input" to the *physical* system, meaning the voltage which is **output** by the microcontroller.
+
 Motor models have the form:
 ```
 accel = state_term_1(state) + state_term_2(state) + ... + Voltage * (input_term_1(state) + ...)

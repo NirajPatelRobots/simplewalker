@@ -75,23 +75,25 @@ bool msg_set_weight(GROUP group, unsigned term_idx, float weight, Request &msg_o
 }
 
 
-const std::array<std::string, 3> success_status_names{"UNSET", "SUCCESS", "HELLO"};
-const std::array<std::string, 6> failure_status_names{
+constexpr size_t NUM_SUCCESS_STATUSES = 3;
+constexpr size_t NUM_FAILURE_STATUSES = 6;
+constexpr std::array<const char *, NUM_SUCCESS_STATUSES> success_status_names{"UNSET", "SUCCESS", "HELLO"};
+constexpr std::array<const char *, NUM_FAILURE_STATUSES> failure_status_names{
     "UNSET", "BAD_REQUEST", "BAD_TERM_IDX", "BAD_FCN_IDX", "BAD_FCN_ID", "BAD_PARAM_IDX",
 };
-const std::array<std::string, 4> request_command_names{
+constexpr std::array<const char *, 4> request_command_names{
     "HELLO", "SET_FCN", "SET_PARAM", "SET_WEIGHT"
 };
 
-const char *response_status_name(Response::STATUS status) {
+const char * response_status_name(Response::STATUS status) {
     if (status >= 0) {
-        return success_status_names.at(status).c_str();
+        return success_status_names[status % NUM_SUCCESS_STATUSES];
     } else {
-        return failure_status_names.at(-status).c_str();
+        return failure_status_names[-status % NUM_FAILURE_STATUSES];
     }
 }
 
-const char *request_command_name(COMMAND cmd) {
-    return request_command_names.at((uint8_t)cmd).c_str();
+const char * request_command_name(COMMAND cmd) {
+    return request_command_names[(uint8_t)cmd];
 }
 }

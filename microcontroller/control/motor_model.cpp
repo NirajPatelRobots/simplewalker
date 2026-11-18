@@ -70,6 +70,7 @@ float LinearGroup::call(const model_inputs_t &model_inputs) const {
 MotorModel::MotorModel() {
     state_terms.set_function(0, 0, ModelFcns::Vel::create());
     input_terms.set_function(0, 0, ModelFcns::One::create());
+    state_terms.set_weight(0, -1.0);
 }
 
 
