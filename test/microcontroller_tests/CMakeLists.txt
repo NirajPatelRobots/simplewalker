@@ -1,7 +1,6 @@
-# microcontroller/control is built in the microcontroller project
-#   and in the non-test code for this project 
-# microcontroller/filter is built in the microcontroller project and here
+# microcontroller/control and microcontroller/filter are built here and in the microcontroller project
 add_subdirectory(../../microcontroller/filter filter/)
+add_subdirectory(../../microcontroller/control control/)
 
 add_executable(unittest_motor_model unittest_motor_model.cpp)
 target_link_libraries(unittest_motor_model GTest::gtest_main MotorModel)

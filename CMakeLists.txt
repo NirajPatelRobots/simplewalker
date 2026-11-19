@@ -21,9 +21,6 @@ include_directories(mainsrc display physics)
 add_subdirectory(communication)
 add_subdirectory(state_estimation)
 add_subdirectory(display)
-# Subdirectory shared with microcontroller
-add_subdirectory(microcontroller/control)
-# motor_model needs microcontroller motor_model for now
 add_subdirectory(motor_model)
 
 

@@ -1,10 +1,11 @@
 /* Common header for motor model API user and target.
     TODO:
-        user API imports model_fcns to get IDs. Separate them, with a common enum here
+        Remove function ID enums?
 */
 #ifndef SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
 #define SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
 #include <stdint.h>
+#include <string_view>
 
 class MotorModel;
 
@@ -52,8 +53,15 @@ struct Response {
 };
 static_assert(sizeof(Response) / sizeof(int8_t) == 8);
 
+enum class BaseFunctionID {
+    Vel_ID, One_ID, NUM_FCNS
+};
+enum class NonBaseFunctionID {
+    Sign_ID, Mult_ID, NUM_FCNS
+};
+
 // Request API functions (run on main computer)
-bool msg_set_function(GROUP group, uint8_t term_idx, uint8_t fcn_idx, const char *fcn_name, Request &msg_out);
+bool msg_set_function(GROUP group, uint8_t term_idx, uint8_t fcn_idx, std::string_view fcn_name, Request &msg_out);
 bool msg_set_parameter(GROUP group, unsigned term_idx, unsigned fcn_idx, unsigned param_idx, float value, Request &msg_out);
 bool msg_set_weight(GROUP group, unsigned term_idx, float weight, Request &msg_out);
 // Additional user functions

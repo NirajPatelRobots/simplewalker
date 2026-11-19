@@ -1,4 +1,3 @@
-#include "model_fcns.hpp"
 #include "motor_model_API.hpp"
 #include <array>
 #include <string>
@@ -8,36 +7,31 @@
 namespace MotorModelAPI {
 // helpers
 const uint8_t FCN_NOT_FOUND = UINT8_MAX;
-std::unordered_map<std::string, ModelFcn *(*)(void)> BASE_FUNCTION_NAME_MAP {
-    {"vel", ModelFcns::Vel::create},
-    {"one", ModelFcns::One::create},
+
+constexpr std::array<std::string_view, (size_t)BaseFunctionID::NUM_FCNS> BASE_FCN_NAMES {
+    "vel", "one"
 };
 
-std::unordered_map<std::string, ModelFcn *(*)(void)> NONBASE_FUNCTION_NAME_MAP {
-    {"mult", ModelFcns::Mult::create},
-    {"sign", ModelFcns::Sign::create},
+constexpr std::array<std::string_view, (size_t)NonBaseFunctionID::NUM_FCNS> NONBASE_FCN_NAMES {
+    "mult", "sign"
 };
 
-uint8_t get_base_fcn_id(const char *fcn_name) {
-    const auto &creator_fcn = BASE_FUNCTION_NAME_MAP.find(fcn_name);
-    if (creator_fcn == BASE_FUNCTION_NAME_MAP.end()) return FCN_NOT_FOUND;
-    for (size_t i = 0; i < NUM_BASE_FUNCTIONS; i++) {
-        if (BASE_FUNCTIONS[i] == creator_fcn->second) return i;
+uint8_t get_base_fcn_id( std::string_view fcn_name) {
+    for (size_t i = 0; i < (size_t)BaseFunctionID::NUM_FCNS; i++) {
+        if (BASE_FCN_NAMES[i] == fcn_name) return i;
     }
     return FCN_NOT_FOUND;
 }
 
-uint8_t get_nonbase_fcn_id(const char *fcn_name) {
-    const auto &creator_fcn = NONBASE_FUNCTION_NAME_MAP.find(fcn_name);
-    if (creator_fcn == NONBASE_FUNCTION_NAME_MAP.end()) return FCN_NOT_FOUND;
-    for (size_t i = 0; i < NUM_NONBASE_FUNCTIONS; i++) {
-        if (NONBASE_FUNCTIONS[i] == creator_fcn->second) return i;
+uint8_t get_nonbase_fcn_id(std::string_view fcn_name) {
+    for (size_t i = 0; i < (size_t)NonBaseFunctionID::NUM_FCNS; i++) {
+        if (NONBASE_FCN_NAMES[i] == fcn_name) return i;
     }
     return FCN_NOT_FOUND;
 }
 
 
-bool msg_set_function(GROUP group, uint8_t term_idx, uint8_t fcn_idx, const char *fcn_name, Request &msg_out) {
+bool msg_set_function(GROUP group, uint8_t term_idx, uint8_t fcn_idx, std::string_view fcn_name, Request &msg_out) {
     msg_out.group = group;
     msg_out.term_idx = term_idx;
     msg_out.fcn_idx = fcn_idx;

@@ -52,9 +52,7 @@ public:
         if (model_request_inbox->get_newest(model_request) >= 0) {
             model_request_inbox->clear();
             MotorModelAPI::handle_request(model_request, model, model_response_outbox->message);
-            sleep_ms(100);
             model_response_outbox->send();
-            sleep_ms(100);
             num_messages++;
         }
     }
@@ -70,6 +68,7 @@ int main() {
     calibrator.ADC->set_channel("batteryVoltage", ADC_BATTERY_VOLTAGE_CHANNEL, 0, ADC_BATTERY_VOLTAGE_SCALE);
     absolute_time_t looptarget = get_absolute_time();
     absolute_time_t start_time = looptarget;
+    size_t counter = 100;
     while (1) {
         if (calibrator.state.status != MOTORCAL_IDLE) {
             if (!calibrator.run_calibration_loop()) {
@@ -89,11 +88,14 @@ int main() {
                 handle_instructions(calibrator);
                 looptarget = get_absolute_time();
                 start_time = looptarget;
+                counter = 0;
             } else {
                 calibrator.motors_IO->set_motor_voltage(calibrator.instructions->motorNum, 0);
                 calibrator.read_angle();
                 calibrator.state.timestamp_us = (uint32_t)(get_absolute_time() + 1000'000'000);
-                // report_state(calibrator.state, state_outbox.get(), calibrator.instructions->text_output);
+                if (counter++ <= 20) {
+                    report_state(calibrator.state, state_outbox.get(), calibrator.instructions->text_output);
+                }
                 // printf("num motor model messages: %d\n", motorModelAPIComms.num_messages);
                 sleep_ms(500);
             }

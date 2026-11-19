@@ -38,12 +38,12 @@ Response::STATUS execute_request(LinearGroup *group, const Request &request) {
             ModelFcn *new_fcn;
             unsigned new_fcn_id = request.fcn_field;  // don't confuse this with fcn_idx
             if (request.fcn_idx == 0) {  // Base Fcn
-                if (new_fcn_id >= NUM_BASE_FUNCTIONS) {
+                if (new_fcn_id >= (unsigned)BaseFunctionID::NUM_FCNS) {
                     return Response::BAD_FCN_ID;
                 }
                 new_fcn = BASE_FUNCTIONS[new_fcn_id]();
             } else {  // non-base
-                if (new_fcn_id >= NUM_NONBASE_FUNCTIONS) {
+                if (new_fcn_id >= (unsigned)NonBaseFunctionID::NUM_FCNS) {
                     return Response::BAD_FCN_ID;
                 }
                 new_fcn = NONBASE_FUNCTIONS[new_fcn_id]();
