@@ -34,19 +34,23 @@ struct Request {
     uint8_t unused;
     float value;
 };
+static_assert(sizeof(Request) / sizeof(int8_t) == 12);
 
 struct Response {
     uint16_t message_ID{MotorModelAPIResponseID};
     int8_t status;
     GROUP group;
+    COMMAND command;
     uint8_t term_idx;
     uint8_t fcn_idx;
+    uint8_t fcn_field;
     enum STATUS : int8_t {
         SUCCESS = 1, HELLO = 2,
         UNSET = 0, BAD_REQUEST = -1, BAD_TERM_IDX = -2, BAD_FCN_IDX = -3, BAD_FCN_ID = -4, BAD_PARAM_IDX = -5,
     };
     inline bool successful() {return status > 0;}
 };
+static_assert(sizeof(Response) / sizeof(int8_t) == 8);
 
 // Request API functions (run on main computer)
 bool msg_set_function(GROUP group, uint8_t term_idx, uint8_t fcn_idx, const char *fcn_name, Request &msg_out);

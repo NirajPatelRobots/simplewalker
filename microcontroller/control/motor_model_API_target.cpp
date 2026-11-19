@@ -7,8 +7,8 @@ Response::STATUS execute_request(LinearGroup *group, const Request &request);
 
 void handle_request(const Request &request, MotorModel &model, Response &response) {
     LinearGroup *group = nullptr;
-    response = {.status = response.UNSET,  // default
-                .group = request.group, .term_idx = request.term_idx, .fcn_idx = request.fcn_idx};
+    response = {.status = response.UNSET, .group = request.group, .command = request.command,
+                .term_idx = request.term_idx, .fcn_idx = request.fcn_idx, .fcn_field = request.fcn_field};
 
     switch (request.group)
     {

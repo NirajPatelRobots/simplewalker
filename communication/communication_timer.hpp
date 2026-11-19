@@ -19,7 +19,22 @@ long count_us(chrono::duration<Rep, Period> duration) {
 }
 
 
-void listen_timeout(Communicator &comm, chrono::microseconds wait_us,
+template<typename T, unsigned skip_every>
+int64_t listen_timeout(MessageInbox<T, skip_every> &inbox, int64_t wait_us,
+                        chrono::microseconds increment_us = MAX_LISTEN_INTERVAL) {
+    const time_point start_point = chrono::steady_clock::now();
+    time_point sleep_target = start_point;
+    chrono::microseconds wait_duration{wait_us};
+    while ((sleep_target < start_point + wait_duration) && (inbox.num_available() == 0)) {
+        sleep_target = std::min(start_point + wait_duration, sleep_target + increment_us);
+        std::this_thread::sleep_until(sleep_target);
+        inbox.comm.receive_messages();
+    }
+    return count_us(sleep_target - start_point);
+}
+
+
+void listen_duration(Communicator &comm, chrono::microseconds wait_us,
                         time_point start_point = chrono::steady_clock::now()) {
     auto sleep_target = start_point;
     while (sleep_target < start_point + wait_us) {
@@ -29,9 +44,9 @@ void listen_timeout(Communicator &comm, chrono::microseconds wait_us,
     }
 }
 
-void listen_timeout(Communicator &comm, unsigned wait_us,
+void listen_duration(Communicator &comm, unsigned wait_us,
                         time_point start_point = chrono::steady_clock::now()) {
-    listen_timeout(comm, chrono::microseconds(wait_us), start_point);
+    listen_duration(comm, chrono::microseconds(wait_us), start_point);
 }
 
 
@@ -62,7 +77,7 @@ public:
             inbox.clear();
         }
         bool message_was_missing = message_is_missing();
-        listen_timeout(inbox.comm, timestep, loopstart);
+        listen_duration(inbox.comm, timestep, loopstart);
 
         loopstart = loopstart + timestep;
         bool waiting_for_late = false;

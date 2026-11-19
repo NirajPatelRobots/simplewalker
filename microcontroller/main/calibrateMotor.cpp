@@ -50,10 +50,11 @@ public:
     // call after comm.receive_messages()
     void handle(MotorModel &model) {
         if (model_request_inbox->get_newest(model_request) >= 0) {
+            model_request_inbox->clear();
             MotorModelAPI::handle_request(model_request, model, model_response_outbox->message);
             sleep_ms(100);
             model_response_outbox->send();
-            sleep_ms(500);
+            sleep_ms(100);
             num_messages++;
         }
     }
