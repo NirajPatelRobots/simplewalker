@@ -8,23 +8,24 @@ namespace MotorModelAPI {
 // helpers
 const uint8_t FCN_NOT_FOUND = UINT8_MAX;
 
-constexpr std::array<std::string_view, (size_t)BaseFunctionID::NUM_FCNS> BASE_FCN_NAMES {
+// must stay in line with microcontroller model_fcns.hpp
+constexpr std::array<std::string_view, NUM_BASE_FUNCTIONS> BASE_FCN_NAMES {
     "vel", "one"
 };
 
-constexpr std::array<std::string_view, (size_t)NonBaseFunctionID::NUM_FCNS> NONBASE_FCN_NAMES {
-    "mult", "sign"
+constexpr std::array<std::string_view, NUM_NONBASE_FUNCTIONS> NONBASE_FCN_NAMES {
+    "sign", "mult"
 };
 
 uint8_t get_base_fcn_id( std::string_view fcn_name) {
-    for (size_t i = 0; i < (size_t)BaseFunctionID::NUM_FCNS; i++) {
+    for (size_t i = 0; i < NUM_BASE_FUNCTIONS; i++) {
         if (BASE_FCN_NAMES[i] == fcn_name) return i;
     }
     return FCN_NOT_FOUND;
 }
 
 uint8_t get_nonbase_fcn_id(std::string_view fcn_name) {
-    for (size_t i = 0; i < (size_t)NonBaseFunctionID::NUM_FCNS; i++) {
+    for (size_t i = 0; i < NUM_NONBASE_FUNCTIONS; i++) {
         if (NONBASE_FCN_NAMES[i] == fcn_name) return i;
     }
     return FCN_NOT_FOUND;

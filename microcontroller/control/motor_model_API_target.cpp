@@ -5,6 +5,10 @@ namespace MotorModelAPI {
 Response::STATUS execute_request(LinearGroup *group, const Request &request);
 
 
+static_assert (NUM_BASE_FUNCTIONS    == sizeof(BASE_FUNCTIONS)    / sizeof(BASE_FUNCTIONS[0]));
+static_assert (NUM_NONBASE_FUNCTIONS == sizeof(NONBASE_FUNCTIONS) / sizeof(NONBASE_FUNCTIONS[0]));
+
+
 void handle_request(const Request &request, MotorModel &model, Response &response) {
     LinearGroup *group = nullptr;
     response = {.status = response.UNSET, .group = request.group, .command = request.command,
@@ -38,12 +42,12 @@ Response::STATUS execute_request(LinearGroup *group, const Request &request) {
             ModelFcn *new_fcn;
             unsigned new_fcn_id = request.fcn_field;  // don't confuse this with fcn_idx
             if (request.fcn_idx == 0) {  // Base Fcn
-                if (new_fcn_id >= (unsigned)BaseFunctionID::NUM_FCNS) {
+                if (new_fcn_id >= NUM_BASE_FUNCTIONS) {
                     return Response::BAD_FCN_ID;
                 }
                 new_fcn = BASE_FUNCTIONS[new_fcn_id]();
             } else {  // non-base
-                if (new_fcn_id >= (unsigned)NonBaseFunctionID::NUM_FCNS) {
+                if (new_fcn_id >= NUM_NONBASE_FUNCTIONS) {
                     return Response::BAD_FCN_ID;
                 }
                 new_fcn = NONBASE_FUNCTIONS[new_fcn_id]();

@@ -40,16 +40,15 @@ namespace ModelFcns {
 }  // namespace ModelFcns
 
 
+// must stay in line with main computer motor_model_API_user.cpp
 ModelFcn * (*const BASE_FUNCTIONS[])(void) = {
     ModelFcns::Vel::create,
     ModelFcns::One::create,
 };
-const size_t NUM_BASE_FUNCTIONS = sizeof(BASE_FUNCTIONS) / sizeof(BASE_FUNCTIONS[0]);
 
 
 ModelFcn * (*const NONBASE_FUNCTIONS[])(void) = {
     ModelFcns::Sign::create,
     ModelFcns::Mult::create,
 };
-const size_t NUM_NONBASE_FUNCTIONS = sizeof(NONBASE_FUNCTIONS) / sizeof(NONBASE_FUNCTIONS[0]);
 #endif  // SIMPLEWALKER_PICO_MODEL_FCNS_HPP

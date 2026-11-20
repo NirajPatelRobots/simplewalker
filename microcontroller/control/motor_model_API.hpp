@@ -1,6 +1,5 @@
 /* Common header for motor model API user and target.
     TODO:
-        Remove function ID enums?
 */
 #ifndef SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
 #define SIMPLEWALKER_PICO_MOTOR_MODEL_API_HPP
@@ -53,12 +52,7 @@ struct Response {
 };
 static_assert(sizeof(Response) / sizeof(int8_t) == 8);
 
-enum class BaseFunctionID {
-    Vel_ID, One_ID, NUM_FCNS
-};
-enum class NonBaseFunctionID {
-    Sign_ID, Mult_ID, NUM_FCNS
-};
+const size_t NUM_BASE_FUNCTIONS = 2, NUM_NONBASE_FUNCTIONS = 2;
 
 // Request API functions (run on main computer)
 bool msg_set_function(GROUP group, uint8_t term_idx, uint8_t fcn_idx, std::string_view fcn_name, Request &msg_out);
