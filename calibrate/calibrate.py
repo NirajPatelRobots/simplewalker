@@ -107,6 +107,16 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
             results["dt_std_dev"] = float(np.std(np.where(results["diff_t"] > 10 * results["dt"], results["dt"], results["diff_t"])))
             minutes, seconds = divmod(int(np.max(results["t"])), 60)
             results["runtime"] = f'{minutes:02d}:{seconds:02d}' if minutes > 0 else f'{seconds} s'
+            acc_predict_nan = np.where(np.abs(accel_error) < results["outlier_thresh"], results["accel_predic"], np.nan)
+            ref_err_total, ref_accel_total, ref_model_err_total, model_predict_total = (0, 0, 0, 0)
+            for signal_type, ref, accel_section, predict_section in zip(results["signal_type"], results["ref"], segment_log(results, acc_f_nan), segment_log(results, acc_predict_nan)):
+                if ref is not None and signal_type == "accel":
+                    ref_err_total += np.nansum((ref - accel_section)**2)
+                    ref_accel_total += np.nansum(accel_section**2)
+                    ref_model_err_total += np.nansum((ref - predict_section)**2)
+                    model_predict_total += np.nansum(predict_section**2)
+            results["ref_accel_R^2"]   = 1 - (ref_err_total / ref_accel_total) if ref_accel_total > 0 else None
+            results["ref_model_R^2"] = 1 - (ref_model_err_total / model_predict_total) if model_predict_total > 0 else None
 
     def calc_residual(nonlin_paramArr, results, model, model_fcns):
         X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramArr)
@@ -138,6 +148,7 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
         model = model or []
     else:
         if test_only:
+            print("Test only, using loaded params")
             model = [m for m in params.lin if m not in ["V", "omega"]]
         print("Loaded nonlinear params:", params.nonlin)
         for mod in model:
@@ -149,7 +160,11 @@ def examineMotor(testdata, model, params, filter_params=FilterParams(), test_onl
     if (not test_only) and (len(nonlin_paramArr) > 0):
         nonlin_paramArr = optimize(nonlin_paramArr, results, model, model_fcns)
     X = motor_model.make_independent_variable(results, model, model_fcns, nonlin_paramArr)
-    paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
+    if test_only:
+        print(params.lin)
+        paramArr = np.array(list(params.lin.values()))
+    else:
+        paramArr = determine_params(X, results["acc_f"], results, remove_outliers=True)
     results["accel_predic"] = X @ paramArr
     calc_result_stats(results, True)
     results["model_contributions"] = motor_model.calc_model_contributions(X, paramArr, model)
@@ -166,6 +181,8 @@ def printMotorResults(params, results):
           f"Ratio: {round(clean_angle_noise/spiky_angle_noise, 3)}")
     print(f'{results["filter_desc"]} filter; Period = {round(results["filter_period"] * 1000)}ms')
     print("Parameters:", params, end="\n\n")
+    print(f'Accel reference R^2: {round(results["ref_accel_R^2"], 3) if results["ref_accel_R^2"] is not None else "None"},',
+          "Reference prediction R^2:", round(results["ref_model_R^2"], 3) if results["ref_model_R^2"] is not None else "None")
     print("Average error =", round(results["avg_error"], 3), "rad/s^2, Average acceleration =",
           round(np.sum(np.abs(results["acc_f"] )) / results["N"], 3), "rad/s^2")
     print("Error std dev:", round(results["error_std_dev"], 3), "rad/s^2")
@@ -197,3 +214,9 @@ def clean_up_test_data(this_data, results, filter_params):
     # moving average, mostly to counter value quantization. After spike removal, before lowpass.
     this_data["angle"] = moving_avg(this_data["angle"], n_samples=filter_params.angle_moving_avg_N,
                                     pad_val=this_data["angle"][0])
+
+
+def segment_log(results: ResultsType, field: str | np.ndarray):
+    array = results[field] if type(field) is str else field
+    for log_start, log_end in zip(results["log_starts"], sorted(results["log_starts"])[1:] + [len(results["t"])]):
+        yield array[log_start:log_end]

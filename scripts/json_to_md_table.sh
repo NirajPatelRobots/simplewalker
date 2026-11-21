@@ -42,10 +42,11 @@ jq -r --argjson fixed "$FIXED_COLS" --argjson ignore "$IGNORE_COLS" --argjson pr
     if type == "number" then
       if . == 0 then "0"
       else
+        (if . < 0 then -1 else 1 end) as $sign | (. * $sign) |
         # $mult is the 10^n multiplier to shift numbers to $precision digits to be rounded to int
         # Ex: precision=4; value=1.234 -> mult=1000, value=12 -> mult=100, value>1000 -> mult=1
         ([((($precision - 1) - (log10 | floor)) | pow(10; .)), 1] | max) as $mult |
-        ((. * $mult | round) / $mult)
+        ((. * $mult * $sign | round) / $mult)
       end
     else
       (. // "-")  # Replace null with "-"
