@@ -48,13 +48,17 @@ class ControllerSerial(serial.Serial):
             print("Could not connect to", self.name)
 
     def readstr(self) -> str:
-        return self.read(2048).decode().replace("\r", "")
+        try:
+            return self.read(2048).decode().replace("\r", "")
+        except serial.serialutil.SerialException as e:
+            print("Serial error:", e, file=sys.stderr)
+            sys.exit(1)
 
 
-def make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, input_type, command_signal_type,
+def make_MotorCalibrationTriggerMessage(motorNum, amp_scale, freq_scale, dt, wave_shape, command_signal_type,
                                         max_displacement, min_displacement, text_output) -> bytes:
     return struct.pack("<hhfffffcch", 0x0D11, motorNum, amp_scale, freq_scale, dt, max_displacement, min_displacement,
-                       bytes([input_type]), bytes([command_signal_type]), text_output)
+                       bytes([wave_shape]), bytes([command_signal_type]), text_output)
 
 
 def parse_MotorCalibrationStateMessage(message:bytes):
@@ -62,7 +66,7 @@ def parse_MotorCalibrationStateMessage(message:bytes):
     return types.SimpleNamespace(timestamp_us=fields[1], angle=fields[2], angvel=fields[3], voltage=fields[4])
 
 
-input_type_names = ["sin", "squ", "db", "const"] # must match messages.h
+wave_shape_names = ["sin", "squ", "db", "const"] # must match messages.h
 signal_type_names = ["voltage", "accel", "angle"]
 
 def print_from_micro(ser: ControllerSerial):
@@ -91,8 +95,8 @@ def print_from_micro(ser: ControllerSerial):
     return np.array(voltage), np.array(angle), np.array(ref), np.array(timestamp)
 
 
-def motortest_filename_tag(amp_scale, freq_scale, sig_type, input_type) -> str:
-    return f"_{sig_type}_{input_type}_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
+def motortest_filename_tag(amp_scale, freq_scale, sig_type, wave_shape) -> str:
+    return f"_{sig_type}_{wave_shape}_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
 
 
 def run_tests_from_file_input(infile_name: str, series_name: str):
@@ -104,31 +108,31 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
     print(data)
     for run in series_config["runs"]:
         print((run["name"] + ": ") if "name" in run else "", end='')
-        for run_type in run["types"]:
-            data["run_type"] = run_type
-            run_type_num = input_type_names.index(run_type)
-            signal_type_num = signal_type_names.index(series_config["signal_type"])
-            print(f'{run_type} (type {run_type_num}) run')
-            for amp_scale in run["amp_scales"]:
-                data["amp_scale"] = amp_scale
-                for freq_scale in run["freq_scales"]:
-                    filename = series_name + motortest_filename_tag(
-                                    amp_scale, freq_scale, series_config["signal_type"], run_type)
-                    data["freq_scale"] = freq_scale
-                    if (series_config.get("dry_run")) or (run.get("skip")):
-                        print("Skipping", filename)
-                        continue
-                    print("\tRunning:", filename)
-                    time.sleep(0.5)
-                    ser.reset_input_buffer()
-                    ser.write(make_MotorCalibrationTriggerMessage(data["motorNum"], amp_scale, freq_scale,
-                                                        data["dt"], run_type_num, signal_type_num,
-                                                        series_config["max_angle"], series_config["min_angle"], True))
-                    data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
-                    print("got", ", ".join([k + ": " + str(data[k].shape) for k in ("V", "angle", "t")]))
-                    saveRun(filename, data)
-                    time.sleep(0.5)
-                    ser.reset_input_buffer()
+        wave_shape = run["shape"]
+        data["wave_shape"] = wave_shape
+        wave_shape_num = wave_shape_names.index(wave_shape)
+        signal_type_num = signal_type_names.index(series_config["signal_type"])
+        print(f'{wave_shape} (type {wave_shape_num}) run')
+        for amp_scale in run["amp_scales"]:
+            data["amp_scale"] = amp_scale
+            for freq_scale in run["freq_scales"]:
+                filename = series_name + motortest_filename_tag(
+                                amp_scale, freq_scale, series_config["signal_type"], wave_shape)
+                data["freq_scale"] = freq_scale
+                if (series_config.get("dry_run")) or (run.get("skip")):
+                    print("Skipping", filename)
+                    continue
+                print("\tRunning:", filename)
+                time.sleep(0.5)
+                ser.reset_input_buffer()
+                ser.write(make_MotorCalibrationTriggerMessage(data["motorNum"], amp_scale, freq_scale,
+                                                    data["dt"], wave_shape_num, signal_type_num,
+                                                    series_config["max_angle"], series_config["min_angle"], True))
+                data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
+                print("got", ", ".join([k + ": " + str(data[k].shape) for k in ("V", "angle", "t")]))
+                saveRun(filename, data)
+                time.sleep(0.5)
+                ser.reset_input_buffer()
 
 
 def interactive_main():
@@ -147,7 +151,7 @@ def interactive_main():
     min_angle = -1
     filename = None
     data = {"V": np.array([]), "angle": np.array([]), "timestamp": np.array([]), "dt": 0.002, "motorNum": 0,
-            "signal_type": "voltage", "input_type": "sin", "freq_scale": 1., "amp_scale": 1.}
+            "signal_type": "voltage", "wave_shape": "sin", "freq_scale": 1., "amp_scale": 1.}
     
     while True:
         args = input(">>> ").split()
@@ -164,9 +168,9 @@ def interactive_main():
                     data["amp_scale"] = float(args[2])
                     if len(args) > 3:
                         filename = (args[3] + motortest_filename_tag(
-                                    data["amp_scale"], data["freq_scale"], data["signal_type"], data["input_type"]))
+                                    data["amp_scale"], data["freq_scale"], data["signal_type"], data["wave_shape"]))
             message = make_MotorCalibrationTriggerMessage(data["motorNum"], data["amp_scale"], data["freq_scale"], data["dt"],
-                            input_type_names.index(data["input_type"]), signal_type_names.index(data["signal_type"]),
+                            wave_shape_names.index(data["wave_shape"]), signal_type_names.index(data["signal_type"]),
                             max_angle, min_angle, True)
             ser.reset_input_buffer()
             ser.write(message)
@@ -182,7 +186,7 @@ def interactive_main():
                 print("Invalid motor number")
         elif command == "save":
             filename = (args[1] if len(args) > 1 else "") + motortest_filename_tag(
-                            data["amp_scale"], data["freq_scale"], data["signal_type"], data["input_type"])
+                            data["amp_scale"], data["freq_scale"], data["signal_type"], data["wave_shape"])
             saveRun(filename, data)
         elif command == "dt":
             if len(args) > 1:
@@ -202,13 +206,13 @@ def interactive_main():
             print([d[5:-10] for d in glob.glob(ls_path)])
         elif command == "type":
             if len(args) > 1:
-                if args[1] in input_type_names:
-                    data["input_type"] = args[1]
+                if args[1] in wave_shape_names:
+                    data["wave_shape"] = args[1]
                 elif args[1] in signal_type_names:
                     data["signal_type"] = args[1]
                 else:
-                    data["input_type"] = input_type_names[int(args[1])]
-            print(f'Input type: {data["input_type"]} ({input_type_names.index(data["input_type"])})')
+                    data["wave_shape"] = wave_shape_names[int(args[1])]
+            print(f'Input type: {data["wave_shape"]} ({wave_shape_names.index(data["wave_shape"])})')
             print(f'Signal type: {data["signal_type"]} ({signal_type_names.index(data["signal_type"])})')
         elif command.startswith("exit"):
             break

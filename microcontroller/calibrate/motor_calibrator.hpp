@@ -6,7 +6,6 @@ TODO:
     error if can't return to start
         detect wrong direction
     measure battery voltage variability?
-    better names used consistently for input_signal_type and command_signal_type
     configure which signal to send? (reference, velocity, battery voltage)
     */
 #ifndef SIMPLEWALKER_PICO_MOTOR_CALIBRATOR_HPP

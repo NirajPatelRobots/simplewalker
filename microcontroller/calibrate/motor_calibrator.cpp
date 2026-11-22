@@ -3,7 +3,7 @@
 #include <math.h>
 
 
-const char *const input_type_names[] = {"sine", "square", "deadband", "constant"}; 
+const char *const wave_shape_names[] = {"sine", "square", "deadband", "constant"}; 
 const char *const signal_type_names[] = {"voltage", "accel", "position"}; 
 
 
@@ -30,7 +30,7 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
             printf("Error: Invalid signal type\n");
             return -1;
         }
-        if (instructions->input_signal_type == CAL_INPUT_DEADBAND 
+        if (instructions->wave_shape == CAL_INPUT_DEADBAND 
          && instructions->command_signal_type != CAL_SIGNAL_VOLTAGE) {
             printf("Error: Deadband is only possible for Voltage signals.\n");
             return -2;
@@ -40,15 +40,15 @@ MotorCalibrator::MotorCalibrator(const std::vector<motorIOSettings> _motor_setti
             state.status = MOTORCAL_IDLE;
             return -4;
         }
-        generator = make_signal_generator(MotorCalibrationInputType(instructions->input_signal_type),
+        generator = make_signal_generator(MotorCalibrationWaveShape(instructions->wave_shape),
                                           instructions->frequency * instructions->dt,
                                           instructions->amplitude);
         if (!generator) {
-            printf("Invalid input type: %u", instructions->input_signal_type);
+            printf("Invalid input type: %u", instructions->wave_shape);
             return -3;
         }
         printf("Signal %s tracking waveform %s\n", signal_type_names[instructions->command_signal_type],
-                                                    input_type_names[instructions->input_signal_type]);
+                                                    wave_shape_names[instructions->wave_shape]);
         state.status = MOTORCAL_CENTERING;
         run_section = SECTION_START;
         counter = 0; numInRange = 0;

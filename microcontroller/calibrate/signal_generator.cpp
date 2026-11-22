@@ -115,7 +115,7 @@ public:
 
 
 std::unique_ptr<ExcitationSignalGenerator> make_signal_generator(
-        MotorCalibrationInputType type, float frequency_scale, float amplitude_scale) {
+        MotorCalibrationWaveShape type, float frequency_scale, float amplitude_scale) {
     switch (type) {
         case CAL_INPUT_SINES:
             return std::make_unique<SineExcitationGenerator>(frequency_scale, amplitude_scale);

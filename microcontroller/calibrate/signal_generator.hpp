@@ -14,6 +14,6 @@ public:
 };
 
 std::unique_ptr<ExcitationSignalGenerator> make_signal_generator(
-        MotorCalibrationInputType type, float frequency_scale, float amplitude_scale);
+        MotorCalibrationWaveShape type, float frequency_scale, float amplitude_scale);
 
 #endif  // SIMPLEWALKER_PICO_SIGNAL_GENERATOR_HPP
