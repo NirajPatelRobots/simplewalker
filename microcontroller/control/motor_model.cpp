@@ -23,6 +23,7 @@ FcnChain::FcnChain(FcnChain &&other) noexcept
 
 FcnChain &FcnChain::operator=(FcnChain &&other) noexcept {
     if (this != &other) {
+        for (auto *const fcn : fcns) delete fcn;
         fcns = other.fcns;
         weight = other.weight;
         other.fcns = {};
