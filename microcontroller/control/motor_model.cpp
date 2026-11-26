@@ -2,10 +2,14 @@
 
 
 bool FcnChain::set_function(unsigned fcn_idx, ModelFcn *new_fcn) {
-    if (fcn_idx > fcns.size()) return false;
+    if (fcn_idx > fcns.size()) {
+        delete new_fcn;
+        return false;
+    }
     if (fcn_idx == fcns.size()) {
         fcns.emplace_back(new_fcn);
     } else {
+        delete fcns[fcn_idx];
         fcns[fcn_idx] = new_fcn;
     }
     return true;
