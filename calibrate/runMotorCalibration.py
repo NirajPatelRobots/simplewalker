@@ -7,6 +7,7 @@ TODO:
     measure battery voltage during calibration
     improve stdout display
     compare reported controller time with system time?
+    Don't save empty logs
 
 Created Jun 2021, reworked late 2023
 @author: Niraj
@@ -95,6 +96,10 @@ def print_from_micro(ser: ControllerSerial):
     return np.array(voltage), np.array(angle), np.array(ref), np.array(timestamp)
 
 
+def send_blank_trigger(ser: ControllerSerial):
+    ser.write(make_MotorCalibrationTriggerMessage(0, 0, 0, 0, 0, 0, 0, 0, True))
+
+
 def motortest_filename_tag(amp_scale, freq_scale, sig_type, wave_shape) -> str:
     return f"_{sig_type}_{wave_shape}_a{amp_scale:g}_f{freq_scale:g}".replace(".", "p")
 
@@ -128,7 +133,11 @@ def run_tests_from_file_input(infile_name: str, series_name: str):
                 ser.write(make_MotorCalibrationTriggerMessage(data["motorNum"], amp_scale, freq_scale,
                                                     data["dt"], wave_shape_num, signal_type_num,
                                                     series_config["max_angle"], series_config["min_angle"], True))
-                data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
+                try:
+                    data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
+                except:
+                    send_blank_trigger(ser)
+                    raise
                 print("got", ", ".join([k + ": " + str(data[k].shape) for k in ("V", "angle", "t")]))
                 saveRun(filename, data)
                 time.sleep(0.5)
@@ -175,7 +184,11 @@ def interactive_main():
             ser.reset_input_buffer()
             ser.write(message)
             print("sent:", message)
-            data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
+            try:
+                data["V"], data["angle"], data["ref"], data["t"] = print_from_micro(ser)
+            except:
+                send_blank_trigger(ser)
+                raise
             print("got", ", ".join([k + ": " + str(data[k].shape) for k in ("V", "angle", "ref", "t")]))
             if filename:
                 saveRun(filename, data)

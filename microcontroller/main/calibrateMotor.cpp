@@ -31,6 +31,8 @@ void handle_instructions(MotorCalibrator &calibrator) {
             VEL_FILT_DESPIKE_N, VEL_FILT_AVG_N);
     if (calibrator.state.voltage < 3.3) {
         printf("Low battery, won't run calibration\n");
+    } else if (calibrator.instructions->frequency < 0.01 || calibrator.instructions->dt < 1e-6) {
+        printf("Instructions have invalid frequency or dt\n");
     } else {
         calibrator.start_calibration();
     }
@@ -70,11 +72,16 @@ int main() {
     absolute_time_t start_time = looptarget;
     size_t counter = 100;
     while (1) {
+        comm->receive_messages();
         if (calibrator.state.status != MOTORCAL_IDLE) {
             if (!calibrator.run_calibration_loop()) {
                 calibrator.motors_IO->set_motor_voltage(calibrator.instructions->motorNum, 0);
                 calibrator.state.status = MOTORCAL_IDLE;
                 printf("Calibration failed :(\n");
+            }
+            if (trigger_inbox->get_newest(*calibrator.instructions) >= 0) {
+                printf("Received trigger message during calibration, cancelling\n");
+                calibrator.state.status = MOTORCAL_IDLE;
             }
             calibrator.state.timestamp_us = (uint32_t)(looptarget - start_time);
             report_state(calibrator.state, state_outbox.get(), calibrator.instructions->text_output);
@@ -82,7 +89,6 @@ int main() {
             sleep_until(looptarget);
         } else {
             calibrator.state.voltage = calibrator.ADC->read_ADC_scaled(ADC_BATTERY_VOLTAGE_CHANNEL);
-            comm->receive_messages();
             motorModelAPIComms.handle(calibrator.motor_model);
             if (trigger_inbox->get_newest(*calibrator.instructions) >= 0) {
                 handle_instructions(calibrator);

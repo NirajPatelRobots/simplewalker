@@ -1,7 +1,6 @@
 /* Motor Calibrator follows an input and reports voltage and angle measurements
 Created October 2021, reworked late 2023, 2026
 TODO:
-    way to cancel calibration
     Standardize error responses?
     error if can't return to start
         detect wrong direction
