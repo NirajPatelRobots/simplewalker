@@ -14,7 +14,7 @@ target_sources(InterboardComm
         PUBLIC
             FILE_SET HEADERS
             BASE_DIRS .
-            FILES comm_serial.hpp
+            FILES comm_serial.hpp "communication_timer.hpp"
         )
 target_link_libraries(InterboardComm BasicCommunication wiringPi)
 

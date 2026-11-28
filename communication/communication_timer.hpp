@@ -8,20 +8,55 @@
 #include "communication.hpp"
 
 namespace chrono = std::chrono;
+typedef chrono::time_point<chrono::steady_clock> time_point;
+
+chrono::microseconds MAX_LISTEN_INTERVAL {20000};  // guess
+
 
 template< class Rep, class Period >
 long count_us(chrono::duration<Rep, Period> duration) {
     return chrono::duration_cast<std::chrono::microseconds>(duration).count();
 }
 
+
+template<typename T, unsigned skip_every>
+int64_t listen_timeout(MessageInbox<T, skip_every> &inbox, int64_t wait_us,
+                        chrono::microseconds increment_us = MAX_LISTEN_INTERVAL) {
+    const time_point start_point = chrono::steady_clock::now();
+    time_point sleep_target = start_point;
+    chrono::microseconds wait_duration{wait_us};
+    while ((sleep_target < start_point + wait_duration) && (inbox.num_available() == 0)) {
+        sleep_target = std::min(start_point + wait_duration, sleep_target + increment_us);
+        std::this_thread::sleep_until(sleep_target);
+        inbox.comm.receive_messages();
+    }
+    return count_us(sleep_target - start_point);
+}
+
+
+void listen_duration(Communicator &comm, chrono::microseconds wait_us,
+                        time_point start_point = chrono::steady_clock::now()) {
+    auto sleep_target = start_point;
+    while (sleep_target < start_point + wait_us) {
+        sleep_target = std::min(start_point + wait_us, sleep_target + MAX_LISTEN_INTERVAL);
+        std::this_thread::sleep_until(sleep_target);
+        comm.receive_messages();
+    }
+}
+
+void listen_duration(Communicator &comm, unsigned wait_us,
+                        time_point start_point = chrono::steady_clock::now()) {
+    listen_duration(comm, chrono::microseconds(wait_us), start_point);
+}
+
+
 class CommTimer {
-    chrono::time_point<chrono::steady_clock> timestart;
-    chrono::time_point<chrono::steady_clock> loopstart;
-    chrono::time_point<chrono::steady_clock> missing_readtime;
+    time_point timestart;
+    time_point loopstart;
+    time_point missing_readtime;
 public:
     chrono::microseconds timestep;
     chrono::microseconds msgwaittime;
-    chrono::microseconds max_listen_interval {20000};  // guess
     chrono::microseconds acceptable_delay;
     bool print_stdout;
     CommTimer(unsigned timestep_us, unsigned max_wait_time, unsigned acceptable_delay_us = 0, unsigned start_delay_us = 0) :
@@ -42,9 +77,11 @@ public:
             inbox.clear();
         }
         bool message_was_missing = message_is_missing();
-        sleep_until_next_loop(inbox.comm);
+        listen_duration(inbox.comm, timestep, loopstart);
+
+        loopstart = loopstart + timestep;
         bool waiting_for_late = false;
-        chrono::time_point<chrono::steady_clock> late_readtime;
+        time_point late_readtime;
         while (inbox.get_newest(message) < 0) {
             inbox.comm.receive_messages();
             late_readtime = chrono::steady_clock::now();
@@ -71,20 +108,10 @@ public:
     }
 
     inline bool message_is_missing() { return missing_readtime + timestep == loopstart; }
-    const chrono::time_point<chrono::steady_clock> &last_missing_msg_time() { return missing_readtime; };
-    const chrono::time_point<chrono::steady_clock> &initial_timestamp() { return timestart; };
-    const chrono::time_point<chrono::steady_clock> &loop_timestamp() { return loopstart; };
+    const time_point &last_missing_msg_time() { return missing_readtime; };
+    const time_point &initial_timestamp() { return timestart; };
+    const time_point &loop_timestamp() { return loopstart; };
     auto duration() const { return loopstart - timestart; };
-protected:
-    void sleep_until_next_loop(Communicator &comm) {
-        auto sleep_target = loopstart;
-        while (sleep_target < loopstart + timestep) {
-            sleep_target = std::min(loopstart + timestep, sleep_target + max_listen_interval);
-            std::this_thread::sleep_until(sleep_target);
-            comm.receive_messages();
-        }
-        loopstart = sleep_target;  // = loopstart + timestep
-    }
 };
 
 #endif // SIMPLEWALKER_COMM_TIMER_HPP

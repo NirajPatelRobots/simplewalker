@@ -62,7 +62,8 @@ The built executables are simplewalker, test_localization, unittests, and collec
 ## Motor Models
 A motor model predicts the change in state (acceleration) for any current state (velocity).
 
-A motor model has two linear groups of terms: state terms and input terms.
+A motor model has two linear groups of terms: state terms and input terms. "Input" terms refer to the Control Theory definition of "input" to the *physical* system, meaning the voltage which is **output** by the microcontroller.
+
 Motor models have the form:
 ```
 accel = state_term_1(state) + state_term_2(state) + ... + Voltage * (input_term_1(state) + ...)
@@ -72,21 +73,22 @@ accel = state_group(state) + Voltage * input_group(state)
 Each term is a chain of model functions.
 A function chain has the form:
 ```
-state_term_1(state) = weight * f_1(f_2(f_base(state)))
+state_term_1(state) = weight * f_2(f_1(f_base(state)))
 ```
-In this example, f_2 is f_1's parent and f_base is f_2's parent. Base functions are special.
+In this example, f_base is f_1's parent and f_1 is f_2's parent. The function which outputs the value to be multiplied by the weight has the highest index. Base functions are special.
 
 ### Motor Model API
 API Requests:
-- Create_Term(base function ID, weight)
-- Delete_Term(term index)
-- Add_Function(term index, nonbase function ID)
+- Set_Function(term index, function index, function name)
+  - Function index = 0 for the base function, = (number of fcns - 1) for the last child.
+  - If there is already a function with this index in this term, it sets the function.
+  - If the function or term index is == the number of functions or terms, it creates a new function or term.
+  - If the function index is 0, function name is a base function name, otherwise it's a nonbase function name.
 - Set_Parameter(term index, function index, param index, value)
-  - Function index = 0 for the first function, = (number of fcns - 1) for base.
 - Set_Weight(term index, weight)
 
-API response: `{int status, int term_idx}` where status > 0 is success
-
+API response: `{int status, int group, int term_idx, int fcn_idx}` where status > 0 is success.
+See `motor_model_API.hpp`.
 
 ## Calibration
 ### IMU Calibration
@@ -94,12 +96,13 @@ collect_sensor_cal_data saves files in `data/stationary_calibration_[number].log
 Copy these to the base computer and run `sensorAnalysis.py` on them to get sensor calibration values.
 
 ### Motor Calibration
-- To collect motor calibration data, run `python3 runMotorCalibration.py` on the main computer (SBC). 
-- Copy that data to the Base computer with `rsync -zic pi@raspberrypi:/home/pi/simplewalker/data/*.motortest ./data/`.
+- To collect motor calibration data, either:
+  - Run `python3 runMotorCalibration.py` on the main computer (SBC). 
+  - Run `scripts/run_remote_calibration.sh -i settings/<calibration_inputs_file>.json <output_tag>` from your computer.
 - To run the calibration and get motor parameters, run `uv run calibrate/calibrate_cli.py [file_glob]`
 - To validate saved parameters, run `uv run calibrate/model_functions.py <motor_params.json>`
 - To run the interactive calibration with a UI, run `uv run --extra interactive_calibration calibrate/interactive_calibrate.py`
-- To run the motor calibration as a notebook, run `uv run -w jupyter -w ipympl --extra interactive_calibration jupyter lab`
+- To run the motor calibration as a notebook, run `uv run --extra notebook_calibration jupyter lab`
 
 
 ## CI

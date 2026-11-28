@@ -21,7 +21,7 @@ def saveResultsJson(filename, results, model):
         elif type(v) is str:
             this_test[k] = v
     this_test["model"] = " ".join(model)
-    this_test["input_file_prefix"] = commonprefix(list(results["log_starts"].values())).split("/")[-1]
+    this_test["input_file_prefix"] = commonprefix(results["filename"]).split("/")[-1]
     for existing_test in output["tests"]:
         if all(existing_test.get(k) == v for k, v in this_test.items()):
             return

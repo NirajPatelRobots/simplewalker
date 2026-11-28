@@ -5,6 +5,7 @@ TODO:
     graph model partials like slowness
     fancy modern interactive data frontend?
     histogram of velocity
+    plot test data with files labeled, without running calibration
 """
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,7 +13,7 @@ from os import listdir
 from os.path import isfile, join, dirname, splitext
 import sys
 
-from calibrate import examineMotor, printMotorResults
+from calibrate import examineMotor, printMotorResults, segment_log
 from calibrate_fileIO import loadRun, saveParams, loadParams
 from filter import FilterParams, FourierAnalysis, FourierSignal
 
@@ -43,7 +44,10 @@ def graph_V_and_angle_and_derivatives(results):
     plt.suptitle("Raw and Filtered Data")
     plt.ylabel("Driving Voltage (V)")
     lines = plt.plot(results["t"], results["V"], results["t"], results["V_f"])
-    plt.legend(lines, ["Raw", "Filtered"])
+    if "ref" in results:
+        plt.legend(lines + [plt.Line2D([0], [0], color='C4')], ["Raw", "Filtered", "Filt. Ref"])
+    else:
+        plt.legend(lines, ["Raw", "Filtered"])
     plt.grid()
     plt.subplot(412, sharex=ax)
     plt.ylabel("Angle [rad]")
@@ -63,6 +67,10 @@ def graph_V_and_angle_and_derivatives(results):
                      results["t"], results["accel_predic"])
     plt.legend(lines, ["Raw", "Filtered", "Predicted"])
     ax.set_ylim(np.min(results["acc_f"]) * 1.1, np.max(results["acc_f"]) * 1.1)
+    for signal_type, ref, t_section in zip(results["signal_type"], results["ref"], segment_log(results, "t")):
+        if signal_type is not None and ref is not None:
+            plt.subplot({"voltage": 411, "accel": 414, "angle": 412}[signal_type])
+            plt.plot(t_section, ref, 'C4')
     plt.grid()
 
 # 3D graph acceleration and acceleration error against voltage and speed

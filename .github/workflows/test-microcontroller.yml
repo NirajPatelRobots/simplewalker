@@ -11,6 +11,7 @@ on:
       - microcontroller/control/CMakeLists.txt
       - microcontroller/control/motor_model*.*pp
       - microcontroller/control/model_fcns.*pp
+      - microcontroller/filter/*
 
 jobs:
   build_unit_tests:
@@ -35,6 +36,9 @@ jobs:
       - name: make test_motor_model_api
         run: make test_motor_model_api -j$(nproc)
         continue-on-error: true
+      - name: make unittest_filter
+        run: make unittest_filter -j$(nproc)
+        continue-on-error: true
       - name: Upload unit tests
         uses: actions/upload-artifact@v6
         with:
@@ -43,6 +47,7 @@ jobs:
             ./build/test/microcontroller_tests/unittest_motor_model
             ./build/test/microcontroller_tests/unittest_model_functions
             ./build/test/microcontroller_tests/test_motor_model_api
+            ./build/test/microcontroller_tests/unittest_filter
           retention-days: 1
           overwrite: true
           if-no-files-found: error
@@ -54,7 +59,7 @@ jobs:
       - name: Download unit tests
         uses: actions/download-artifact@v8
         with: { name: microcontroller_unit_tests }
-      - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api
+      - run: chmod +x unittest_motor_model unittest_model_functions test_motor_model_api unittest_filter
         continue-on-error: true
       - parallel:  # run tests
         - name: unittest motor_model
@@ -63,6 +68,8 @@ jobs:
           run: ./unittest_model_functions --gtest_output="xml:unittest_model_functions.xml"
         - name: test motor model API
           run: ./test_motor_model_api --gtest_output="xml:test_motor_model_api.xml"
+        - name: test filter
+          run: ./unittest_filter --gtest_output="xml:unittest_filter.xml"
       - parallel:  # if all passed, run tests with valgrind
         - name: valgrind motor model
           uses: Ximaz/valgrind-action@v1.2.0
@@ -76,6 +83,10 @@ jobs:
           uses: Ximaz/valgrind-action@v1.2.0
           with:
             binary_path: "./test_motor_model_api"
+        - name: valgrind filter
+          uses: Ximaz/valgrind-action@v1.2.0
+          with:
+            binary_path: "./unittest_filter"
       - name: Summarize tests results
         uses: test-summary/action@v2.6
         with:

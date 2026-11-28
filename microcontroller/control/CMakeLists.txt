@@ -4,7 +4,7 @@
 # The pico sdk doesn't have file IO, not even pipes, so tests need 
 #   to be built with the host machine's os functions. That means this directory can
 #   only use minimal dependencies.
-# Currently uses only stdlib: array, stdint, vector. API User uses string and unordered_map.
+# Currently uses only stdlib.
 
 add_library(MotorControl)
 target_sources(MotorControl
@@ -27,7 +27,3 @@ target_sources(MotorModel
 add_library(MotorModelMicrocontroller)
 target_sources(MotorModelMicrocontroller PRIVATE "motor_model_API_target.cpp")
 target_link_libraries(MotorModelMicrocontroller PUBLIC MotorModel)
-
-add_library(MotorModelUser)
-target_sources(MotorModelUser PRIVATE "motor_model_API_user.cpp")
-target_link_libraries(MotorModelUser MotorModel)

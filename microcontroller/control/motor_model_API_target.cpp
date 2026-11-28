@@ -2,11 +2,19 @@
 #include "motor_model_API.hpp"
 
 namespace MotorModelAPI {
-void handle_request(const Request &msg, MotorModel &model, Response &response) {
-    LinearGroup *group = nullptr;
-    response = {.status = response.UNSET, .term_idx = msg.term_idx};  // default
+Response::STATUS execute_request(LinearGroup *group, const Request &request);
 
-    switch (msg.group)
+
+static_assert (NUM_BASE_FUNCTIONS    == sizeof(BASE_FUNCTIONS)    / sizeof(BASE_FUNCTIONS[0]));
+static_assert (NUM_NONBASE_FUNCTIONS == sizeof(NONBASE_FUNCTIONS) / sizeof(NONBASE_FUNCTIONS[0]));
+
+
+void handle_request(const Request &request, MotorModel &model, Response &response) {
+    LinearGroup *group = nullptr;
+    response = {.status = response.UNSET, .group = request.group, .command = request.command,
+                .term_idx = request.term_idx, .fcn_idx = request.fcn_idx, .fcn_field = request.fcn_field};
+
+    switch (request.group)
     {
     case GROUP::STATE:
         group = &model.state_terms;
@@ -19,52 +27,54 @@ void handle_request(const Request &msg, MotorModel &model, Response &response) {
         return;
     }
 
-    if (group->terms.size() <= msg.term_idx && msg.command > COMMAND::CREATE_TERM) {
-        response.status = response.BAD_TERM_IDX;
-        return;
-    }
+    response.status = execute_request(group, request);
+}
 
-    switch (msg.command)
+Response::STATUS execute_request(LinearGroup *group, const Request &request) {
+    switch (request.command)
     {
     case COMMAND::HELLO:
-        response.status = response.HELLO;
-        return;
-    case COMMAND::CREATE_TERM:
-        if (msg.fcn_field >= NUM_BASE_FUNCTIONS) {
-            response = {.status = response.BAD_FCN_FIELD, .term_idx = 0};
-            return;
-        }
-        group->create_term(BASE_FUNCTIONS[msg.fcn_field](), msg.value);
-        response.term_idx = group->terms.size();
-        break;
-    case COMMAND::DELETE_TERM:
-        group->delete_term(msg.term_idx);
-        response.term_idx = group->terms.size();
-        break;
-    case COMMAND::ADD_FCN:
-        if (msg.fcn_field >= NUM_NONBASE_FUNCTIONS) {
-            response = {.status = response.BAD_FCN_FIELD, .term_idx = 0};
-            return;
-        }
-        group->add_function(msg.term_idx, NONBASE_FUNCTIONS[msg.fcn_field]());
-        break;
-    case COMMAND::SET_PARAM:
-        {
-            uint8_t fcn_idx = ((msg.fcn_field & 0xF0) >> 4);
-            uint8_t param_idx = (msg.fcn_field & 0xF);
-            if (!group->set_param(msg.term_idx, fcn_idx, param_idx, msg.value)) {
-                response.status = response.BAD_PARAM;
-                return;
+        return Response::HELLO;
+    case COMMAND::SET_FCN: {
+            if (request.term_idx > group->terms.size()) {
+                return Response::BAD_TERM_IDX;
+            }
+            ModelFcn *new_fcn;
+            unsigned new_fcn_id = request.fcn_field;  // don't confuse this with fcn_idx
+            if (request.fcn_idx == 0) {  // Base Fcn
+                if (new_fcn_id >= NUM_BASE_FUNCTIONS) {
+                    return Response::BAD_FCN_ID;
+                }
+                new_fcn = BASE_FUNCTIONS[new_fcn_id]();
+            } else {  // non-base
+                if (new_fcn_id >= NUM_NONBASE_FUNCTIONS) {
+                    return Response::BAD_FCN_ID;
+                }
+                new_fcn = NONBASE_FUNCTIONS[new_fcn_id]();
+            }
+            if (!group->set_function(request.term_idx, request.fcn_idx, new_fcn)) {
+                return Response::BAD_FCN_IDX;
             }
         }
         break;
+    case COMMAND::SET_PARAM:
+        if (request.term_idx >= group->terms.size()) {
+            return Response::BAD_TERM_IDX;
+        }
+        // Here, request.fcn_field is param_idx. Don't confuse this with fcn_idx or fcn_ID.
+        if (!group->set_param(request.term_idx, request.fcn_idx, request.fcn_field, request.value)) {
+            return Response::BAD_PARAM_IDX;
+        }
+        break;
     case COMMAND::SET_WEIGHT:
-        group->set_weight(msg.term_idx, msg.value);
+        if (request.term_idx >= group->terms.size()) {
+            return Response::BAD_TERM_IDX;
+        }
+        group->set_weight(request.term_idx, request.value);
         break;
     default:
-        response = {.status = response.BAD_REQUEST, .term_idx = 0};
-        return;
+        return Response::BAD_REQUEST;
     }
-    response.status = response.SUCCESS;
+    return Response::SUCCESS;
 }
 }

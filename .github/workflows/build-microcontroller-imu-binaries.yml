@@ -1,0 +1,69 @@
+name: Build Microcontroller IMU Binaries
+
+on:
+  push:
+    paths:
+      - .github/workflows/build-microcontroller-imu-binaries.yml
+      - microcontroller/main/IMU_main.cpp
+      - microcontroller/sensors/IMU**
+      - microcontroller/sensors/CMakeLists.txt
+      - microcontroller/communication/**
+      - microcontroller/CMakeLists.txt
+      - communication/communication.*
+      - communication/messages.h
+
+jobs:
+  build_IMU_lib_from_pico-examples:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: lukstep/raspberry-pi-pico-sdk:latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: NirajPatelRobots/pico-examples
+      - run: mkdir build
+      - name: Configure cmake
+        run: cmake ..
+        working-directory: ./build
+      - name: make mpu6050_i2c
+        run: make -j$(nproc)
+        working-directory: ./build/i2c/mpu6050_i2c/
+      - name: upload mpu6050_i2c_lib
+        uses: actions/upload-artifact@v6
+        with:
+          name: mpu6050_i2c_lib
+          path: |
+            ./build/i2c/mpu6050_i2c/libMPU6050_i2c_pico*_lib.a
+            ./i2c/mpu6050_i2c/*.h*
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+
+  build_with_IMU:
+    runs-on: ubuntu-24.04-arm
+    needs: build_IMU_lib_from_pico-examples
+    container:
+      image: lukstep/raspberry-pi-pico-sdk:latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            microcontroller
+            communication
+            sensors
+      - name: download mpu6050_i2c_lib
+        uses: actions/download-artifact@v8
+        with:
+          name: mpu6050_i2c_lib
+          path: imu
+      - run: mkdir microcontroller/build
+      - name: Configure cmake
+        run: cmake ..
+        working-directory: ./microcontroller/build
+        env:
+          MPU6050_SRC_DIR:   ${{ github.workspace }}/imu/i2c/mpu6050_i2c/
+          MPU6050_BUILD_DIR: ${{ github.workspace }}/imu/build/i2c/mpu6050_i2c/
+      - name: make IMU_main -j$(nproc)
+        run: make IMU_main -j$(nproc)
+        working-directory: ./microcontroller/build

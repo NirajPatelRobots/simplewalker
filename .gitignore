@@ -118,6 +118,7 @@ venv.bak/
 .spyproject
 .idea/
 .vscode/*
+microcontroller/.vscode/*
 
 # Rope project settings
 .ropeproject
